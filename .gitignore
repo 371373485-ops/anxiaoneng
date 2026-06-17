@@ -1,0 +1,60 @@
+# Local agent/workspace state
+.autoclaw-attachments/
+.openclaw/
+.openclaw-attachments/
+.opencode/
+config/
+memory/
+drafts/
+evolution-drafts/
+dashboard-builder-skill/
+okr-pilot/
+USER.md
+SOUL.md
+TOOLS.md
+HEARTBEAT.md
+IDENTITY.md
+AGENTS.md
+memory.md
+MEMORY.md
+
+# Python/runtime cache
+__pycache__/
+*.py[cod]
+
+# Logs and local backups
+*.log
+server_stdout.log
+server_stderr.log
+_server.log
+_data_backup.json
+*.bak
+
+# Packaged/generated deploy artifacts
+*.zip
+deploy/
+gh-pages/
+
+# Local diagnostic scratch files
+_diag.html
+_test.html
+_find_*.js
+_refix.js
+_verify.js
+
+# Generated reports and filled forms
+report_*.html
+月度经营报告-示例.*
+月度经营月报-示例.*
+经营分析报告-*.html
+经营分析报告-*.pdf
+附件*-已填写.docx
+安效能数据看板-对话证明.md
+安效能数据看板-开发对话精选.md
+安效能看板测试报告_*.md
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
