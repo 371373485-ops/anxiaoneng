@@ -10,6 +10,7 @@ function _fi(k){return (App.FIELDS||[]).find(function(x){return x.k===k;})||{};}
 function _fv(v,u){return typeof fmtVal==='function'?fmtVal(v,u):(v!=null?v.toFixed(2):'-');}
 function _fdelta(v,u){if(u==='%')return (v*100).toFixed(0)+'pp';return _fv(v,u);}
 function _pct(v){return v!=null?(v*100).toFixed(0)+'%':'-';}
+function _eh(v){return typeof escapeHtml==='function'?escapeHtml(v):String(v==null?'':v);}
 
 var KM={
   premRate:   {k:'时间进度计划达成率',label:'保费达成率',u:'%',rd:'desc',th:{good:0.90,warn:0.70,bad:0.50}},
@@ -467,8 +468,8 @@ function _report(bn,alerts){
   h+='<div style="margin-bottom:10px;padding:10px 14px;background:linear-gradient(135deg,'+
     (lv.level.indexOf('高风险')>=0?'#fef2f2,#fee2e2':'#f8fafc,#e2e8f0')+
     ');border-radius:8px;border-left:5px solid '+lv.color+'">';
-  h+='<div style="font-size:18px;font-weight:800;margin-bottom:3px">'+lv.level+'</div>';
-  h+='<div style="font-size:12px;color:var(--muted)">'+lv.desc+'</div></div>';
+  h+='<div style="font-size:18px;font-weight:800;margin-bottom:3px">'+_eh(lv.level)+'</div>';
+  h+='<div style="font-size:12px;color:var(--muted)">'+_eh(lv.desc)+'</div></div>';
 
   // 关键指标表
   h+='<div style="margin-bottom:3px;font-weight:700">📊 关键指标</div>';
@@ -493,11 +494,11 @@ function _report(bn,alerts){
 
     var rkStr='-';if(s.rank)rkStr='第'+s.rank.rank+'/'+s.rank.total+'名';
     var peerStr=s.peer!=null?_fv(s.peer,s.u):'-';
-    h+='<tr><td style="padding:4px 7px;border:1px solid #e5e7eb;text-align:left">'+m.label+'</td>'+
-      '<td style="padding:4px 7px;text-align:right;border:1px solid #e5e7eb;font-weight:700;color:'+valColor+'">'+_fv(s.cur,s.u)+'</td>'+
-      '<td style="padding:4px 7px;text-align:right;border:1px solid #e5e7eb;font-size:11px;color:var(--muted)">'+peerStr+'</td>'+
-      '<td style="padding:4px 7px;text-align:right;border:1px solid #e5e7eb">'+rkStr+'</td>'+
-      '<td style="padding:4px 7px;text-align:center;border:1px solid #e5e7eb;font-size:11px">'+_yoyStr(s.delta,s.u)+'</td></tr>';
+    h+='<tr><td style="padding:4px 7px;border:1px solid #e5e7eb;text-align:left">'+_eh(m.label)+'</td>'+
+      '<td style="padding:4px 7px;text-align:right;border:1px solid #e5e7eb;font-weight:700;color:'+valColor+'">'+_eh(_fv(s.cur,s.u))+'</td>'+
+      '<td style="padding:4px 7px;text-align:right;border:1px solid #e5e7eb;font-size:11px;color:var(--muted)">'+_eh(peerStr)+'</td>'+
+      '<td style="padding:4px 7px;text-align:right;border:1px solid #e5e7eb">'+_eh(rkStr)+'</td>'+
+      '<td style="padding:4px 7px;text-align:center;border:1px solid #e5e7eb;font-size:11px">'+_eh(_yoyStr(s.delta,s.u))+'</td></tr>';
   });
   h+='</table>';
 
@@ -506,7 +507,7 @@ function _report(bn,alerts){
     h+='<div style="margin-bottom:3px;font-weight:700">🏷️ 经营模式识别</div>';
     pat.forEach(function(p){
       h+='<div style="margin-bottom:4px;padding:6px 10px;background:#fef7ed;border-left:3px solid #f59e0b;border-radius:4px;font-size:12px">';
-      h+='<b>'+p.name+'</b>：'+p.desc+'<br><span style="color:#92400e">▶ '+p.action+'</span></div>';
+      h+='<b>'+_eh(p.name)+'</b>：'+_eh(p.desc)+'<br><span style="color:#92400e">▶ '+_eh(p.action)+'</span></div>';
     });
   }
 
@@ -520,21 +521,21 @@ function _report(bn,alerts){
       h+='<div style="margin-bottom:4px;font-size:11px;color:var(--muted)">▸ 触发预警</div>';
       alertRisks.forEach(function(r){
         var c=r.s==='error'?'#dc2626':'#d97706';
-        h+='<div style="margin-bottom:2px;margin-left:4px;font-size:12px;color:'+c+'">● '+r.t+'</div>';
+        h+='<div style="margin-bottom:2px;margin-left:4px;font-size:12px;color:'+c+'">● '+_eh(r.t)+'</div>';
       });
     }
     // 第二层：劣于分公司整体
     if(benchRisks.length){
       h+='<div style="margin-top:4px;margin-bottom:2px;font-size:11px;color:var(--muted)">▸ 劣于分公司整体</div>';
       benchRisks.forEach(function(r){
-        h+='<div style="margin-bottom:2px;margin-left:4px;font-size:12px;color:#d97706">● '+r.t+'</div>';
+        h+='<div style="margin-bottom:2px;margin-left:4px;font-size:12px;color:#d97706">● '+_eh(r.t)+'</div>';
       });
     }
     // 第三层：排名考核
     if(rankRisks.length){
       h+='<div style="margin-top:4px;margin-bottom:2px;font-size:11px;color:var(--muted)">▸ 排名靠后（后25%）</div>';
       rankRisks.forEach(function(r){
-        h+='<div style="margin-bottom:2px;margin-left:4px;font-size:12px;color:#2563eb">● '+r.t+'</div>';
+        h+='<div style="margin-bottom:2px;margin-left:4px;font-size:12px;color:#2563eb">● '+_eh(r.t)+'</div>';
       });
     }
     h+='<div style="margin-bottom:10px"></div>';
@@ -543,13 +544,13 @@ function _report(bn,alerts){
   // 可能原因
   h+='<div style="margin-bottom:3px;font-weight:700">🔍 可能原因</div>';
   h+='<ol style="margin:0 0 8px;padding-left:18px">';
-  causes.forEach(function(c){h+='<li style="margin-bottom:2px;font-size:12px">'+c+'</li>';});
+  causes.forEach(function(c){h+='<li style="margin-bottom:2px;font-size:12px">'+_eh(c)+'</li>';});
   h+='</ol>';
 
   // 需要核查
   h+='<div style="margin-bottom:3px;font-weight:700">📝 需要进一步核查的数据</div>';
   h+='<ol style="margin:0 0 8px;padding-left:18px">';
-  inv.forEach(function(c){h+='<li style="margin-bottom:2px;font-size:12px">'+c+'</li>';});
+  inv.forEach(function(c){h+='<li style="margin-bottom:2px;font-size:12px">'+_eh(c)+'</li>';});
   h+='</ol>';
 
   // 管理建议（分级）
@@ -560,9 +561,9 @@ function _report(bn,alerts){
     terms[s.term].push(s.text);
   });
   Object.keys(terms).forEach(function(term){
-    h+='<div style="margin-bottom:4px"><span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;background:#e5e7eb;margin-right:6px">'+term+'</span></div>';
+    h+='<div style="margin-bottom:4px"><span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;background:#e5e7eb;margin-right:6px">'+_eh(term)+'</span></div>';
     h+='<ol style="margin:0 0 6px;padding-left:20px">';
-    terms[term].forEach(function(t){h+='<li style="margin-bottom:2px;font-size:12px">'+t+'</li>';});
+    terms[term].forEach(function(t){h+='<li style="margin-bottom:2px;font-size:12px">'+_eh(t)+'</li>';});
     h+='</ol>';
   });
 
@@ -638,7 +639,7 @@ window.renderAITab = function(){
   reps.forEach(function(rep){
     h+='<details open style="margin-bottom:8px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden">';
     h+='<summary style="padding:10px 14px;cursor:pointer;background:#fafafa;font-weight:800;font-size:16px;user-select:none">'+
-      rep.sum+'</summary><div style="padding:0 12px 6px">'+rep.body+'</div></details>';
+      _eh(rep.sum)+'</summary><div style="padding:0 12px 6px">'+rep.body+'</div></details>';
   });
 
   // 全国/责任区
@@ -647,8 +648,8 @@ window.renderAITab = function(){
     h+='<div style="font-weight:700;font-size:13px;margin-bottom:8px">📊 全国/责任区级告警</div>';
     nonBranchAlerts.forEach(function(r){
       var u=_fi(r.field).u||'',sev=r.severity==='error'?'🔴':(r.severity==='warn'?'🟠':'🔵');
-      h+='<div style="padding:2px 0;font-size:11px">'+sev+' <b>'+(r.regionName||'全国')+'</b> · '+
-        (r.fieldLabel||r.field)+'：'+_fv(r.currentValue,u)+'（阈值 '+_fv(r.threshold,u)+'）</div>';
+      h+='<div style="padding:2px 0;font-size:11px">'+_eh(sev)+' <b>'+_eh(r.regionName||'全国')+'</b> · '+
+        _eh(r.fieldLabel||r.field)+'：'+_eh(_fv(r.currentValue,u))+'（阈值 '+_eh(_fv(r.threshold,u))+'）</div>';
     });
     h+='</div>';
   }

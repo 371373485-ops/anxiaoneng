@@ -1,5 +1,26 @@
 App.TP_NOTE="* TP = 当前月份/12（根据数据月份动态计算），用于将年度计划值折算为截至当前月份的累计目标值";
 
+function escapeHtml(value){
+  return String(value == null ? '' : value)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+window.escapeHtml = escapeHtml;
+
+function escapeJsString(value){
+  return escapeHtml(String(value == null ? '' : value)
+    .replace(/\\/g,'\\\\')
+    .replace(/'/g,"\\'")
+    .replace(/\r/g,'\\r')
+    .replace(/\n/g,'\\n')
+    .replace(/\u2028/g,'\\u2028')
+    .replace(/\u2029/g,'\\u2029'));
+}
+window.escapeJsString = escapeJsString;
+
 function renderIndicatorGuide(){
   var gh=`<div class="section"><div class="sec-header" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')"><span class="arrow">▶</span><h3>📋 指标说明</h3><span class="badge">68项</span></div><div class="sec-body open">`;
   gh+='<p style="color:#666;font-size:12px;margin:8px 0">'+App.TP_NOTE+'<br><span style=color:#888>本模块与看板指标同步更新。若发现描述与实际计算不一致，请反馈核实。</span></p>';
@@ -56,8 +77,8 @@ function renderOverview(){
     var nat=App.DATA.national;
     var cd=App.isCompareMode?getCompareData('national'):null;
     var kpiLabels=['保费实际合计','保费达成率','经营利润','利润达成率','综合成本率','整体产能(实际)','整体人均利润(实际)','后台产能(实际)','整体保费率(实际)','后台保费率(实际)','整体实际','后台实际'];
-    document.getElementById('overview-kpi').innerHTML=App.FIELDS.filter(f=>kpiLabels.includes(f.l)).map(f=>{var v2=cd?Number(cd[f.k])||0:0;var delta=cd?(nat[f.k]||0)-v2:0;var deltaHTML='';if(cd){var dc=diffColor(f.rd,f.u,delta);var ds=(delta>=0?'+':'')+fmtVal(delta,f.u);deltaHTML='<div class="kpi-delta" style="color:'+dc+'">vs '+formatMonth(App.compareMonth)+': '+ds+'</div>';}let v=nat[f.k]||0,cls=f.u==='万元'?(v>=0?'c-green':'c-red'):(f.u==='%'?((f.rd==='desc'&&v>=1)||(f.rd==='asc'&&v<=0.98)?'c-green':'c-red'):'c-blue');return'<div class="kpi-card '+cls+'" data-field="'+f.k.replace(/"/g,'&quot;')+'"><div class="kl">'+f.l+'</div><div class="kv">'+fmtVal(v,f.u)+'</div>'+deltaHTML+'</div>';}).join('');
-    let sh='';['保费','效益','效能','人员'].forEach(g=>{var gf=App.FIELDS.filter(f=>f.g===g);sh+='<div class="section"><div class="sec-header" onclick="this.classList.toggle(\'open\');this.nextElementSibling.classList.toggle(\'open\')"><span class="arrow">▶</span><h3>'+g+'明细</h3><span class="badge">'+gf.length+'项</span></div><div class="sec-body"><div class="tbl-wrap"><table><thead><tr><th>指标</th><th class="num">数值</th><th>单位</th><th>来源</th></tr></thead><tbody>';gf.forEach(f=>{sh+='<tr><td>'+f.l+'</td><td class="num"><b>'+fmtVal(nat[f.k]||0,f.u)+'</b></td><td>'+f.u+'</td><td class="computed">'+(f.m?'手动填写':'自动计算')+'</td></tr>';});sh+='</tbody></table></div></div></div>';});document.getElementById('overview-sections').innerHTML=sh;
+    document.getElementById('overview-kpi').innerHTML=App.FIELDS.filter(f=>kpiLabels.includes(f.l)).map(f=>{var v2=cd?Number(cd[f.k])||0:0;var delta=cd?(nat[f.k]||0)-v2:0;var deltaHTML='';if(cd){var dc=diffColor(f.rd,f.u,delta);var ds=(delta>=0?'+':'')+fmtVal(delta,f.u);deltaHTML='<div class="kpi-delta" style="color:'+dc+'">vs '+escapeHtml(formatMonth(App.compareMonth))+': '+escapeHtml(ds)+'</div>';}let v=nat[f.k]||0,cls=f.u==='万元'?(v>=0?'c-green':'c-red'):(f.u==='%'?((f.rd==='desc'&&v>=1)||(f.rd==='asc'&&v<=0.98)?'c-green':'c-red'):'c-blue');return'<div class="kpi-card '+cls+'" data-field="'+escapeHtml(f.k)+'"><div class="kl">'+escapeHtml(f.l)+'</div><div class="kv">'+escapeHtml(fmtVal(v,f.u))+'</div>'+deltaHTML+'</div>';}).join('');
+    let sh='';['保费','效益','效能','人员'].forEach(g=>{var gf=App.FIELDS.filter(f=>f.g===g);sh+='<div class="section"><div class="sec-header" onclick="this.classList.toggle(\'open\');this.nextElementSibling.classList.toggle(\'open\')"><span class="arrow">▶</span><h3>'+escapeHtml(g)+'明细</h3><span class="badge">'+gf.length+'项</span></div><div class="sec-body"><div class="tbl-wrap"><table><thead><tr><th>指标</th><th class="num">数值</th><th>单位</th><th>来源</th></tr></thead><tbody>';gf.forEach(f=>{sh+='<tr><td>'+escapeHtml(f.l)+'</td><td class="num"><b>'+escapeHtml(fmtVal(nat[f.k]||0,f.u))+'</b></td><td>'+escapeHtml(f.u)+'</td><td class="computed">'+(f.m?'手动填写':'自动计算')+'</td></tr>';});sh+='</tbody></table></div></div></div>';});document.getElementById('overview-sections').innerHTML=sh;
     if(App.isCompareMode){injectOverviewCompare();}
     renderAlertDots();
 }
@@ -65,14 +86,14 @@ function renderOverview(){
 function renderRegions(){
     // Top KPI cards — same fields as core table (KEY_SET)
     var kfs2=App.FIELDS.filter(f=>App.KEY_SET.has(f.k));
-    let kh='';App.REGIONS.forEach(r=>{var d=App.DATA.regions[r]||{};kh+='<div class="region-card"><h4>'+r+'</h4>';kfs2.forEach(f=>{kh+='<div class="metric" data-field="'+f.k.replace(/"/g,'&quot;')+'"><span>'+f.l+'</span><span class="mv">'+fmtVal(d[f.k]||0,f.u)+'</span></div>';});kh+='</div>';});document.getElementById('regions-kpi').innerHTML=kh;
+    let kh='';App.REGIONS.forEach(r=>{var d=App.DATA.regions[r]||{};kh+='<div class="region-card"><h4>'+escapeHtml(r)+'</h4>';kfs2.forEach(f=>{kh+='<div class="metric" data-field="'+escapeHtml(f.k)+'"><span>'+escapeHtml(f.l)+'</span><span class="mv">'+escapeHtml(fmtVal(d[f.k]||0,f.u))+'</span></div>';});kh+='</div>';});document.getElementById('regions-kpi').innerHTML=kh;
 
     // Key metrics table (折叠隐藏，对比模式下自动展开)
     var kfs=App.FIELDS.filter(f=>App.KEY_SET.has(f.k));
     let kt='<div class="section collapsible"><div class="sec-header'+(App.isCompareMode?' open':'')+'" onclick="this.classList.toggle(\'open\');this.nextElementSibling.classList.toggle(\'open\')"><span class="arrow">▶</span><h3>📊 核心指标对比</h3></div><div class="sec-body'+(App.isCompareMode?' open':'')+'">';
     kt+='<div class="tbl-wrap"><table><thead><tr><th class="s0">核心指标</th><th class="s1">单位</th>';
-    App.REGIONS.forEach(r=>kt+='<th class="num" data-rname="'+r.replace(/"/g,'&quot;')+'">'+r+'</th>');kt+='</tr></thead><tbody>';
-    kfs.forEach(f=>{kt+='<tr><td class="s0"><b>'+f.l+'</b></td><td class="s1 computed">'+f.u+'</td>';App.REGIONS.forEach(r=>{let v=(App.DATA.regions[r]||{})[f.k]||0;kt+='<td class="num '+getColor(f.u,f.rd,v)+'" data-field="'+f.k.replace(/"/g,'&quot;')+'">'+fmtVal(v,f.u)+'</td>';});kt+='</tr>';});
+    App.REGIONS.forEach(r=>kt+='<th class="num" data-rname="'+escapeHtml(r)+'">'+escapeHtml(r)+'</th>');kt+='</tr></thead><tbody>';
+    kfs.forEach(f=>{kt+='<tr><td class="s0"><b>'+escapeHtml(f.l)+'</b></td><td class="s1 computed">'+escapeHtml(f.u)+'</td>';App.REGIONS.forEach(r=>{let v=(App.DATA.regions[r]||{})[f.k]||0;kt+='<td class="num '+getColor(f.u,f.rd,v)+'" data-field="'+escapeHtml(f.k)+'">'+escapeHtml(fmtVal(v,f.u))+'</td>';});kt+='</tr>';});
     kt+='</tbody></table></div></div></div>';
     document.getElementById('regions-key-table').innerHTML=kt;
     requestAnimationFrame(function(){requestAnimationFrame(function(){var t=document.querySelector('#regions-key-table table');if(t)fixStickyColumns(t);});});
@@ -82,8 +103,8 @@ function renderRegions(){
     var cmpClass=App.isCompareMode?' compare-mode':'';
     ['保费','效益','效能','人员'].forEach(g=>{
         var gf=App.FIELDS.filter(f=>f.g===g),cg=App.CHART_GROUPS[g]||[];
-        chartsHtml+='<div class="section"><div class="sec-header open" onclick="this.classList.toggle(\'open\');this.nextElementSibling.classList.toggle(\'open\');setTimeout(renderRegionsCharts,150)"><span class="arrow">▶</span><h3>'+g+'对比</h3><span class="badge">'+cg.length+'张图</span></div><div class="sec-body open"><div class="chart-grid'+cmpClass+'">';
-        cg.forEach((c,i)=>chartsHtml+='<div class="chart-card"><h4>'+c.title+'</h4><div class="chart-wrap"><canvas id="rc-'+g+'-'+i+'"></canvas></div></div>');
+        chartsHtml+='<div class="section"><div class="sec-header open" onclick="this.classList.toggle(\'open\');this.nextElementSibling.classList.toggle(\'open\');setTimeout(renderRegionsCharts,150)"><span class="arrow">▶</span><h3>'+escapeHtml(g)+'对比</h3><span class="badge">'+cg.length+'张图</span></div><div class="sec-body open"><div class="chart-grid'+cmpClass+'">';
+        cg.forEach((c,i)=>chartsHtml+='<div class="chart-card"><h4>'+escapeHtml(c.title)+'</h4><div class="chart-wrap"><canvas id="rc-'+escapeHtml(g)+'-'+i+'"></canvas></div></div>');
         chartsHtml+='</div></div></div>';
     });
     document.getElementById('regions-charts').innerHTML=chartsHtml;
@@ -94,8 +115,8 @@ function renderRegions(){
     ['保费','效益','效能','人员'].forEach(g=>{
         var gf=App.FIELDS.filter(f=>f.g===g);
         dt+='<div class="tbl-wrap"><table><thead><tr><th>'+g+'</th>';
-        App.REGIONS.forEach(r=>{dt+='<th class="num cmp-region-col" data-region="'+r+'">'+r+'</th>';});dt+='</tr></thead><tbody>';
-        gf.forEach(f=>{dt+='<tr><td>'+f.l+'</td>';App.REGIONS.forEach(r=>{let v=(App.DATA.regions[r]||{})[f.k]||0;dt+='<td class="num '+getColor(f.u,f.rd,v)+'" data-region="'+r+'" data-field="'+f.k+'">'+fmtVal(v,f.u)+'</td>';});dt+='</tr>';});
+        App.REGIONS.forEach(r=>{dt+='<th class="num cmp-region-col" data-region="'+escapeHtml(r)+'">'+escapeHtml(r)+'</th>';});dt+='</tr></thead><tbody>';
+        gf.forEach(f=>{dt+='<tr><td>'+escapeHtml(f.l)+'</td>';App.REGIONS.forEach(r=>{let v=(App.DATA.regions[r]||{})[f.k]||0;dt+='<td class="num '+getColor(f.u,f.rd,v)+'" data-region="'+escapeHtml(r)+'" data-field="'+escapeHtml(f.k)+'">'+escapeHtml(fmtVal(v,f.u))+'</td>';});dt+='</tr>';});
         dt+='</tbody></table></div>';
     });
     dt+='</div>';
@@ -137,11 +158,12 @@ function renderBranches(){
   df.forEach(function(f,fi){
     var dirIcon='';
     if(sortCol===f.k)dirIcon=sortDir==='asc'?' ▲':' ▼';
-    h+='<th class="num sortable" onclick="sortBranches(\''+f.k.replace(/'/g,'\\\'')+'\')" title="点击排序" data-fk="'+f.k+'">'+f.l+dirIcon+'</th>';
+    h+='<th class="num sortable" onclick="sortBranches(\''+escapeJsString(f.k)+'\')" title="点击排序" data-fk="'+escapeHtml(f.k)+'">'+escapeHtml(f.l)+escapeHtml(dirIcon)+'</th>';
   });
   h+='</tr></thead><tbody>';
   br.forEach(function(b,bi){
-    h+='<tr class="clickable-row" onclick="showBranchDetail(\''+b.n.replace(/\\/g,'\\\\').replace(/'/g,'\\\'')+'\',\''+b.r.replace(/\\/g,'\\\\').replace(/'/g,'\\\'')+'\')"><td class="s0" style="color:var(--text2);font-size:11px">'+(bi+1)+'</td><td class="s1">'+b.r+'</td><td class="s2" data-fname="'+b.n.replace(/"/g,'&quot;')+'"><b>'+b.n+'</b></td>';
+    var bn=escapeHtml(b.n),brn=escapeHtml(b.r),jsBn=escapeJsString(b.n),jsBr=escapeJsString(b.r);
+    h+='<tr class="clickable-row" onclick="showBranchDetail(\''+jsBn+'\',\''+jsBr+'\')"><td class="s0" style="color:var(--text2);font-size:11px">'+(bi+1)+'</td><td class="s1">'+brn+'</td><td class="s2" data-fname="'+bn+'"><b>'+bn+'</b></td>';
     df.forEach(function(f,fi){
       var v=Number((b.d||{})[f.k])||0;
       h+='<td class="num '+getColor(f.u,f.rd,v)+'" data-field="'+f.k.replace(/"/g,'&quot;')+'" title="'+f.l.replace(/"/g,'&quot;')+'">'+fmtVal(v,f.u)+'</td>';
@@ -204,11 +226,12 @@ function renderAllBranches(){
   df.forEach(function(f,fi){
     var dirIcon='';
     if(sortCol===f.k)dirIcon=sortDir==='asc'?' ▲':' ▼';
-    h+='<th class="num sortable" onclick="sortBranches(\''+f.k.replace(/'/g,'\\\'')+'\')" title="点击排序" data-fk="'+f.k+'">'+f.l+dirIcon+'</th>';
+    h+='<th class="num sortable" onclick="sortBranches(\''+escapeJsString(f.k)+'\')" title="点击排序" data-fk="'+escapeHtml(f.k)+'">'+escapeHtml(f.l)+escapeHtml(dirIcon)+'</th>';
   });
   h+='</tr></thead><tbody>';
   br.forEach(function(b,bi){
-    h+='<tr class="clickable-row" onclick="showBranchDetail(\''+b.n.replace(/\\/g,'\\\\').replace(/'/g,'\\\'')+'\',\''+b.r.replace(/\\/g,'\\\\').replace(/'/g,'\\\'')+'\')"><td class="s0" style="color:var(--text2);font-size:11px">'+(bi+1)+'</td><td class="s1">'+b.r+'</td><td class="s2" data-fname="'+b.n.replace(/"/g,'&quot;')+'"><b>'+b.n+'</b></td>';
+    var bn=escapeHtml(b.n),brn=escapeHtml(b.r),jsBn=escapeJsString(b.n),jsBr=escapeJsString(b.r);
+    h+='<tr class="clickable-row" onclick="showBranchDetail(\''+jsBn+'\',\''+jsBr+'\')"><td class="s0" style="color:var(--text2);font-size:11px">'+(bi+1)+'</td><td class="s1">'+brn+'</td><td class="s2" data-fname="'+bn+'"><b>'+bn+'</b></td>';
     df.forEach(function(f,fi){
       var v=Number((b.d||{})[f.k])||0;
       h+='<td class="num '+getColor(f.u,f.rd,v)+'" data-field="'+f.k.replace(/"/g,'&quot;')+'" title="'+f.l.replace(/"/g,'&quot;')+'">'+fmtVal(v,f.u)+'</td>';
@@ -270,8 +293,9 @@ function renderBranchDetail(name,region){
     if(u==='万元/人')return'<span class="'+cls+'">'+arrow+sign+d.toFixed(2)+'万元/人</span>';
     return'<span class="'+cls+'">'+arrow+sign+d.toFixed(2)+'</span>';
   }  var html='';
-  html+='<div class="breadcrumb"><a onclick="hideBranchDetail()">各分公司明细</a> &gt; '+name+'</div>';
-  html+='<div class="branch-header"><h2>'+name+'</h2><span style="color:var(--text2);font-size:13px">'+region+'</span><span style="color:var(--text2);font-size:11px">共'+total+'家分公司</span></div>';
+  var safeName=escapeHtml(name),safeRegion=escapeHtml(region);
+  html+='<div class="breadcrumb"><a onclick="hideBranchDetail()">各分公司明细</a> &gt; '+safeName+'</div>';
+  html+='<div class="branch-header"><h2>'+safeName+'</h2><span style="color:var(--text2);font-size:13px">'+safeRegion+'</span><span style="color:var(--text2);font-size:11px">共'+total+'家分公司</span></div>';
 
   // KPI cards: key metrics with vs-average and rank
   var kpiKeys=[
@@ -294,7 +318,7 @@ function renderBranchDetail(name,region){
     if(App.isCompareMode){var cmpBr=getCompareData('branches')||[];var cb=cmpBr.find(function(x){return x.n===name;});if(cb&&cb.d)av=Number(cb.d[kp.k])||0;}
     var rk=ranks[kp.k]||'-';
     html+='<div class="kpi-card">';
-    html+='<h4>'+kp.l+'</h4>';
+    html+='<h4>'+escapeHtml(kp.l)+'</h4>';
     html+='<div class="val">'+fmtVal(v,f.u)+'</div>';
     html+='<div class="rank">排名 <span class="badge-rank '+rankBadge(rk,total)+'">'+rk+'/'+total+'</span></div>';
     html+='<div class="avg">'+(App.isCompareMode?formatMonth(App.compareMonth):(App.NAT_CMP.has(f.k)?'分公司整体':'整体均值'))+' '+fmtVal(av,f.u)+'</div>';
@@ -313,17 +337,17 @@ function renderBranchDetail(name,region){
     var rest=gf.filter(function(f){return ck.indexOf(f.k)<0;});
     
     // Chart section for core indicators
-    html+='<div class="section"><div class="sec-header open" onclick="this.classList.toggle(\'open\');this.nextElementSibling.classList.toggle(\'open\');var cv=document.getElementById(\'br-chart-'+g+'\');if(cv&&this.classList.contains(\'open\')){renderBranchChart(\''+g+'\',\''+name+'\');}"><span class="arrow">▶</span><h3>'+g+'类指标 ('+gf.length+'项)</h3></div><div class="sec-body open">';
+    html+='<div class="section"><div class="sec-header open" onclick="this.classList.toggle(\'open\');this.nextElementSibling.classList.toggle(\'open\');var cv=document.getElementById(\'br-chart-'+escapeJsString(g)+'\');if(cv&&this.classList.contains(\'open\')){renderBranchChart(\''+escapeJsString(g)+'\',\''+escapeJsString(name)+'\');}"><span class="arrow">▶</span><h3>'+escapeHtml(g)+'类指标 ('+gf.length+'项)</h3></div><div class="sec-body open">';
     
     // Bar chart: branch vs average for core indicators (only if same unit, else just table)
     html+='<div id="br-charts-'+g+'" class="branch-charts"></div>';
     
     // Core indicators table
     var cmpLabel=App.isCompareMode?'vs '+formatMonth(App.compareMonth):'整体均值';
-    html+='<div class="tbl-wrap"><table><thead><tr><th>指标</th><th>单位</th><th class="num">当前值</th><th class="col-rank">排名</th><th class="num">'+cmpLabel+'</th><th class="num">差值</th></tr></thead><tbody>';
+    html+='<div class="tbl-wrap"><table><thead><tr><th>指标</th><th>单位</th><th class="num">当前值</th><th class="col-rank">排名</th><th class="num">'+escapeHtml(cmpLabel)+'</th><th class="num">差值</th></tr></thead><tbody>';
     cfs.forEach(function(f){
       var v=Number((d||{})[f.k])||0,av=cmpVal(f.k)||0;if(App.isCompareMode){var cmpBr5=getCompareData('branches')||[];var cb5=cmpBr5.find(function(x){return x.n===name;});if(cb5&&cb5.d)av=Number(cb5.d[f.k])||0;}var rk=ranks[f.k]||'-';
-      html+='<tr><td>'+f.l+'</td><td class="computed">'+f.u+'</td>';
+      html+='<tr><td>'+escapeHtml(f.l)+'</td><td class="computed">'+escapeHtml(f.u)+'</td>';
       html+='<td class="num '+getColor(f.u,f.rd,v)+'">'+fmtVal(v,f.u)+'</td>';
       html+='<td class="col-rank"><span class="badge-rank '+rankBadge(rk,total)+'">'+rk+'/'+total+'</span></td>';
       html+='<td class="num">'+fmtVal(av,f.u)+'</td>';
@@ -335,10 +359,10 @@ function renderBranchDetail(name,region){
     // Remaining indicators (collapsible)
     if(rest.length>0){
       html+='<div class="more-toggle" onclick="var t=this;t.classList.toggle(\'open\');t.nextElementSibling.classList.toggle(\'open\')"><span class="mt-arrow">▶</span> 查看其余 '+rest.length+'项指标</div>';
-      html+='<div class="more-body"><div class="tbl-wrap"><table><thead><tr><th>指标</th><th>单位</th><th class="num">当前值</th><th class="col-rank">排名</th><th class="num">'+cmpLabel+'</th><th class="num">差值</th></tr></thead><tbody>';
+      html+='<div class="more-body"><div class="tbl-wrap"><table><thead><tr><th>指标</th><th>单位</th><th class="num">当前值</th><th class="col-rank">排名</th><th class="num">'+escapeHtml(cmpLabel)+'</th><th class="num">差值</th></tr></thead><tbody>';
       rest.forEach(function(f){
         var v=Number((d||{})[f.k])||0,av=cmpVal(f.k)||0;if(App.isCompareMode){var cmpBr5=getCompareData('branches')||[];var cb5=cmpBr5.find(function(x){return x.n===name;});if(cb5&&cb5.d)av=Number(cb5.d[f.k])||0;}var rk=ranks[f.k]||'-';
-        html+='<tr><td>'+f.l+'</td><td class="computed">'+f.u+'</td>';
+        html+='<tr><td>'+escapeHtml(f.l)+'</td><td class="computed">'+escapeHtml(f.u)+'</td>';
         html+='<td class="num '+getColor(f.u,f.rd,v)+'">'+fmtVal(v,f.u)+'</td>';
         html+='<td class="col-rank"><span class="badge-rank '+rankBadge(rk,total)+'">'+rk+'/'+total+'</span></td>';
         html+='<td class="num">'+fmtVal(av,f.u)+'</td>';
@@ -400,7 +424,7 @@ function renderBranchChart(group,name){
     var avgData=ufs.map(function(f){var v=cmpVal(f.k);return isPct?v*100:v;});
     var barH=200;
     var cmpLabel=ufs.some(function(f){return App.NAT_CMP.has(f.k);})?'分公司整体':'整体均值';
-    container.insertAdjacentHTML('beforeend','<div class="chart-card"><h4>'+name+' vs '+cmpLabel+' — '+unitLabel+'</h4><div class="chart-wrap" style="height:'+barH+'px"><canvas id="'+canvasId+'"></canvas></div></div>');
+    container.insertAdjacentHTML('beforeend','<div class="chart-card"><h4>'+escapeHtml(name)+' vs '+escapeHtml(cmpLabel)+' — '+escapeHtml(unitLabel)+'</h4><div class="chart-wrap" style="height:'+barH+'px"><canvas id="'+escapeHtml(canvasId)+'"></canvas></div></div>');
     var canvas=document.getElementById(canvasId);
     if(!canvas)return;
     if(App.charts[canvasId])App.charts[canvasId].destroy();
@@ -685,7 +709,7 @@ function renderDataTab(){
     h+='<p style="color:#999;font-size:12px;margin:12px 0">暂无导入的实际数据</p>';
   }else{
     yearKeys.forEach(function(y){
-      h+='<div class="data-year"><h3>'+y+'年</h3><div class="month-grid">';
+        h+='<div class="data-year"><h3>'+escapeHtml(y)+'年</h3><div class="month-grid">';
       for(var m=1;m<=12;m++){
         var has=years[y][m];
         var cls=has?'has-data':'no-data';
@@ -712,7 +736,7 @@ function renderDataTab(){
       var pt=impTimes.plans&&impTimes.plans[pk];
       var timeStr='';
       if(pt){try{var d2=new Date(pt);timeStr='<span class="import-time">导入: '+d2.toLocaleString('zh-CN')+'</span>';}catch(e){}}
-      h+='<div class="plan-card"><span class="vers">'+pk+'</span><span class="info">'+bc+'家分公司</span>'+timeStr+'<div class="plan-actions"><button class="btn-sm danger" onclick="deletePlanVersion(\''+pk+'\')">删除</button></div></div>';
+      h+='<div class="plan-card"><span class="vers">'+escapeHtml(pk)+'</span><span class="info">'+bc+'家分公司</span>'+timeStr+'<div class="plan-actions"><button class="btn-sm danger" onclick="deletePlanVersion(\''+escapeJsString(pk)+'\')">删除</button></div></div>';
     });
     h+='</div>';
   }
@@ -748,7 +772,7 @@ function renderEmptyState(reason){
   var old=document.querySelector('.empty-overlay');if(old)old.remove();
   var msg='';
   if(reason==='currentMonth'){
-    msg='<h3 style="font-size:20px;margin-bottom:12px">📭 该月份暂无数据</h3><p style="font-size:14px;color:#666">当前选择的月份（'+App.currentMonth+'）尚未导入实际数据。</p><p style="font-size:13px;color:#888">请切换到有数据的月份，或通过 Excel 导入功能导入该月份数据。</p>';
+    msg='<h3 style="font-size:20px;margin-bottom:12px">📭 该月份暂无数据</h3><p style="font-size:14px;color:#666">当前选择的月份（'+escapeHtml(App.currentMonth)+'）尚未导入实际数据。</p><p style="font-size:13px;color:#888">请切换到有数据的月份，或通过 Excel 导入功能导入该月份数据。</p>';
   }else{
     msg='<h3 style="font-size:20px;margin-bottom:12px">📭 暂无数据</h3><p style="font-size:14px;color:#666">请先通过 Excel 导入数据。</p>';
   }

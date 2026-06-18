@@ -190,16 +190,16 @@ function switchTab(t){
 }
 
 // 批量导入实际数据（支持多文件同时选中）
-var _actualBatchFiles=[];_actualBatchIdx=0;_actualBatchCount=0;
+var _actualBatchFiles=[];_actualBatchIdx=0;_actualBatchCount=0;var _actualBatchSuccess=0;var _actualBatchFail=0;
 function importExcel(input){
 console.log("importExcel batch, files="+(input.files?input.files.length:0));
 _actualBatchFiles=Array.prototype.slice.call(input.files||[]);
-_actualBatchIdx=0;_actualBatchCount=_actualBatchFiles.length;
+_actualBatchIdx=0;_actualBatchCount=_actualBatchFiles.length;_actualBatchSuccess=0;_actualBatchFail=0;
 if(_actualBatchCount===0)return;
 _actualProcessNext();
 }
 function _actualProcessNext(){
-if(_actualBatchIdx>=_actualBatchCount){toast('全部 '+_actualBatchCount+' 个实际数据文件导入完成','success');destroyCharts();if(typeof runAlerts==='function')runAlerts();switchTab('overview');return;}
+if(_actualBatchIdx>=_actualBatchCount){toast('实际数据导入完成：成功 '+_actualBatchSuccess+' 个，失败 '+_actualBatchFail+' 个',_actualBatchFail>0?'info':'success');destroyCharts();if(typeof runAlerts==='function')runAlerts();switchTab('overview');return;}
 toast('正在导入第 '+(_actualBatchIdx+1)+'/'+_actualBatchCount+' 个文件...','info');
 var file=_actualBatchFiles[_actualBatchIdx];_actualBatchIdx++;if(!file){_actualProcessNext();return;}
 var reader=new FileReader();
@@ -210,7 +210,7 @@ reader.onload=function(e){
     var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
     var hr=-1;
     for(var i=0;i<Math.min(rows.length,10);i++){if(rows[i]&&rows[i][0]==='年度'){hr=i;break;}}
-    if(hr<0){toast('未找到表头行（第1列需为"年度"），请用下载的模板格式','error');return;}
+    if(hr<0){_actualBatchFail++;toast('未找到表头行（第1列需为"年度"），请用下载的模板格式','error');_actualProcessNext();return;}
     var hdrs=rows[hr],nb=[];
     var impYear='',impMonth='';
     for(var i=hr+1;i<rows.length;i++){
@@ -228,14 +228,14 @@ reader.onload=function(e){
       for(var ai=0;ai<App.ACTUAL_KEYS.length;ai++){var ak=App.ACTUAL_KEYS[ai];ad[ak]=bd[ak]!=null?bd[ak]:0;}
       nb.push({n:bn,r:row[3]||'',d:ad});
     }
-    if(nb.length===0){toast('未找到分公司数据行','error');return;}
+    if(nb.length===0){_actualBatchFail++;toast('未找到分公司数据行','error');_actualProcessNext();return;}
     var mNum=impMonth.replace(/[^0-9]/g,'');
     if(!mNum)mNum='4';
     var mk=impYear+'-'+mNum.padStart(2,'0');
-    if(!impYear){toast('未检测到年度信息','error');return;}
+    if(!impYear){_actualBatchFail++;toast('未检测到年度信息','error');_actualProcessNext();return;}
     var yn=impYear+'年'+impMonth;
     if(!App.ALL_DATA.actuals)App.ALL_DATA.actuals={};
-    if(App.ALL_DATA.actuals[mk]&&!confirm(yn+'的实际数据已存在，是否覆盖？'))return;
+    if(App.ALL_DATA.actuals[mk]&&!confirm(yn+'的实际数据已存在，是否覆盖？')){_actualBatchFail++;_actualProcessNext();return;}
     // Aggregate
     var rm={};
     nb.forEach(function(b){if(!rm[b.r])rm[b.r]=[];rm[b.r].push(b);});
@@ -264,28 +264,35 @@ reader.onload=function(e){
     var warns=[];if(emptyNames>0)warns.push(emptyNames+'条分公司名称为空');if(zeroRows>0)warns.push(zeroRows+'条数据全为零');
     if(warns.length>0)summary+=' ('+warns.join('，')+')';
     toast(summary,warns.length>0?'info':'success');
+    _actualBatchSuccess++;
     _actualProcessNext();
   }catch(err){
 var ep=document.getElementById('errPanel');
 if(ep){ep.style.display='block';ep.textContent='[Import Error] '+err.message+'\nStack: '+(err.stack||'');}
 toast('解析失败: '+err.message,'error');
+_actualBatchFail++;
 _actualProcessNext();
 }
+};
+reader.onerror=function(){
+  _actualBatchFail++;
+  toast('文件读取失败: '+(file&&file.name?file.name:'未知文件'),'error');
+  _actualProcessNext();
 };
 reader.readAsArrayBuffer(file);
 }
 
 // 批量导入计划数据（支持多文件同时选中）
-var _planBatchFiles=[];var _planBatchIdx=0;var _planBatchCount=0;
+var _planBatchFiles=[];var _planBatchIdx=0;var _planBatchCount=0;var _planBatchSuccess=0;var _planBatchFail=0;
 function importPlanExcel(input){
 console.log("importPlanExcel batch, files="+(input.files?input.files.length:0));
 _planBatchFiles=Array.prototype.slice.call(input.files||[]);
-_planBatchIdx=0;_planBatchCount=_planBatchFiles.length;
+_planBatchIdx=0;_planBatchCount=_planBatchFiles.length;_planBatchSuccess=0;_planBatchFail=0;
 if(_planBatchCount===0)return;
 _planProcessNext();
 }
 function _planProcessNext(){
-if(_planBatchIdx>=_planBatchCount){toast('全部 '+_planBatchCount+' 个计划数据文件导入完成','success');destroyCharts();switchTab('overview');return;}
+if(_planBatchIdx>=_planBatchCount){toast('计划数据导入完成：成功 '+_planBatchSuccess+' 个，失败 '+_planBatchFail+' 个',_planBatchFail>0?'info':'success');destroyCharts();switchTab('overview');return;}
 toast('正在导入第 '+(_planBatchIdx+1)+'/'+_planBatchCount+' 个文件...','info');
 var file=_planBatchFiles[_planBatchIdx];_planBatchIdx++;if(!file){_planProcessNext();return;}
 var reader=new FileReader();
@@ -298,7 +305,7 @@ reader.onload=function(e){
     for(var i=0;i<Math.min(rows.length,10);i++){
       if(rows[i]&&rows[i][0]==='年度'){hr=i;break;}
     }
-    if(hr<0){toast('表头未找到（第1列需为年度），请用下载的模板格式','error');return;}
+    if(hr<0){_planBatchFail++;toast('表头未找到（第1列需为年度），请用下载的模板格式','error');_planProcessNext();return;}
     var hdrs=rows[hr],nb=[],impYear='';
     for(var i=hr+1;i<rows.length;i++){
       var row=rows[i];
@@ -319,9 +326,9 @@ reader.onload=function(e){
       }
       nb.push({n:bn,r:row[1]||'',d:pd});
     }
-    if(nb.length===0){toast('未找到分公司数据行','error');return;}
+    if(nb.length===0){_planBatchFail++;toast('未找到分公司数据行','error');_planProcessNext();return;}
     var y2=impYear.replace(/[^0-9]/g,'');
-    if(!y2){toast('未检测到年度信息','error');return;}
+    if(!y2){_planBatchFail++;toast('未检测到年度信息','error');_planProcessNext();return;}
     if(!y2)y2='2026';
     var maxV=0;
     if(App.ALL_DATA._plans){
@@ -335,7 +342,7 @@ reader.onload=function(e){
     var pk2=y2+'-v'+(maxV+1);
     var yn=y2+'年 (版本'+(maxV+1)+')';
     if(!App.ALL_DATA._plans)App.ALL_DATA._plans={};
-    if(App.ALL_DATA._plans[pk2]&&!confirm(yn+'的计划数据已存在，是否覆盖？'))return;
+    if(App.ALL_DATA._plans[pk2]&&!confirm(yn+'的计划数据已存在，是否覆盖？')){_planBatchFail++;_planProcessNext();return;}
     var rm2={},na={};
     var rm={};
     nb.forEach(function(b){
@@ -364,8 +371,14 @@ reader.onload=function(e){
     refreshMergedData();saveAllData();
     updatePlanUI();
     toast('已导入 '+yn+' 计划数据，'+nb.length+' 家分公司','success');
+    _planBatchSuccess++;
     _planProcessNext();
-  }catch(err){toast('解析失败[计划]: '+err.message,'error');console.error('Plan import error:',err);_planProcessNext();}
+  }catch(err){_planBatchFail++;toast('解析失败[计划]: '+err.message,'error');console.error('Plan import error:',err);_planProcessNext();}
+};
+reader.onerror=function(){
+  _planBatchFail++;
+  toast('文件读取失败[计划]: '+(file&&file.name?file.name:'未知文件'),'error');
+  _planProcessNext();
 };
 reader.readAsArrayBuffer(file);
 }
@@ -436,6 +449,15 @@ function refreshCompareMonths(optMonth){
   }
 }
 
+function updateComparePeriodLabels(text, visible){
+  ['headerComparePeriodLabel','barComparePeriodLabel'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(!el)return;
+    el.textContent=text||'';
+    el.style.display=visible?'inline':'none';
+  });
+}
+
 function toggleCompareMode(){
   try{
     App.isCompareMode=!App.isCompareMode;
@@ -453,11 +475,10 @@ function toggleCompareMode(){
       if(defM===1){defM=12;defY=String(parseInt(defY)-1);}else{defM--;}
       cy.value=defY;refreshCompareMonths(defM);
       setComparePeriod();
-      var cl=document.getElementById('comparePeriodLabel');if(cl){cl.textContent='vs '+formatMonth(App.compareMonth);cl.style.display='inline';}
     }else{
       btn.textContent='\u{1f50d} 对比模式';btn.style.opacity='.85';btn.style.background='rgba(59,130,246,.25)';
       bar.style.display='none';App.compareMonth=null;
-      var cl2=document.getElementById('comparePeriodLabel');if(cl2)cl2.style.display='none';
+      updateComparePeriodLabels('', false);
       destroyCharts();
       var at=document.querySelector('.nav button.active');
       if(at)switchTab(at.dataset.tab||'overview');else switchTab('overview');
@@ -474,6 +495,7 @@ function setComparePeriod(){
     if(!App.isCompareMode)return;var cy=document.getElementById('compareYear');var cm=document.getElementById('compareMonth');
     if(!cy||!cm)return;
     App.compareMonth=cy.value+'-'+String(cm.value).padStart(2,'0');
+    updateComparePeriodLabels('vs '+formatMonth(App.compareMonth), true);
     refreshCompareData();destroyCharts();
     var at=document.querySelector('.nav button.active');
     if(at)switchTab(at.dataset.tab||'overview');else switchTab('overview');
@@ -544,7 +566,7 @@ function quickCompare(type){
   refreshCompareMonths(m);
   // Set period and refresh
   App.compareMonth=cmpM;
-  var cl=document.getElementById('comparePeriodLabel');if(cl){cl.textContent='vs '+formatMonth(cmpM);cl.style.display='inline';}
+  updateComparePeriodLabels('vs '+formatMonth(cmpM), true);
   refreshCompareData();destroyCharts();
   var at=document.querySelector('.nav button.active');
   if(at)switchTab(at.dataset.tab||'overview');else switchTab('overview');
@@ -576,7 +598,6 @@ function clearAllData(){
   App.currentMonth='2026-04';
   App.currentPlanKey='auto';
   App.currentYear='2026';
-  App.DATA={branches:[],regions:{},national:{d:{}}};
   saveAllData();
   refreshMergedData();
   updateYearUI();
@@ -585,7 +606,7 @@ function clearAllData(){
   destroyCharts();
   switchTab('overview');
   toast('所有数据已清空','info');
-  fetch('/save-backup',{method:'POST',body:'{}'}).catch(function(){});
+  fetch('/save-backup',{method:'POST',body:JSON.stringify(App.ALL_DATA)}).catch(function(){});
 }
 
 // ── Button binding ──
@@ -614,13 +635,6 @@ function clearAllData(){
     if(ep){ep.style.display='block';ep.style.background='#efe';ep.style.color='#060';ep.style.borderTop='2px solid green';ep.textContent='看板启动成功 | App: OK | currentMonth: '+(App.currentMonth||'未设置');setTimeout(function(){if(ep.textContent.indexOf('启动成功')>=0)ep.style.display='none';},3000);}
     initData();
     if(typeof initAlertRules==='function')initAlertRules();
-    // 每次页面刷新后强制禁用所有预警规则
-    var alertRules = App.ALL_DATA._alertRules;
-    if (alertRules && alertRules.length) {
-      alertRules.forEach(function(r) { r.disabled = true; });
-    }
-    App._rulesConfigured = false;
-    App.ALL_DATA.__rulesConfigured = false;
     if (typeof runAlerts === 'function') runAlerts();
     updateYearUI();
     if(typeof updateMonthDropdown==='function')updateMonthDropdown();

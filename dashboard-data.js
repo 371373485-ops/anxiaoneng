@@ -206,6 +206,19 @@ function findPlanBranch(plan,region,name){
   return null;
 }
 
+function aggregateEarnedPremiumRate(branches, key){
+  var weightedSum=0,totalEarned=0,simpleSum=0,simpleCount=0;
+  (branches||[]).forEach(function(b){
+    var d=b.d||{};
+    var rate=Number(d[key])||0;
+    var earned=Number(d['已赚保费'])||0;
+    simpleSum+=rate;simpleCount++;
+    if(earned>0){weightedSum+=rate*earned;totalEarned+=earned;}
+  });
+  if(totalEarned>0)return weightedSum/totalEarned;
+  return simpleCount>0?simpleSum/simpleCount:0;
+}
+
 function refreshMergedData(){
   var pk=resolvePlanKey();
   var mk='_merged';
@@ -264,7 +277,7 @@ function refreshMergedData(){
     var agg={};
     for(var fi=0;fi<App.FIELDS.length;fi++){var fk=App.FIELDS[fi].k;agg[fk]=0;}
     App.FIELDS.filter(function(f){return f.m;}).forEach(function(f){agg[f.k]=bl.reduce(function(s,b){return s+(Number(b.d[f.k])||0);},0);});
-    ['已赚赔付率实际','已赚费用率实际','综合成本率计划（整体利润口径）'].forEach(function(k){agg[k]=bl.reduce(function(s,b){return s+(Number(b.d[k])||0);},0)/bl.length;});
+    ['已赚赔付率实际','已赚费用率实际'].forEach(function(k){agg[k]=aggregateEarnedPremiumRate(bl,k);});
     var rTotalPlan=(Number(agg['已赚保费计划'])||0);
     agg['综合成本率计划（整体利润口径）']=rTotalPlan>0?1-(Number(agg['经营利润年度计划'])||0)/rTotalPlan:0;
     computeDerived(agg);
@@ -272,7 +285,7 @@ function refreshMergedData(){
   });
   for(var fi2=0;fi2<App.FIELDS.length;fi2++){var fk2=App.FIELDS[fi2].k;na[fk2]=0;}
   App.FIELDS.filter(function(f){return f.m;}).forEach(function(f){na[f.k]=mb.reduce(function(s,b){return s+(Number(b.d[f.k])||0);},0);});
-  ['已赚赔付率实际','已赚费用率实际','综合成本率计划（整体利润口径）'].forEach(function(k){na[k]=mb.reduce(function(s,b){return s+(Number(b.d[k])||0);},0)/mb.length;});
+  ['已赚赔付率实际','已赚费用率实际'].forEach(function(k){na[k]=aggregateEarnedPremiumRate(mb,k);});
   // COR计划先算，再computeDerived，保证与本年计划比较正确
   var nTotalPlan=(Number(na['已赚保费计划'])||0);
   na['综合成本率计划（整体利润口径）']=nTotalPlan>0?1-(Number(na['经营利润年度计划'])||0)/nTotalPlan:0;
@@ -333,7 +346,7 @@ function computeMonthData(mk){
     var agg={};
     for(var fi=0;fi<App.FIELDS.length;fi++){var fk=App.FIELDS[fi].k;agg[fk]=0;}
     App.FIELDS.filter(function(f){return f.m;}).forEach(function(f){agg[f.k]=bl.reduce(function(s,b){return s+(Number(b.d[f.k])||0);},0);});
-    ['已赚赔付率实际','已赚费用率实际','综合成本率计划（整体利润口径）'].forEach(function(k){agg[k]=bl.reduce(function(s,b){return s+(Number(b.d[k])||0);},0)/bl.length;});
+    ['已赚赔付率实际','已赚费用率实际'].forEach(function(k){agg[k]=aggregateEarnedPremiumRate(bl,k);});
     var rtp=(Number(agg['已赚保费计划'])||0);
     agg['综合成本率计划（整体利润口径）']=rtp>0?1-(Number(agg['经营利润年度计划'])||0)/rtp:0;
     computeDerived(agg);
@@ -341,7 +354,7 @@ function computeMonthData(mk){
   });
   for(var fi2=0;fi2<App.FIELDS.length;fi2++){var fk2=App.FIELDS[fi2].k;na[fk2]=0;}
   App.FIELDS.filter(function(f){return f.m;}).forEach(function(f){na[f.k]=ab.reduce(function(s,b){return s+(Number(b.d[f.k])||0);},0);});
-  ['已赚赔付率实际','已赚费用率实际','综合成本率计划（整体利润口径）'].forEach(function(k){na[k]=ab.reduce(function(s,b){return s+(Number(b.d[k])||0);},0)/ab.length;});
+  ['已赚赔付率实际','已赚费用率实际'].forEach(function(k){na[k]=aggregateEarnedPremiumRate(ab,k);});
   var ntp=(Number(na['已赚保费计划'])||0);
   na['综合成本率计划（整体利润口径）']=ntp>0?1-(Number(na['经营利润年度计划'])||0)/ntp:0;
   computeDerived(na);

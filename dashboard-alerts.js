@@ -137,6 +137,7 @@ function runAlerts() {
     var ab = document.getElementById('alert-bar'); if(ab) ab.style.display = 'none';
     var rb = document.getElementById('regions-badge'); if(rb) rb.style.display = 'none';
     var bb = document.getElementById('branches-badge'); if(bb) bb.style.display = 'none';
+    var ai = document.getElementById('ai-badge'); if(ai) { ai.textContent = '0'; ai.style.display = 'none'; }
     return;
   }
   
@@ -217,11 +218,11 @@ function renderAlertBar(results) {
     var th = fmtVal(r.threshold, r.unit);
     var s = '<div class="alert-item" style="padding:6px 12px;border-left:3px solid ' + ac.color + ';margin:4px 0;background:' + ac.bg + ';border-radius:4px;font-size:12px">';
     s += '<span style="margin-right:6px">' + ac.icon + '</span>';
-    s += '<b>' + r.fieldLabel + '</b> &nbsp;当前: <b style="color:' + ac.color + '">' + fv + '</b>';
-    s += ' &nbsp;' + r.op + ' ' + th;
-    s += ' &nbsp;<span style="color:' + ac.color + '">[' + ac.label + ']</span>';
-    if (r.regionName) s += ' &nbsp;<span style="color:#6b21a8;font-size:11px">— ' + r.regionName + '</span>';
-    if (r.branchName) s += ' &nbsp;<span style="color:#888;font-size:11px">— ' + r.branchName + '</span>';
+    s += '<b>' + escapeHtml(r.fieldLabel) + '</b> &nbsp;当前: <b style="color:' + ac.color + '">' + escapeHtml(fv) + '</b>';
+    s += ' &nbsp;' + escapeHtml(r.op) + ' ' + escapeHtml(th);
+    s += ' &nbsp;<span style="color:' + ac.color + '">[' + escapeHtml(ac.label) + ']</span>';
+    if (r.regionName) s += ' &nbsp;<span style="color:#6b21a8;font-size:11px">— ' + escapeHtml(r.regionName) + '</span>';
+    if (r.branchName) s += ' &nbsp;<span style="color:#888;font-size:11px">— ' + escapeHtml(r.branchName) + '</span>';
     s += '</div>';
     return s;
   }
@@ -312,41 +313,41 @@ function renderAlertConfig() {
       h += '<tr style="background:#fffbeb;' + disabledStyle + '">';
       h += '<td><select id="editAlertField" style="padding:2px 4px;border-radius:3px;border:1px solid #ccc;font-size:11px;max-width:140px">';
       App.FIELDS.forEach(function(f) {
-        h += '<option value="' + f.k + '"' + (f.k === r.field ? ' selected' : '') + '>' + f.l + '</option>';
+        h += '<option value="' + escapeHtml(f.k) + '"' + (f.k === r.field ? ' selected' : '') + '>' + escapeHtml(f.l) + '</option>';
       });
       h += '</select></td>';
       h += '<td><select id="editAlertOp" style="padding:2px 4px;border-radius:3px;border:1px solid #ccc;font-size:11px">';
       ['>=','<=','>','<','!='].forEach(function(op) {
-        h += '<option value="' + op + '"' + (op === r.op ? ' selected' : '') + '>' + op + '</option>';
+        h += '<option value="' + escapeHtml(op) + '"' + (op === r.op ? ' selected' : '') + '>' + escapeHtml(op) + '</option>';
       });
       h += '</select></td>';
       var editVal = fieldInfo && fieldInfo.u==='%' ? (r.value*100) : r.value;
-      h += '<td><input id="editAlertValue" type="number" step="any" value="' + editVal + '" style="padding:2px 4px;border-radius:3px;border:1px solid #ccc;font-size:11px;width:60px">' + (fieldInfo ? ' ' + fieldInfo.u : '') + '</td>';
+      h += '<td><input id="editAlertValue" type="number" step="any" value="' + escapeHtml(editVal) + '" style="padding:2px 4px;border-radius:3px;border:1px solid #ccc;font-size:11px;width:60px">' + (fieldInfo ? ' ' + escapeHtml(fieldInfo.u) : '') + '</td>';
       h += '<td><select id="editAlertSeverity" style="padding:2px 4px;border-radius:3px;border:1px solid #ccc;font-size:11px">';
       Object.keys(App.ALERT_COLORS).forEach(function(s) {
         var ac2 = App.ALERT_COLORS[s];
-        h += '<option value="' + s + '"' + (s === r.severity ? ' selected' : '') + '>' + ac2.icon + ' ' + ac2.label + '</option>';
+        h += '<option value="' + escapeHtml(s) + '"' + (s === r.severity ? ' selected' : '') + '>' + escapeHtml(ac2.icon + ' ' + ac2.label) + '</option>';
       });
       h += '</select></td>';
-      h += '<td><input id="editAlertMsg" value="' + (r.msg||'').replace(/"/g,'&quot;') + '" style="padding:2px 4px;border-radius:3px;border:1px solid #ccc;font-size:11px;width:120px"></td>';
+      h += '<td><input id="editAlertMsg" value="' + escapeHtml(r.msg||'') + '" style="padding:2px 4px;border-radius:3px;border:1px solid #ccc;font-size:11px;width:120px"></td>';
       h += '<td style="white-space:nowrap">';
-      h += '<button class="btn-xs" onclick="saveAlertRuleEdit(\'' + r.id + '\')" style="margin-right:4px;font-size:10px;padding:2px 6px;background:#059669;color:#fff;border:none;border-radius:3px;cursor:pointer">保存</button>';
+      h += '<button class="btn-xs" onclick="saveAlertRuleEdit(\'' + escapeJsString(r.id) + '\')" style="margin-right:4px;font-size:10px;padding:2px 6px;background:#059669;color:#fff;border:none;border-radius:3px;cursor:pointer">保存</button>';
       h += '<button class="btn-xs" onclick="cancelAlertRuleEdit()" style="font-size:10px;padding:2px 6px;background:#6b7280;color:#fff;border:none;border-radius:3px;cursor:pointer">取消</button>';
       h += '</td></tr>';
     } else {
       // 展示模式
       h += '<tr style="' + disabledStyle + '">';
-      h += '<td>' + label + '</td>';
-      h += '<td>' + r.op + '</td>';
-      h += '<td>' + (fieldInfo && fieldInfo.u==='%' ? (r.value*100) : r.value) + (fieldInfo ? ' ' + fieldInfo.u : '') + '</td>';
-      h += '<td><span style="color:' + ac.color + ';font-weight:600">' + ac.icon + ' ' + ac.label + '</span></td>';
-      h += '<td style="font-size:11px;color:#666">' + r.msg + '</td>';
+      h += '<td>' + escapeHtml(label) + '</td>';
+      h += '<td>' + escapeHtml(r.op) + '</td>';
+      h += '<td>' + escapeHtml(fieldInfo && fieldInfo.u==='%' ? (r.value*100) : r.value) + (fieldInfo ? ' ' + escapeHtml(fieldInfo.u) : '') + '</td>';
+      h += '<td><span style="color:' + ac.color + ';font-weight:600">' + escapeHtml(ac.icon + ' ' + ac.label) + '</span></td>';
+      h += '<td style="font-size:11px;color:#666">' + escapeHtml(r.msg) + '</td>';
       h += '<td style="white-space:nowrap">';
-      h += '<button class="btn-xs" onclick="toggleAlertRule(\'' + r.id + '\')" style="margin-right:4px;font-size:10px;padding:2px 6px">' + (r.disabled ? '启用' : '禁用') + '</button>';
+      h += '<button class="btn-xs" onclick="toggleAlertRule(\'' + escapeJsString(r.id) + '\')" style="margin-right:4px;font-size:10px;padding:2px 6px">' + (r.disabled ? '启用' : '禁用') + '</button>';
       if (r.disabled) {
-        h += '<button class="btn-xs" onclick="editAlertRule(\'' + r.id + '\')" style="margin-right:4px;font-size:10px;padding:2px 6px;background:#2563eb;color:#fff;border:none;border-radius:3px;cursor:pointer">编辑</button>';
+        h += '<button class="btn-xs" onclick="editAlertRule(\'' + escapeJsString(r.id) + '\')" style="margin-right:4px;font-size:10px;padding:2px 6px;background:#2563eb;color:#fff;border:none;border-radius:3px;cursor:pointer">编辑</button>';
       }
-      h += '<button class="btn-xs danger" onclick="deleteAlertRule(\'' + r.id + '\')" style="font-size:10px;padding:2px 6px">删除</button>';
+      h += '<button class="btn-xs danger" onclick="deleteAlertRule(\'' + escapeJsString(r.id) + '\')" style="font-size:10px;padding:2px 6px">删除</button>';
       h += '</td></tr>';
     }
   });
@@ -366,7 +367,7 @@ function renderAlertConfig() {
   h += '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;align-items:center">';
   h += '<select id="newAlertField" style="padding:4px 8px;border-radius:4px;border:1px solid #ccc;font-size:12px;max-width:160px">';
   App.FIELDS.forEach(function(f) {
-    h += '<option value="' + f.k + '">' + f.l + '</option>';
+    h += '<option value="' + escapeHtml(f.k) + '">' + escapeHtml(f.l) + '</option>';
   });
   h += '</select>';
   h += '<select id="newAlertOp" style="padding:4px 8px;border-radius:4px;border:1px solid #ccc;font-size:12px"><option value=">=">>=</option><option value="<="><=</option><option value=">">></option><option value="<"><</option><option value="!=">!=</option></select>';

@@ -3,6 +3,10 @@ import http.server, socketserver, os, sys, json, urllib.request, urllib.error, s
 PORT = 8921
 DIR = os.path.dirname(os.path.abspath(__file__))
 os.chdir(DIR)
+ALLOWED_CORS_ORIGINS = {
+    'http://127.0.0.1:8921',
+    'http://localhost:8921',
+}
 
 # ── Zhipu GLM API config ──
 ZHIPU_API_KEY = os.environ.get("ZAI_API_KEY", "")
@@ -64,34 +68,49 @@ class H(http.server.SimpleHTTPRequestHandler):
     def do_OPTIONS(self):
         """Handle CORS preflight"""
         self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
+        self._send_cors()
         self.send_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.end_headers()
 
     def _send_cors(self):
-        self.send_header('Access-Control-Allow-Origin', '*')
+        origin = self.headers.get('Origin')
+        if origin in ALLOWED_CORS_ORIGINS:
+            self.send_header('Access-Control-Allow-Origin', origin)
+            self.send_header('Vary', 'Origin')
+
+    def _send_json(self, status, payload):
+        self.send_response(status)
+        self.send_header('Content-Type', 'application/json')
+        self._send_cors()
+        self.end_headers()
+        self.wfile.write(json.dumps(payload).encode())
+
+    def _validate_backup_payload(self, data):
+        try:
+            payload = json.loads(data.decode('utf-8'))
+        except (UnicodeDecodeError, json.JSONDecodeError) as e:
+            raise ValueError('invalid JSON') from e
+        if not isinstance(payload, dict):
+            raise ValueError('backup payload must be a JSON object')
+        if 'actuals' not in payload and '_plans' not in payload:
+            raise ValueError('backup payload must contain actuals or _plans')
 
     def do_POST(self):
         if self.path == '/save-backup':
             try:
                 length = int(self.headers.get('Content-Length', 0))
                 data = self.rfile.read(length)
+                self._validate_backup_payload(data)
                 bkpath = os.path.join(DIR, '_data_backup.json')
                 with open(bkpath, 'wb') as f:
                     f.write(data)
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json')
-                self._send_cors()
-                self.end_headers()
-                self.wfile.write(json.dumps({'ok': True, 'size': len(data)}).encode())
+                self._send_json(200, {'ok': True, 'size': len(data)})
                 print('[Backup] Saved', len(data), 'bytes to', bkpath, flush=True)
+            except ValueError as e:
+                self._send_json(400, {'ok': False, 'error': str(e)})
             except Exception as e:
-                self.send_response(500)
-                self.send_header('Content-Type', 'application/json')
-                self._send_cors()
-                self.end_headers()
-                self.wfile.write(json.dumps({'ok': False, 'error': str(e)}).encode())
+                self._send_json(500, {'ok': False, 'error': str(e)})
 
         elif self.path == '/ai/chat':
             self._handle_ai_chat()
@@ -333,5 +352,5 @@ print(f'AI model: {ZHIPU_MODEL}', flush=True)
 print(f'API Key: {"已配置" if ZHIPU_API_KEY else "❌ 未配置！请设置 ZAI_API_KEY 环境变量"}', flush=True)
 
 socketserver.ThreadingTCPServer.allow_reuse_address = True
-with socketserver.ThreadingTCPServer(('', PORT), H) as h:
+with socketserver.ThreadingTCPServer(('127.0.0.1', PORT), H) as h:
     h.serve_forever()

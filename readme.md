@@ -40,3 +40,13 @@
 ## 部署
 
 通过 GitHub Pages 自动部署，`deploy/` 目录对应站点根目录。
+
+## 发布同步
+
+发布前从项目根目录执行：
+
+```powershell
+.\scripts\sync-deploy.ps1
+```
+
+脚本以根目录为唯一源码，将 `index.html`、`dashboard-*.js`、`dashboard.css`、`chart.umd.min.js`、`xlsx.full.min.js`、`readme.md` 和两个 Excel 导入模板同步到 `deploy/`。如果 `gh-pages/` 目录存在，也会同步同一批文件。执行完成后会输出每个目标文件的大小和 SHA256，用于确认版本一致。

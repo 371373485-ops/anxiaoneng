@@ -30,14 +30,14 @@ function renderExportTab() {
   h += '<button class="exp-sel-all" onclick="exportToggleGroup(\'region\',true)" style="font-size:11px">全选</button> ';
   h += '<button class="exp-sel-all" onclick="exportToggleGroup(\'region\',false)" style="font-size:11px">取消</button></div>';
   regions.forEach(function (r) {
-    h += '<label class="exp-check"><input type="checkbox" value="' + r + '" class="exp-region" checked onchange="exportUpdatePreview()"> ' + r + '</label>';
+    h += '<label class="exp-check"><input type="checkbox" value="' + escapeHtml(r) + '" class="exp-region" checked onchange="exportUpdatePreview()"> ' + escapeHtml(r) + '</label>';
   });
   // Branches
   h += '<div style="flex-basis:100%;margin-top:8px"><b>分公司（31家）：</b>';
   h += '<button class="exp-sel-all" onclick="exportToggleGroup(\'branch\',true)" style="font-size:11px">全选</button> ';
   h += '<button class="exp-sel-all" onclick="exportToggleGroup(\'branch\',false)" style="font-size:11px">取消</button></div>';
   branches.forEach(function (b) {
-    h += '<label class="exp-check exp-branch-label"><input type="checkbox" value="' + b.n + '" class="exp-branch" data-region="' + b.r + '" onchange="exportUpdatePreview()"> ' + b.n + ' <span style="font-size:10px;color:var(--text2)">(' + b.r + ')</span></label>';
+    h += '<label class="exp-check exp-branch-label"><input type="checkbox" value="' + escapeHtml(b.n) + '" class="exp-branch" data-region="' + escapeHtml(b.r) + '" onchange="exportUpdatePreview()"> ' + escapeHtml(b.n) + ' <span style="font-size:10px;color:var(--text2)">(' + escapeHtml(b.r) + ')</span></label>';
   });
   h += '</div></div>'; // end unit section
 
@@ -59,9 +59,9 @@ function renderExportTab() {
     gFields.forEach(function (f) {
       var checked = f.m ? ' checked' : '';
       h += '<label class="exp-check exp-check-card" style="display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:4px;cursor:pointer;font-size:12px;transition:background .15s">';
-      h += '<input type="checkbox" value="' + f.k + '" class="exp-field exp-field-' + g + '"' + checked + ' onchange="exportUpdatePreview()">';
-      h += '<span style="flex:1">' + f.l + '</span>';
-      h += '<span style="font-size:10px;color:#9ca3af">' + f.u + '</span>';
+      h += '<input type="checkbox" value="' + escapeHtml(f.k) + '" class="exp-field exp-field-' + escapeHtml(g) + '"' + checked + ' onchange="exportUpdatePreview()">';
+      h += '<span style="flex:1">' + escapeHtml(f.l) + '</span>';
+      h += '<span style="font-size:10px;color:#9ca3af">' + escapeHtml(f.u) + '</span>';
       h += '</label>';
     });
     h += '</div></div>';
@@ -76,7 +76,7 @@ function renderExportTab() {
     h += '<select id="exp-month-select" onchange="exportUpdatePreview()" style="padding:6px 12px;border:1px solid var(--divider);border-radius:6px;background:var(--card);font-size:13px;color:#1e3a5f;max-width:300px">';
     h += '<option value="_all">📅 全部月份（每月份一个Sheet）</option>';
     months.forEach(function (m) {
-      h += '<option value="' + m + '">' + m.replace('-', '年') + '月</option>';
+      h += '<option value="' + escapeHtml(m) + '">' + escapeHtml(m.replace('-', '年')) + '月</option>';
     });
     h += '</select>';
     h += '<span style="font-size:11px;color:var(--text2);margin-left:8px">选「全部」则每月份独立一个Sheet</span>';
@@ -122,7 +122,7 @@ function exportUpdatePreview() {
   var monthCount = (ms && ms.value === '_all') ? (ms.options.length - 1) : 1;
 
   var total = unitCount * monthCount;
-  preview.innerHTML = '选中 <b>' + unitCount + '</b> 个单位 × <b>' + fieldCount + '</b> 个指标 × <b>' + selLabel + '</b> = 共 <b>' + total + '</b> 行数据';
+  preview.innerHTML = '选中 <b>' + unitCount + '</b> 个单位 × <b>' + fieldCount + '</b> 个指标 × <b>' + escapeHtml(selLabel) + '</b> = 共 <b>' + total + '</b> 行数据';
 }
 
 // Main export function - one sheet per selected month (uses computeMonthData for 100% consistency)
