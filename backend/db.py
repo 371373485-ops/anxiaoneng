@@ -221,6 +221,7 @@ SCHEMA = [
         unit TEXT NOT NULL, category TEXT, direction TEXT NOT NULL,
         benchmark_strategy TEXT NOT NULL, trend_threshold REAL,
         display_precision INTEGER NOT NULL, calculation_version TEXT NOT NULL,
+        formula TEXT, applicable_org_types TEXT, metadata_version TEXT,
         updated_at TEXT NOT NULL
     )""",
     """CREATE TABLE IF NOT EXISTS organizations (
@@ -269,6 +270,9 @@ SCHEMA = [
         idempotency_key TEXT NOT NULL UNIQUE, model TEXT,
         prompt_version TEXT NOT NULL, schema_version TEXT NOT NULL,
         tool_version TEXT NOT NULL, error_type TEXT,
+        risk_level TEXT NOT NULL DEFAULT 'medium',
+        validation_policy TEXT NOT NULL DEFAULT 'strict',
+        validation_report TEXT, execution_mode TEXT NOT NULL DEFAULT 'deterministic',
         created_by TEXT NOT NULL, created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
     )""",
@@ -284,6 +288,7 @@ SCHEMA = [
         org_id TEXT NOT NULL, tool_name TEXT NOT NULL, tool_version TEXT NOT NULL,
         input_hash TEXT NOT NULL, input_payload TEXT NOT NULL,
         output_payload TEXT, status TEXT NOT NULL, latency_ms INTEGER NOT NULL,
+        calculation_version TEXT, source TEXT,
         error_type TEXT, created_by TEXT NOT NULL, created_at TEXT NOT NULL,
         UNIQUE(run_id, step_id, input_hash)
     )""",
@@ -293,6 +298,39 @@ SCHEMA = [
         payload TEXT NOT NULL, source_id TEXT, active INTEGER NOT NULL DEFAULT 1,
         created_by TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
         UNIQUE(org_id, user_id, memory_type, memory_key)
+    )""",
+    """CREATE TABLE IF NOT EXISTS evaluation_versions (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL, dataset_version TEXT NOT NULL,
+        blind_set_version TEXT, prompt_version TEXT NOT NULL,
+        schema_version TEXT NOT NULL, tool_version TEXT NOT NULL,
+        case_count INTEGER NOT NULL, frozen INTEGER NOT NULL DEFAULT 0,
+        created_by TEXT NOT NULL, created_at TEXT NOT NULL
+    )""",
+    """CREATE TABLE IF NOT EXISTS evaluation_scores (
+        id TEXT PRIMARY KEY, run_id TEXT NOT NULL, case_id TEXT NOT NULL,
+        numeric_score REAL NOT NULL, evidence_score REAL NOT NULL,
+        relevance_score REAL NOT NULL, specificity_score REAL NOT NULL,
+        safety_score REAL NOT NULL, critical_violation INTEGER NOT NULL,
+        details TEXT NOT NULL, created_at TEXT NOT NULL
+    )""",
+    """CREATE TABLE IF NOT EXISTS human_reviews (
+        id TEXT PRIMARY KEY, target_id TEXT NOT NULL, target_type TEXT NOT NULL,
+        org_id TEXT, reviewer_id TEXT NOT NULL, reviewer_role TEXT NOT NULL,
+        factual_score INTEGER NOT NULL, relevance_score INTEGER NOT NULL,
+        specificity_score INTEGER NOT NULL, actionability_score INTEGER NOT NULL,
+        decision TEXT NOT NULL, comment TEXT, created_at TEXT NOT NULL
+    )""",
+    """CREATE TABLE IF NOT EXISTS shadow_runs (
+        id TEXT PRIMARY KEY, agent_run_id TEXT, org_id TEXT NOT NULL,
+        branch TEXT NOT NULL, period TEXT NOT NULL, model TEXT,
+        candidate_output TEXT NOT NULL, validation_report TEXT NOT NULL,
+        status TEXT NOT NULL, visible_to_user INTEGER NOT NULL DEFAULT 0,
+        created_by TEXT NOT NULL, created_at TEXT NOT NULL
+    )""",
+    """CREATE TABLE IF NOT EXISTS release_gates (
+        id TEXT PRIMARY KEY, evaluation_run_id TEXT, dataset_version TEXT NOT NULL,
+        metrics TEXT NOT NULL, blockers TEXT NOT NULL, passed INTEGER NOT NULL,
+        approved_by TEXT, created_by TEXT NOT NULL, created_at TEXT NOT NULL
     )""",
 ]
 
@@ -320,6 +358,19 @@ MIGRATION_COLUMNS = {
         "rank_change": "REAL",
     },
     "audit_logs": {"org_id": "TEXT"},
+    "metric_metadata": {
+        "formula": "TEXT", "applicable_org_types": "TEXT",
+        "metadata_version": "TEXT",
+    },
+    "agent_runs": {
+        "risk_level": "TEXT NOT NULL DEFAULT 'medium'",
+        "validation_policy": "TEXT NOT NULL DEFAULT 'strict'",
+        "validation_report": "TEXT",
+        "execution_mode": "TEXT NOT NULL DEFAULT 'deterministic'",
+    },
+    "tool_executions": {
+        "calculation_version": "TEXT", "source": "TEXT",
+    },
 }
 
 

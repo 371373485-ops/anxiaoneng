@@ -64,6 +64,21 @@ node --check dashboard-agent.js
 node --check dashboard-diagnosis.js
 ```
 
+## AI 可靠性 V2
+
+- 默认采用严格校验；数字、证据、机构、指标方向、相关性、建议具体性、
+  因果表述和安全风险均有独立评分。
+- 新增 `insufficient_evidence`、`validation_failed`、
+  `human_review_required` 和 `degraded` 状态。
+- `POST /api/agent-runs/{id}/shadow-generate` 仅在显式启用 AI 后运行，
+  生成结果始终进入不可见影子区。
+- `POST /api/shadow-runs` 可提交候选输出进行离线可靠性验证。
+- `POST /api/human-reviews` 保存业务专家盲评。
+- `POST /api/release-gates` 按严格阈值生成发布阻断结论。
+- 评测集包含不少于 200 个场景，并支持盲测筛选及1至5次重复运行。
+- GitHub Actions 在每次推送和合并请求中执行完整测试、前端语法检查和
+  评测集数量检查。
+
 PostgreSQL 生产部署可复制 `backend/.env.example` 配置环境变量后运行：
 
 ```powershell

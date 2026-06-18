@@ -28,6 +28,8 @@ class DatabaseTests(unittest.TestCase):
             "data_backups", "metric_metadata", "task_status_history",
             "organizations", "evaluation_runs", "evaluation_cases",
             "agent_runs", "agent_steps", "tool_executions", "agent_memories",
+            "evaluation_versions", "evaluation_scores", "human_reviews",
+            "shadow_runs", "release_gates",
         }
         self.assertTrue(expected.issubset(names))
 

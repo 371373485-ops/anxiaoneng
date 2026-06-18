@@ -1,0 +1,37 @@
+name: AI Reliability Gate
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  reliability:
+    runs-on: ubuntu-latest
+    env:
+      AI_ENABLED: "false"
+      SERVE_FRONTEND: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install backend dependencies
+        run: python -m pip install -r backend/requirements-dev.txt
+      - name: Run backend and reliability tests
+        run: python -m unittest discover -s tests -v
+      - name: Check frontend syntax
+        run: |
+          node --check dashboard-agent.js
+          node --check dashboard-diagnosis.js
+      - name: Verify minimum evaluation dataset
+        run: |
+          python - <<'PY'
+          from backend.app import load_evaluation_cases
+          cases = load_evaluation_cases()
+          assert len(cases) >= 200, len(cases)
+          assert len({case["id"] for case in cases}) == len(cases)
+          print(f"evaluation cases: {len(cases)}")
+          PY

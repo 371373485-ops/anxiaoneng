@@ -44,6 +44,10 @@ class AgentRuntimeTests(unittest.TestCase):
         self.assertEqual(result["status"], "completed")
         self.assertEqual(len(result["steps"]), 4)
         self.assertEqual(result["result"]["facts"][0]["value"], 0.95)
+        self.assertTrue(result["validationReport"]["passed"])
+        self.assertEqual(
+            result["steps"][0]["output"]["source"], "evidence_snapshot"
+        )
 
     def test_idempotency_returns_same_run(self):
         payload = {
@@ -72,6 +76,16 @@ class AgentRuntimeTests(unittest.TestCase):
         }, "tester")
         cancelled = agent_runtime.cancel_run(result["id"])
         self.assertEqual(cancelled["status"], "cancelled")
+
+    def test_high_risk_result_waits_for_human_review(self):
+        result = agent_runtime.create_run({
+            "goal": "分析综合成本率",
+            "orgId": "BR_A", "branch": "A分公司", "period": "2026-06",
+            "metricIds": ["M_COST"], "riskLevel": "high",
+            "validationPolicy": "strict", "idempotencyKey": "high-risk",
+        }, "tester")
+        self.assertEqual(result["status"], "human_review_required")
+        self.assertTrue(result["validationReport"]["requiresHumanReview"])
 
 
 if __name__ == "__main__":

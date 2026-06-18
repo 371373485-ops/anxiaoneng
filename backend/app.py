@@ -14,7 +14,8 @@ from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import agent_runtime, db
+from . import agent_runtime, db, governance, model_provider
+from .evaluation_dataset import merge_evaluation_cases
 from .domain import (
     FEEDBACK_TYPES,
     METRIC_DIRECTIONS,
@@ -330,6 +331,15 @@ def create_diagnosis(body: DiagnosisInput, user: Identity = Depends(identity)):
         record["id"] = evidence_id
         evidence_payload.append(record)
         if item.metricId and item.direction in METRIC_DIRECTIONS:
+            existing_metric = db.fetch_one(
+                "SELECT * FROM metric_metadata WHERE metric_key=?", (item.metric,)
+            )
+            if existing_metric and existing_metric["metric_id"] != item.metricId:
+                raise HTTPException(
+                    422,
+                    f"指标口径冲突：{item.metric} 已绑定 "
+                    f"{existing_metric['metric_id']}，不能改为 {item.metricId}",
+                )
             db.execute(
                 """INSERT INTO metric_metadata
                 (metric_id,metric_key,label,unit,category,direction,benchmark_strategy,
@@ -651,6 +661,9 @@ class FeedbackInput(BaseModel):
 
 class EvaluationRunInput(BaseModel):
     cases: list[dict] | None = None
+    datasetVersion: str = "reliability-200-v1"
+    blindOnly: bool = False
+    repetitions: int = Field(default=1, ge=1, le=5)
 
 
 def load_evaluation_cases(custom_cases=None):
@@ -663,7 +676,7 @@ def load_evaluation_cases(custom_cases=None):
     cases = json.loads(fixture.read_text(encoding="utf-8"))
     if agent_fixture.exists():
         cases.extend(json.loads(agent_fixture.read_text(encoding="utf-8")))
-    return cases
+    return merge_evaluation_cases(cases)
 
 
 def normalized_evaluation_case(case):
@@ -683,13 +696,39 @@ def run_evaluation(body: EvaluationRunInput, user: Identity = Depends(identity))
     if user.role != "admin":
         raise HTTPException(403, "仅管理员可运行评测")
     cases = [normalized_evaluation_case(item) for item in load_evaluation_cases(body.cases)]
+    if body.blindOnly:
+        source_cases = load_evaluation_cases(body.cases)
+        cases = [
+            normalized_evaluation_case(item)
+            for item in source_cases if item.get("blind")
+        ]
+    if body.repetitions > 1:
+        cases = [
+            {**case, "id": f"{case['id']}__repeat_{repeat + 1}"}
+            for repeat in range(body.repetitions)
+            for case in cases
+        ]
     if not cases:
         raise HTTPException(422, "评测场景不能为空")
     run_id = new_id("eval")
     created_at = now_iso()
+    db.execute(
+        """INSERT INTO evaluation_versions
+        (id,name,dataset_version,blind_set_version,prompt_version,schema_version,
+         tool_version,case_count,frozen,created_by,created_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+        (
+            new_id("evalversion"), "AI可靠性评测", body.datasetVersion,
+            "reliability-blind-v1" if body.blindOnly else None,
+            PROMPT_VERSION, EVALUATION_SCHEMA_VERSION,
+            agent_runtime.TOOL_VERSION, len(cases), 1, user.user_id, created_at,
+        ),
+    )
     counters = {
         "schemaSuccess": 0, "numericSuccess": 0, "unsupportedConclusion": 0,
         "evidenceSuccess": 0, "recommendationSuccess": 0,
+        "relevanceSuccess": 0, "specificitySuccess": 0,
+        "organizationIsolationSuccess": 0,
         "criticalViolation": 0, "fallbackAttempts": 0, "fallbackSuccess": 0,
     }
     for case in cases:
@@ -710,11 +749,31 @@ def run_evaluation(body: EvaluationRunInput, user: Identity = Depends(identity))
             counters["numericSuccess"] += int(score.numeric_success)
             counters["evidenceSuccess"] += int(score.evidence_success)
             counters["recommendationSuccess"] += int(score.recommendation_success)
+            counters["relevanceSuccess"] += int(score.relevance_success)
+            counters["specificitySuccess"] += int(score.specificity_success)
+            counters["organizationIsolationSuccess"] += int(
+                "cross_org_evidence" not in score.critical_violations
+            )
             counters["unsupportedConclusion"] += score.unsupported_conclusions
             counters["criticalViolation"] += len(score.critical_violations)
             if score.critical_violations:
                 error_type = ",".join(score.critical_violations)
                 status = "failed"
+            db.execute(
+                """INSERT INTO evaluation_scores
+                (id,run_id,case_id,numeric_score,evidence_score,relevance_score,
+                 specificity_score,safety_score,critical_violation,details,created_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    new_id("evalscore"), run_id, case["id"],
+                    float(score.numeric_success), float(score.evidence_success),
+                    float(score.relevance_success), float(score.specificity_success),
+                    float(not score.critical_violations),
+                    int(bool(score.critical_violations)),
+                    db.dump({"violations": score.critical_violations}),
+                    created_at,
+                ),
+            )
         except Exception as exc:
             error_type = ai_error_type(exc)
             counters["fallbackAttempts"] += 1
@@ -739,8 +798,12 @@ def run_evaluation(body: EvaluationRunInput, user: Identity = Depends(identity))
     metrics = {
         "numericAccuracy": counters["numericSuccess"] / total,
         "evidenceValidityRate": counters["evidenceSuccess"] / total,
+        "organizationIsolationRate": counters["organizationIsolationSuccess"] / total,
         "recommendationCompletenessRate": counters["recommendationSuccess"] / total,
+        "relevanceRate": counters["relevanceSuccess"] / total,
+        "specificityRate": counters["specificitySuccess"] / total,
         "unsupportedConclusionRate": counters["unsupportedConclusion"] / total,
+        "unsupportedFactRate": counters["unsupportedConclusion"] / total,
         "schemaSuccessRate": counters["schemaSuccess"] / total,
         "criticalViolations": counters["criticalViolation"],
         "fallbackSuccessRate": (
@@ -749,10 +812,13 @@ def run_evaluation(body: EvaluationRunInput, user: Identity = Depends(identity))
         ),
     }
     gate_passed = (
-        metrics["numericAccuracy"] >= 0.99
+        metrics["numericAccuracy"] >= 0.995
         and metrics["evidenceValidityRate"] == 1.0
+        and metrics["organizationIsolationRate"] == 1.0
         and metrics["recommendationCompletenessRate"] >= 0.95
-        and metrics["unsupportedConclusionRate"] <= 0.02
+        and metrics["relevanceRate"] >= 0.90
+        and metrics["specificityRate"] >= 0.95
+        and metrics["unsupportedFactRate"] <= 0.01
         and metrics["schemaSuccessRate"] >= 0.98
         and metrics["criticalViolations"] == 0
         and metrics["fallbackSuccessRate"] == 1.0
@@ -1106,6 +1172,9 @@ class AgentRunInput(BaseModel):
     metricIds: list[str] = Field(default_factory=list)
     taskType: str = "analysis"
     outputFormat: str = "structured"
+    riskLevel: str = "medium"
+    validationPolicy: str = "strict"
+    executionMode: str = "deterministic"
     idempotencyKey: str | None = None
     taskId: str | None = None
 
@@ -1124,6 +1193,41 @@ class AgentMemoryInput(BaseModel):
     key: str = Field(min_length=1, max_length=120)
     payload: dict = Field(default_factory=dict)
     sourceId: str | None = None
+
+
+class ShadowRunInput(BaseModel):
+    agentRunId: str | None = None
+    orgId: str
+    branch: str
+    period: str
+    goal: str = Field(min_length=1, max_length=2000)
+    candidateOutput: dict
+    model: str | None = None
+    riskLevel: str = "medium"
+    validationPolicy: str = "strict"
+
+
+class HumanReviewInput(BaseModel):
+    targetId: str
+    targetType: str
+    orgId: str | None = None
+    factualScore: int = Field(ge=1, le=5)
+    relevanceScore: int = Field(ge=1, le=5)
+    specificityScore: int = Field(ge=1, le=5)
+    actionabilityScore: int = Field(ge=1, le=5)
+    decision: str
+    comment: str | None = None
+
+
+class ReleaseGateInput(BaseModel):
+    evaluationRunId: str
+    datasetVersion: str = "reliability-200-v1"
+
+
+STRICT_AGENT_PROMPT = """你是受控经营分析模型。你只能根据输入中的确定性工具结果和证据生成内容。
+必须严格遵守 responseSchema。所有事实和数字必须引用 evidenceIds；不得自行计算、猜测或补充数字。
+必须区分事实、推断和建议；不得把相关性写成确定因果。证据不足时返回空事实并在 limitations 中说明。
+建议必须包含具体动作、指标、方向、责任角色、周期和证据，不得使用空泛表述。"""
 
 
 @app.get("/api/tools")
@@ -1251,6 +1355,165 @@ def put_agent_memory(body: AgentMemoryInput, user: Identity = Depends(identity))
     return result
 
 
+@app.post("/api/shadow-runs")
+def create_shadow_run(body: ShadowRunInput, user: Identity = Depends(identity)):
+    if user.role not in {"admin", "hq_management", "function"}:
+        raise HTTPException(403, "当前角色无权创建影子运行")
+    assert_org(user, body.orgId, body.branch)
+    result = governance.create_shadow_run(
+        agent_run_id=body.agentRunId,
+        org_id=body.orgId,
+        branch=body.branch,
+        period=body.period,
+        goal=body.goal,
+        candidate_output=body.candidateOutput,
+        model=body.model,
+        validation_policy=body.validationPolicy,
+        risk_level=body.riskLevel,
+        user_id=user.user_id,
+    )
+    audit(
+        user, "shadow.run.create", result["status"],
+        org_id=body.orgId, branch=body.branch, period=body.period,
+        target_id=result["id"], model=body.model,
+        details={"visibleToUser": False, "blockers": result["validationReport"]["blockers"]},
+    )
+    return result
+
+
+@app.post("/api/agent-runs/{run_id}/shadow-generate")
+def generate_agent_shadow(run_id: str, user: Identity = Depends(identity)):
+    if user.role not in {"admin", "hq_management", "function"}:
+        raise HTTPException(403, "当前角色无权运行模型影子分析")
+    if not AI_ENABLED or not AI_KEY:
+        raise HTTPException(503, "AI保持关闭；配置并显式启用后才能运行影子分析")
+    run = get_authorized_agent_run(run_id, user)
+    evidence = db.fetch_all(
+        "SELECT * FROM evidence WHERE org_id=? AND period=? ORDER BY metric",
+        (run["orgId"], run["period"]),
+    )
+    request_context = model_provider.build_grounded_model_request(
+        run["goal"], run["plan"], run["steps"], evidence,
+    )
+    last_error = None
+    for attempt in range(2):
+        try:
+            content, _usage = ai_request([
+                {"role": "system", "content": STRICT_AGENT_PROMPT},
+                {
+                    "role": "user",
+                    "content": json.dumps(request_context, ensure_ascii=False),
+                },
+            ], json_mode=True)
+            candidate = model_provider.parse_strict_output(content)
+            result = governance.create_shadow_run(
+                agent_run_id=run_id, org_id=run["orgId"],
+                branch=run["branch"], period=run["period"], goal=run["goal"],
+                candidate_output=candidate, model=MODEL,
+                validation_policy=run["validationPolicy"],
+                risk_level=run["riskLevel"], user_id=user.user_id,
+            )
+            audit(
+                user, "shadow.run.generate", result["status"],
+                org_id=run["orgId"], branch=run["branch"], period=run["period"],
+                target_id=result["id"], model=MODEL,
+                prompt_version=agent_runtime.AGENT_PROMPT_VERSION,
+                schema_version=agent_runtime.AGENT_SCHEMA_VERSION,
+                details={"attempt": attempt + 1, "visibleToUser": False},
+            )
+            return result
+        except Exception as exc:
+            last_error = exc
+    audit(
+        user, "shadow.run.generate", "degraded",
+        org_id=run["orgId"], branch=run["branch"], period=run["period"],
+        target_id=run_id, model=MODEL, error_type=ai_error_type(last_error),
+        details={"retried": True},
+    )
+    raise HTTPException(
+        422, "模型输出连续两次未通过严格结构或可靠性校验，已阻止展示"
+    )
+
+
+@app.get("/api/shadow-runs")
+def list_shadow_runs(
+    org_id: str | None = Query(default=None, alias="orgId"),
+    limit: int = Query(default=100, ge=1, le=500),
+    user: Identity = Depends(identity),
+):
+    if user.role not in {"admin", "hq_management", "function"}:
+        raise HTTPException(403, "当前角色无权查看影子运行")
+    clauses, params = [], []
+    if org_id:
+        assert_org(user, org_id)
+        clauses.append("org_id=?")
+        params.append(org_id)
+    where = " WHERE " + " AND ".join(clauses) if clauses else ""
+    rows = db.fetch_all(
+        "SELECT * FROM shadow_runs" + where + " ORDER BY created_at DESC LIMIT ?",
+        (*params, limit),
+    )
+    return [
+        {
+            "id": row["id"], "agentRunId": row["agent_run_id"],
+            "orgId": row["org_id"], "branch": row["branch"],
+            "period": row["period"], "model": row["model"],
+            "status": row["status"], "visibleToUser": bool(row["visible_to_user"]),
+            "validationReport": db.load(row["validation_report"], {}),
+            "createdAt": row["created_at"],
+        }
+        for row in rows
+    ]
+
+
+@app.post("/api/human-reviews")
+def create_human_review(
+    body: HumanReviewInput, user: Identity = Depends(identity),
+):
+    if user.role not in {"admin", "hq_management", "function"}:
+        raise HTTPException(403, "当前角色无权提交人工评审")
+    if body.orgId:
+        assert_org(user, body.orgId)
+    try:
+        result = governance.add_human_review(
+            target_id=body.targetId, target_type=body.targetType,
+            org_id=body.orgId, reviewer_id=user.user_id, reviewer_role=user.role,
+            factual_score=body.factualScore,
+            relevance_score=body.relevanceScore,
+            specificity_score=body.specificityScore,
+            actionability_score=body.actionabilityScore,
+            decision=body.decision, comment=body.comment,
+        )
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    audit(
+        user, "human.review.create", "success", org_id=body.orgId,
+        target_id=result["id"], details={"decision": body.decision},
+    )
+    return result
+
+
+@app.post("/api/release-gates")
+def create_release_gate(
+    body: ReleaseGateInput, user: Identity = Depends(identity),
+):
+    if user.role != "admin":
+        raise HTTPException(403, "仅管理员可生成发布门禁")
+    try:
+        result = governance.create_release_gate(
+            body.evaluationRunId, body.datasetVersion, user.user_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    audit(
+        user, "release.gate.create",
+        "passed" if result["passed"] else "blocked",
+        target_id=result["id"],
+        details={"blockers": result["blockers"]},
+    )
+    return result
+
+
 @app.get("/api/pilot-metrics")
 def pilot_metrics(user: Identity = Depends(identity)):
     if user.role not in {"admin", "hq_management"}:
@@ -1276,6 +1539,15 @@ def pilot_metrics(user: Identity = Depends(identity)):
     latest_eval = db.fetch_one(
         "SELECT * FROM evaluation_runs ORDER BY created_at DESC"
     )
+    shadow_stats = db.fetch_all(
+        "SELECT status,COUNT(*) AS total FROM shadow_runs GROUP BY status"
+    )
+    review_stats = db.fetch_all(
+        "SELECT decision,COUNT(*) AS total FROM human_reviews GROUP BY decision"
+    )
+    latest_gate = db.fetch_one(
+        "SELECT * FROM release_gates ORDER BY created_at DESC"
+    )
     return {
         "runs": {"total": total_runs, "byStatus": statuses},
         "failureRate": (
@@ -1291,6 +1563,12 @@ def pilot_metrics(user: Identity = Depends(identity)):
         "toolExecutions": tool_stats["total"] or 0,
         "averageToolLatencyMs": round(tool_stats["avg_latency"] or 0, 2),
         "tokenUsage": token_usage["total"] if token_usage else 0,
+        "shadowRuns": {
+            row["status"]: row["total"] for row in shadow_stats
+        },
+        "humanReviews": {
+            row["decision"]: row["total"] for row in review_stats
+        },
         "latestEvaluation": (
             {
                 "id": latest_eval["id"],
@@ -1298,6 +1576,13 @@ def pilot_metrics(user: Identity = Depends(identity)):
                 "metrics": db.load(latest_eval["metrics"], {}),
             }
             if latest_eval else None
+        ),
+        "latestReleaseGate": (
+            {
+                "id": latest_gate["id"], "passed": bool(latest_gate["passed"]),
+                "blockers": db.load(latest_gate["blockers"], []),
+            }
+            if latest_gate else None
         ),
     }
 

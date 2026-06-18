@@ -1,6 +1,7 @@
 import unittest
 
 from backend.validation import (
+    build_validation_report,
     contains_prompt_injection,
     redact_sensitive,
     score_evaluation_output,
@@ -69,6 +70,73 @@ class ValidationTests(unittest.TestCase):
         self.assertTrue(score.numeric_success)
         self.assertTrue(score.evidence_success)
         self.assertFalse(score.critical_violations)
+
+    def test_report_rejects_wrong_unit_and_direction(self):
+        payload = {
+            "summary": "综合成本率需要改善。",
+            "facts": [{
+                "id": "fact_1", "text": "综合成本率当前值已确认。",
+                "evidenceIds": ["ev_1"], "metricId": "M_COST",
+                "value": 0.95, "unit": "万元",
+            }],
+            "inferences": [],
+            "recommendations": [{
+                "id": "rec_1", "title": "改善综合成本率",
+                "action": "由经营管理部门逐项核查赔付和费用结构",
+                "metricId": "M_COST", "direction": "increase",
+                "evidenceIds": ["ev_1"], "ownerRole": "经营管理",
+                "period": "2026-06",
+            }],
+            "limitations": [], "evidenceIds": ["ev_1"],
+        }
+        report = build_validation_report(
+            "分析综合成本率", payload, self.evidence, "BR_A",
+        )
+        self.assertFalse(report.passed)
+        self.assertIn("metric_mismatch", report.blockers)
+
+    def test_report_blocks_vague_advice_and_causal_claim(self):
+        payload = {
+            "summary": "综合成本率上升导致经营结果恶化。",
+            "facts": [{
+                "id": "fact_1", "text": "综合成本率当前值已确认。",
+                "evidenceIds": ["ev_1"], "metricId": "M_COST",
+                "value": 0.95, "unit": "%",
+            }],
+            "inferences": [],
+            "recommendations": [{
+                "id": "rec_1", "title": "改善成本",
+                "action": "加强管理",
+                "metricId": "M_COST", "direction": "decrease",
+                "evidenceIds": ["ev_1"], "ownerRole": "经营管理",
+                "period": "2026-06",
+            }],
+            "limitations": [], "evidenceIds": ["ev_1"],
+        }
+        report = build_validation_report(
+            "分析综合成本率", payload, self.evidence, "BR_A",
+        )
+        self.assertIn("causal_claim", report.blockers)
+        self.assertIn("vague_recommendation", report.blockers)
+
+    def test_high_risk_valid_output_requires_human_review(self):
+        payload = {
+            "summary": "综合成本率当前值已由证据确认。",
+            "facts": [{
+                "id": "fact_1", "text": "综合成本率当前值已确认。",
+                "evidenceIds": ["ev_1"], "metricId": "M_COST",
+                "value": 0.95, "unit": "%",
+            }],
+            "inferences": [], "recommendations": [],
+            "limitations": ["当前结果仅说明指标表现。"],
+            "evidenceIds": ["ev_1"],
+        }
+        report = build_validation_report(
+            "分析综合成本率", payload, self.evidence, "BR_A",
+            risk_level="high",
+        )
+        self.assertTrue(report.passed)
+        self.assertTrue(report.requiresHumanReview)
 
 
 if __name__ == "__main__":

@@ -1,17 +1,17 @@
 import hashlib
 import json
 import time
-from typing import Any, Callable
+from typing import Any
 
 from . import db
 from .domain import new_id, now_iso
 from .schemas import AgentOutput, AgentPlan, AgentStep, Fact, Recommendation, ToolResult
-from .validation import redact_sensitive
+from .validation import build_validation_report, redact_sensitive
 
 
 AGENT_PROMPT_VERSION = "agent-orchestrator-v1"
-AGENT_SCHEMA_VERSION = "agent-run-v1"
-TOOL_VERSION = "business-tools-v1"
+AGENT_SCHEMA_VERSION = "agent-run-v2"
+TOOL_VERSION = "business-tools-v2"
 
 
 def _hash(value):
@@ -59,7 +59,13 @@ def get_metric_snapshot(context):
     rows = _metric_rows(
         context["orgId"], context["period"], context.get("metricIds") or None
     )
-    return {"metrics": _rows_to_public(rows)}
+    return {
+        "metrics": _rows_to_public(rows),
+        "calculationVersion": (
+            rows[0].get("calculation_version") if rows else "unknown"
+        ) or "unknown",
+        "source": "evidence_snapshot",
+    }
 
 
 def calculate_metric(context):
@@ -67,6 +73,8 @@ def calculate_metric(context):
     return {
         "metrics": snapshot["metrics"],
         "calculationMode": "deterministic",
+        "calculationVersion": snapshot["calculationVersion"],
+        "source": "metric_service",
         "note": "所有数值来自已保存证据和确定性计算结果，模型未参与计算。",
     }
 
@@ -88,7 +96,10 @@ def compare_trend(context):
     grouped = {}
     for item in _rows_to_public(rows):
         grouped.setdefault(item["metricId"], []).append(item)
-    return {"series": grouped, "causalityClaimed": False}
+    return {
+        "series": grouped, "causalityClaimed": False,
+        "calculationVersion": "trend-v1", "source": "evidence_snapshot",
+    }
 
 
 def compare_benchmark(context):
@@ -101,12 +112,19 @@ def compare_benchmark(context):
                 "differenceValue": item["differenceValue"],
             }
             for item in metrics
-        ]
+        ],
+        "calculationVersion": "benchmark-v1",
+        "source": "evidence_snapshot",
     }
 
 
 def get_evidence(context):
-    return {"evidence": get_metric_snapshot(context)["metrics"]}
+    snapshot = get_metric_snapshot(context)
+    return {
+        "evidence": snapshot["metrics"],
+        "calculationVersion": snapshot["calculationVersion"],
+        "source": "evidence_snapshot",
+    }
 
 
 def create_remediation_draft(context):
@@ -117,6 +135,8 @@ def create_remediation_draft(context):
             "ownerDepartment", "ownerName", "dueDate", "targetValue",
         ],
         "message": "仅生成整改草稿；用户确认责任人与目标后才能创建正式任务。",
+        "calculationVersion": "remediation-v1",
+        "source": "remediation_service",
     }
 
 
@@ -127,6 +147,8 @@ def review_remediation(context):
             "status": "waiting_user",
             "missingInputs": ["taskId"],
             "message": "复盘需要指定整改任务。",
+            "calculationVersion": "review-v1",
+            "source": "remediation_service",
         }
     rows = db.fetch_all(
         "SELECT * FROM remediation_reviews WHERE task_id=? ORDER BY created_at DESC",
@@ -135,6 +157,8 @@ def review_remediation(context):
     return {
         "reviews": rows,
         "limitation": "指标变化仅表示相关性，不代表整改措施与结果之间存在确定因果关系。",
+        "calculationVersion": "review-v1",
+        "source": "remediation_service",
     }
 
 
@@ -231,6 +255,8 @@ def create_run(payload, user_id):
         return run_response(existing["id"])
 
     plan = build_plan(goal, clean)
+    risk_level = clean.get("riskLevel") or "medium"
+    validation_policy = clean.get("validationPolicy") or "strict"
     run_id = new_id("run")
     timestamp = now_iso()
     with db.transaction() as tx:
@@ -238,13 +264,16 @@ def create_run(payload, user_id):
             """INSERT INTO agent_runs
             (id,org_id,branch,period,goal,goal_payload,plan,result,status,
              idempotency_key,model,prompt_version,schema_version,tool_version,
-             error_type,created_by,created_at,updated_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+             error_type,risk_level,validation_policy,validation_report,execution_mode,
+             created_by,created_at,updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 run_id, clean.get("orgId") or "", clean.get("branch") or "",
                 clean.get("period") or "", goal, db.dump(clean), db.dump(plan.model_dump()),
                 None, plan.status, idempotency_key, "deterministic-orchestrator",
                 AGENT_PROMPT_VERSION, AGENT_SCHEMA_VERSION, TOOL_VERSION, None,
+                risk_level, validation_policy, None,
+                clean.get("executionMode") or "deterministic",
                 user_id, timestamp, timestamp,
             ),
         )
@@ -297,28 +326,40 @@ def _execute_tool(run, step, user_id):
         (run["id"], step["id"], input_hash),
     )
     if previous and previous["status"] == "success":
-        return db.load(previous["output_payload"], {})
+        cached = db.load(previous["output_payload"], {})
+        return cached.get("output", cached)
 
     started = time.monotonic()
     output = definition["handler"](input_payload)
     latency = int((time.monotonic() - started) * 1000)
+    tool_result = ToolResult(
+        toolName=tool_name,
+        inputHash=input_hash,
+        output=output,
+        status="success",
+        latencyMs=latency,
+        calculationVersion=output.get("calculationVersion") or TOOL_VERSION,
+        source=output.get("source") or tool_name,
+    ).model_dump()
     timestamp = now_iso()
     with db.transaction() as tx:
         tx.execute(
             """INSERT INTO tool_executions
             (id,run_id,step_id,org_id,tool_name,tool_version,input_hash,input_payload,
-             output_payload,status,latency_ms,error_type,created_by,created_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+             output_payload,status,latency_ms,calculation_version,source,error_type,
+             created_by,created_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 new_id("tool"), run["id"], step["id"], run["org_id"], tool_name,
-                TOOL_VERSION, input_hash, db.dump(input_payload), db.dump(output),
-                "success", latency, None, user_id, timestamp,
+                TOOL_VERSION, input_hash, db.dump(input_payload), db.dump(tool_result),
+                "success", latency, tool_result["calculationVersion"],
+                tool_result["source"], None, user_id, timestamp,
             ),
         )
         tx.execute(
             """UPDATE agent_steps SET output_payload=?,status='completed',
                completed_at=? WHERE id=?""",
-            (db.dump(output), timestamp, step["id"]),
+            (db.dump(tool_result), timestamp, step["id"]),
         )
     return output
 
@@ -424,10 +465,59 @@ def execute_run(run_id, user_id):
                 )
                 return
         result = _compose_result(run_id)
+        evidence_rows = _metric_rows(
+            run["org_id"], run["period"],
+            db.load(run["goal_payload"], {}).get("metricIds") or None,
+        )
+        if not result.get("facts"):
+            report = build_validation_report(
+                run["goal"], result, evidence_rows, run["org_id"],
+                run.get("validation_policy") or "strict",
+                run.get("risk_level") or "medium",
+            )
+            result["validationReport"] = report.model_dump()
+            db.execute(
+                """UPDATE agent_runs SET result=?,validation_report=?,
+                   status='insufficient_evidence',updated_at=? WHERE id=?""",
+                (db.dump(result), db.dump(report.model_dump()), now_iso(), run_id),
+            )
+            return
+        report = build_validation_report(
+            run["goal"], result, evidence_rows, run["org_id"],
+            run.get("validation_policy") or "strict",
+            run.get("risk_level") or "medium",
+        )
+        result["validationReport"] = report.model_dump()
+        if not report.passed:
+            safe_result = {
+                "summary": "生成内容未通过可靠性校验，已阻止展示。",
+                "facts": [], "inferences": [], "recommendations": [],
+                "limitations": ["请查看校验报告或使用规则诊断结果。"],
+                "evidenceIds": [],
+                "validationReport": report.model_dump(),
+                "degraded": True,
+                "schemaVersion": result.get("schemaVersion"),
+            }
+            db.execute(
+                """UPDATE agent_runs SET result=?,validation_report=?,
+                   status='validation_failed',error_type='validation_failed',
+                   updated_at=? WHERE id=?""",
+                (
+                    db.dump(safe_result), db.dump(report.model_dump()),
+                    now_iso(), run_id,
+                ),
+            )
+            return
+        final_status = (
+            "human_review_required" if report.requiresHumanReview else "completed"
+        )
         db.execute(
-            """UPDATE agent_runs SET result=?,status='completed',updated_at=?
+            """UPDATE agent_runs SET result=?,validation_report=?,status=?,updated_at=?
                WHERE id=?""",
-            (db.dump(result), now_iso(), run_id),
+            (
+                db.dump(result), db.dump(report.model_dump()),
+                final_status, now_iso(), run_id,
+            ),
         )
     except Exception as exc:
         db.execute(
@@ -442,7 +532,9 @@ def add_inputs(run_id, inputs, user_id):
     run = db.fetch_one("SELECT * FROM agent_runs WHERE id=?", (run_id,))
     if not run:
         raise ValueError("智能体任务不存在")
-    if run["status"] not in {"waiting_user", "failed"}:
+    if run["status"] not in {
+        "waiting_user", "failed", "insufficient_evidence", "validation_failed",
+    }:
         raise ValueError("当前状态不允许补充输入")
     payload = db.load(run["goal_payload"], {})
     payload.update(redact_sensitive(inputs))
@@ -507,6 +599,10 @@ def run_response(run_id):
         "plan": db.load(run["plan"], {}),
         "result": db.load(run["result"], None),
         "errorType": run["error_type"],
+        "riskLevel": run.get("risk_level") or "medium",
+        "validationPolicy": run.get("validation_policy") or "strict",
+        "validationReport": db.load(run.get("validation_report"), None),
+        "executionMode": run.get("execution_mode") or "deterministic",
         "versions": {
             "prompt": run["prompt_version"],
             "schema": run["schema_version"],

@@ -73,6 +73,40 @@ class ApiTests(unittest.TestCase):
         )
         self.assertEqual(mismatch.status_code, 422)
 
+    def test_metric_key_cannot_be_rebound_to_another_metric_id(self):
+        first = self.client.post(
+            "/api/diagnoses",
+            json={
+                "branch": "指标口径测试一", "period": "2026-06",
+                "dataVersion": "metric-v1", "ruleVersion": "rules-1",
+                "riskLevel": "关注", "summary": "测试", "facts": [],
+                "inferences": [], "investigations": [], "recommendations": [],
+                "limitations": [], "evidence": [{
+                    "metric": "stableMetricKey", "metricId": "M_STABLE_1",
+                    "label": "稳定指标", "currentValue": 1, "unit": "万元",
+                    "source": "test", "direction": "increase",
+                }],
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(first.status_code, 200, first.text)
+        conflict = self.client.post(
+            "/api/diagnoses",
+            json={
+                "branch": "指标口径测试二", "period": "2026-06",
+                "dataVersion": "metric-v2", "ruleVersion": "rules-1",
+                "riskLevel": "关注", "summary": "测试", "facts": [],
+                "inferences": [], "investigations": [], "recommendations": [],
+                "limitations": [], "evidence": [{
+                    "metric": "stableMetricKey", "metricId": "M_STABLE_2",
+                    "label": "稳定指标", "currentValue": 1, "unit": "万元",
+                    "source": "test", "direction": "increase",
+                }],
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(conflict.status_code, 422, conflict.text)
+
     def test_proxy_auth_ignores_browser_supplied_development_identity(self):
         from backend import app as app_module
         with patch.object(app_module, "AUTH_MODE", "proxy"):
@@ -319,7 +353,7 @@ class ApiTests(unittest.TestCase):
             headers=self.headers,
         )
         self.assertEqual(resumed.status_code, 200, resumed.text)
-        self.assertEqual(resumed.json()["status"], "completed")
+        self.assertEqual(resumed.json()["status"], "insufficient_evidence")
 
     def test_agent_tools_memories_and_pilot_metrics(self):
         tools = self.client.get("/api/tools", headers=self.headers)
@@ -363,6 +397,105 @@ class ApiTests(unittest.TestCase):
             headers={"X-User-Id": "branch-user", "X-Role": "branch", "X-Branches": "BR_OTHER"},
         )
         self.assertEqual(denied.status_code, 403)
+
+    def test_shadow_run_is_hidden_and_invalid_output_is_blocked(self):
+        diagnosis = self.client.post(
+            "/api/diagnoses",
+            json={
+                "orgId": "BR_SHADOW", "branch": "影子测试分公司",
+                "period": "2026-06", "dataVersion": "shadow-data",
+                "ruleVersion": "rules-1", "riskLevel": "关注",
+                "summary": "影子测试", "facts": [], "inferences": [],
+                "investigations": [], "recommendations": [],
+                "limitations": [],
+                "evidence": [{
+                    "id": "ev_shadow", "metric": "costRate",
+                    "metricId": "M_SHADOW_COST", "label": "综合成本率",
+                    "currentValue": 0.95, "benchmarkValue": 1.0,
+                    "differenceValue": -0.05, "unit": "%",
+                    "source": "test", "direction": "decrease",
+                    "calculationVersion": "calc-v1",
+                }],
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(diagnosis.status_code, 200, diagnosis.text)
+        shadow = self.client.post(
+            "/api/shadow-runs",
+            json={
+                "orgId": "BR_SHADOW", "branch": "影子测试分公司",
+                "period": "2026-06", "goal": "分析综合成本率",
+                "candidateOutput": {
+                    "summary": "综合成本率为1.37。",
+                    "facts": [{
+                        "id": "fact_shadow", "text": "综合成本率为1.37。",
+                        "evidenceIds": ["ev_shadow"],
+                        "metricId": "M_SHADOW_COST", "value": 1.37, "unit": "%",
+                    }],
+                    "inferences": [], "recommendations": [],
+                    "limitations": [], "evidenceIds": ["ev_shadow"],
+                },
+                "model": "shadow-model",
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(shadow.status_code, 200, shadow.text)
+        self.assertEqual(shadow.json()["status"], "validation_failed")
+        self.assertFalse(shadow.json()["visibleToUser"])
+        self.assertIn(
+            "unsupported_number", shadow.json()["validationReport"]["blockers"]
+        )
+
+        disabled_generation = self.client.post(
+            "/api/agent-runs/not-configured/shadow-generate",
+            json={}, headers=self.headers,
+        )
+        self.assertEqual(disabled_generation.status_code, 503)
+
+    def test_human_review_and_release_gate_contract(self):
+        review = self.client.post(
+            "/api/human-reviews",
+            json={
+                "targetId": "shadow_1", "targetType": "shadow_run",
+                "factualScore": 5, "relevanceScore": 4,
+                "specificityScore": 4, "actionabilityScore": 4,
+                "decision": "approved", "comment": "测试评审",
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(review.status_code, 200, review.text)
+        self.assertEqual(review.json()["decision"], "approved")
+
+        from backend import app as app_module
+        eval_id = "eval_release_gate"
+        metrics = {
+            "numericAccuracy": 0.995, "evidenceValidityRate": 1.0,
+            "organizationIsolationRate": 1.0, "unsupportedFactRate": 0.0,
+            "relevanceRate": 0.95, "recommendationCompletenessRate": 0.96,
+            "specificityRate": 0.95, "fallbackSuccessRate": 1.0,
+            "criticalViolations": 0,
+        }
+        app_module.db.execute(
+            """INSERT INTO evaluation_runs
+            (id,status,model,temperature,prompt_version,schema_version,total_cases,
+             completed_cases,metrics,gate_passed,created_by,created_at,completed_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                eval_id, "completed", "test", 0.0, "p1", "s1", 200, 200,
+                app_module.db.dump(metrics), 1, "tester",
+                "2026-06-19T00:00:00+00:00", "2026-06-19T00:00:01+00:00",
+            ),
+        )
+        gate = self.client.post(
+            "/api/release-gates",
+            json={
+                "evaluationRunId": eval_id,
+                "datasetVersion": "reliability-200-v1",
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(gate.status_code, 200, gate.text)
+        self.assertTrue(gate.json()["passed"])
 
 
 if __name__ == "__main__":
