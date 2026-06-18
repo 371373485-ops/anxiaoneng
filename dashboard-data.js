@@ -193,7 +193,25 @@ function initData(){
   switchTab('overview');
 }
 
-function saveAllData(){try{var j=JSON.stringify(App.ALL_DATA);localStorage.setItem(App.STORAGE_KEY,j);var hasData=App.ALL_DATA.actuals&&Object.keys(App.ALL_DATA.actuals).length>0;if(hasData){clearTimeout(App._saveTimer);App._saveTimer=setTimeout(function(){fetch('/save-backup',{method:'POST',body:j}).catch(function(){});},2000);}}catch(e){}}
+function cancelPendingSave(){
+  if(App._saveTimer)clearTimeout(App._saveTimer);
+  App._saveTimer=null;
+}
+
+function saveAllData(){
+  try{
+    var j=JSON.stringify(App.ALL_DATA);
+    localStorage.setItem(App.STORAGE_KEY,j);
+    cancelPendingSave();
+    var hasData=App.ALL_DATA.actuals&&Object.keys(App.ALL_DATA.actuals).length>0;
+    if(hasData){
+      App._saveTimer=setTimeout(function(){
+        App._saveTimer=null;
+        fetch('/save-backup',{method:'POST',body:j}).catch(function(){});
+      },2000);
+    }
+  }catch(e){}
+}
 
 
 // Find a branch in plan data by region and name

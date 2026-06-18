@@ -21,6 +21,60 @@
 
 纯前端 HTML5 + CSS3 + JavaScript ES6，基于 SheetJS（xlsx）处理 Excel，Chart.js 渲染图表。通过 GitHub Pages 部署。
 
+智能经营诊断的内部生产版本增加 FastAPI + PostgreSQL 后端。公开 GitHub
+Pages 仍只运行规则诊断，不发送经营数据，也不启用生成式 AI。
+
+## 智能经营诊断
+
+- 基础诊断由规则引擎确定性生成，AI 故障不会影响看板。
+- AI 解读只读取服务端保存的诊断快照，并对结构和引用数字进行校验。
+- 支持证据追溯、机构/周期隔离会话、反馈、审计及整改任务闭环。
+- 整改任务按 `draft → confirmed → in_progress → completed → closed` 流转。
+
+本地启动内部版本：
+
+```powershell
+python -m pip install -r backend/requirements.txt
+$env:AI_ENABLED="false"
+uvicorn backend.app:app --host 127.0.0.1 --port 8921
+```
+
+## 智能体工作流 V1
+
+内部版本新增可靠、可审计的经营智能体执行链：
+
+- `POST /api/agent-runs` 创建目标分析任务。
+- `GET /api/agent-runs/{id}` 查看计划、工具步骤、状态与结构化结果。
+- `POST /api/agent-runs/{id}/inputs` 补充缺失机构、周期或任务信息。
+- `POST /api/agent-runs/{id}/cancel` 取消未完成任务。
+- `GET /api/tools` 查看白名单工具及版本。
+- `GET/POST /api/agent-memories` 读取或保存按 `orgId` 隔离的受控记忆。
+- `GET /api/pilot-metrics` 查看试点失败率、采纳反馈、任务转化、延迟与发布门禁。
+
+所有数字由确定性工具和证据快照提供；模型不负责心算。跨表诊断、
+评测、整改任务与状态历史使用原子事务。默认 `AI_ENABLED=false`，
+模型异常或输出校验失败时继续返回规则诊断。
+
+运行完整测试：
+
+```powershell
+python -m pip install -r backend/requirements-dev.txt
+python -m unittest discover -s tests -v
+node --check dashboard-agent.js
+node --check dashboard-diagnosis.js
+```
+
+PostgreSQL 生产部署可复制 `backend/.env.example` 配置环境变量后运行：
+
+```powershell
+docker compose up --build
+```
+
+生产环境必须设置 `APP_ENV=production`，并使用 `AUTH_MODE=proxy` 由可信
+身份网关注入用户、角色和机构范围；服务间调用可改用 `AUTH_MODE=token`
+并配置 `API_AUTH_TOKEN`。不要把共享密钥下发到浏览器。默认
+`AI_ENABLED=false`，完成内部安全评审后再启用并配置 `ZAI_API_KEY`。
+
 ## 项目结构
 
 ```

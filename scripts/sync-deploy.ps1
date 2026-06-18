@@ -6,6 +6,8 @@ $root = Resolve-Path (Join-Path $scriptDir '..')
 $literalFiles = @(
   'index.html',
   'dashboard.css',
+  'dashboard-diagnosis.css',
+  'diagnosis-backend.json',
   'chart.umd.min.js',
   'xlsx.full.min.js',
   'readme.md'

@@ -589,6 +589,7 @@ function confirmClearAll(){
 }
 
 function clearAllData(){
+  cancelPendingSave();
   App.ALL_DATA._plans={};
   App.ALL_DATA.actuals={};
   App.ALL_DATA._merged={};
@@ -599,6 +600,7 @@ function clearAllData(){
   App.currentPlanKey='auto';
   App.currentYear='2026';
   saveAllData();
+  cancelPendingSave();
   refreshMergedData();
   updateYearUI();
   updatePlanUI();
@@ -606,7 +608,16 @@ function clearAllData(){
   destroyCharts();
   switchTab('overview');
   toast('所有数据已清空','info');
-  fetch('/save-backup',{method:'POST',body:JSON.stringify(App.ALL_DATA)}).catch(function(){});
+  return fetch('/save-backup',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(App.ALL_DATA)
+  }).then(function(response){
+    if(!response.ok)throw new Error('backup clear failed');
+    return response;
+  }).catch(function(){
+    toast('本地数据已清空，但磁盘备份清空失败','error');
+  });
 }
 
 // ── Button binding ──

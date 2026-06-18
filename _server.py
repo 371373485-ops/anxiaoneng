@@ -1,16 +1,21 @@
 import http.server, socketserver, os, sys, json, urllib.request, urllib.error, ssl, threading
 
-PORT = 8921
-DIR = os.path.dirname(os.path.abspath(__file__))
+PORT = int(os.environ.get("SERVER_PORT", "8921"))
+DIR = os.path.abspath(os.environ.get("SERVER_DATA_DIR", os.path.dirname(os.path.abspath(__file__))))
 os.chdir(DIR)
 ALLOWED_CORS_ORIGINS = {
     'http://127.0.0.1:8921',
     'http://localhost:8921',
 }
+SAVE_BACKUP_MAX_BYTES = 10 * 1024 * 1024
+AI_CHAT_MAX_BYTES = 1 * 1024 * 1024
 
 # ── Zhipu GLM API config ──
 ZHIPU_API_KEY = os.environ.get("ZAI_API_KEY", "")
-ZHIPU_API_URL = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+ZHIPU_API_URL = os.environ.get(
+    "ZHIPU_API_URL",
+    "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+)
 ZHIPU_MODEL = "glm-4-flash"  # 性价比之选，可改为 glm-4 获得更好质量
 
 SYSTEM_PROMPT = """你是一个专业的保险公司经营分析助手，服务于华安保险的管理层。你的职责是：
@@ -67,11 +72,18 @@ class H(http.server.SimpleHTTPRequestHandler):
 
     def do_OPTIONS(self):
         """Handle CORS preflight"""
+        if not self._is_allowed_origin():
+            self._send_json(403, {'ok': False, 'error': 'origin not allowed'})
+            return
         self.send_response(200)
         self._send_cors()
         self.send_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.end_headers()
+
+    def _is_allowed_origin(self):
+        origin = self.headers.get('Origin')
+        return origin is None or origin in ALLOWED_CORS_ORIGINS
 
     def _send_cors(self):
         origin = self.headers.get('Origin')
@@ -86,6 +98,22 @@ class H(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(json.dumps(payload).encode())
 
+    def _read_request_body(self, max_bytes):
+        raw_length = self.headers.get('Content-Length')
+        try:
+            if raw_length is None:
+                raise ValueError
+            length = int(raw_length)
+            if length < 0:
+                raise ValueError
+        except (TypeError, ValueError):
+            self._send_json(400, {'ok': False, 'error': 'invalid Content-Length'})
+            return None
+        if length > max_bytes:
+            self._send_json(413, {'ok': False, 'error': 'request body too large'})
+            return None
+        return self.rfile.read(length)
+
     def _validate_backup_payload(self, data):
         try:
             payload = json.loads(data.decode('utf-8'))
@@ -97,10 +125,15 @@ class H(http.server.SimpleHTTPRequestHandler):
             raise ValueError('backup payload must contain actuals or _plans')
 
     def do_POST(self):
+        if not self._is_allowed_origin():
+            self._send_json(403, {'ok': False, 'error': 'origin not allowed'})
+            return
+
         if self.path == '/save-backup':
             try:
-                length = int(self.headers.get('Content-Length', 0))
-                data = self.rfile.read(length)
+                data = self._read_request_body(SAVE_BACKUP_MAX_BYTES)
+                if data is None:
+                    return
                 self._validate_backup_payload(data)
                 bkpath = os.path.join(DIR, '_data_backup.json')
                 with open(bkpath, 'wb') as f:
@@ -113,7 +146,9 @@ class H(http.server.SimpleHTTPRequestHandler):
                 self._send_json(500, {'ok': False, 'error': str(e)})
 
         elif self.path == '/ai/chat':
-            self._handle_ai_chat()
+            body = self._read_request_body(AI_CHAT_MAX_BYTES)
+            if body is not None:
+                self._handle_ai_chat(body)
 
         elif self.path == '/ai/health':
             self._handle_ai_health()
@@ -136,7 +171,7 @@ class H(http.server.SimpleHTTPRequestHandler):
             'message': 'AI 服务已就绪' if has_key else '未配置 API Key，请在服务端设置 ZAI_API_KEY 环境变量'
         }).encode())
 
-    def _handle_ai_chat(self):
+    def _handle_ai_chat(self, body):
         """Handle AI chat requests with SSE streaming"""
         if not ZHIPU_API_KEY:
             self.send_response(503)
@@ -149,8 +184,6 @@ class H(http.server.SimpleHTTPRequestHandler):
             return
 
         try:
-            length = int(self.headers.get('Content-Length', 0))
-            body = self.rfile.read(length)
             req = json.loads(body)
             question = req.get('question', '')
             context = req.get('context', {})
@@ -346,11 +379,16 @@ class H(http.server.SimpleHTTPRequestHandler):
                 pass
 
 
-print(f'http://localhost:{PORT}/', flush=True)
-print(f'AI endpoint: http://localhost:{PORT}/ai/chat', flush=True)
-print(f'AI model: {ZHIPU_MODEL}', flush=True)
-print(f'API Key: {"已配置" if ZHIPU_API_KEY else "❌ 未配置！请设置 ZAI_API_KEY 环境变量"}', flush=True)
+def serve():
+    print(f'http://localhost:{PORT}/', flush=True)
+    print(f'AI endpoint: http://localhost:{PORT}/ai/chat', flush=True)
+    print(f'AI model: {ZHIPU_MODEL}', flush=True)
+    print(f'API Key: {"已配置" if ZHIPU_API_KEY else "❌ 未配置！请设置 ZAI_API_KEY 环境变量"}', flush=True)
 
-socketserver.ThreadingTCPServer.allow_reuse_address = True
-with socketserver.ThreadingTCPServer(('127.0.0.1', PORT), H) as h:
-    h.serve_forever()
+    socketserver.ThreadingTCPServer.allow_reuse_address = True
+    with socketserver.ThreadingTCPServer(('127.0.0.1', PORT), H) as h:
+        h.serve_forever()
+
+
+if __name__ == '__main__':
+    serve()

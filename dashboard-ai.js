@@ -225,12 +225,6 @@ function _patternAnalysis(sn){
     patterns.push({name:'利润转化效率低',desc:'人均产能接近分公司整体水平，但人均利润（'+_fv(pper.cur,'万元/人')+'）低于分公司整体（'+_fv(pper.peer,'万元/人')+'），保费产出向利润的转化效率或有改善空间',
       action:'综合成本率结构值得分析，赔付端与费用端的相对贡献可作为改善优先级参考'});
   }
-  // 模式6：规模不足（保费明显低于分公司整体）
-  else if(prem.cur!=null&&prem.peer!=null&&prem.peer>0&&prem.cur/prem.peer<0.70){
-    patterns.push({name:'规模不足',desc:'保费收入约为分公司整体水平的'+Math.round(prem.cur/prem.peer*100)+'%，规模效应或可进一步提升',
-      action:'市场开拓策略值得审视，优质业务的获取力度与规模效应可协同关注'});
-  }
-
   return patterns;
 }
 
@@ -300,8 +294,7 @@ function _causesAnalysis(sn,alerts){
   if(pcr.cur!=null&&pcr.cur<0.80){
     var gap=1-pcr.cur;
     cs.push('保费达成率为'+_pct(pcr.cur)+'，与时间进度有约'+Math.round(gap*100)+'个百分点，'+
-      (prem.delta!=null&&prem.delta<0?'同比也有所回落，收入端或存在一定压力':'收入端增长势头或可加强')+
-      (prem.peer!=null?'（分公司整体'+_fv(prem.peer,'万元')+'）':''));
+      (prem.delta!=null&&prem.delta<0?'同比也有所回落，收入端或存在一定压力':'收入端增长势头或可加强'));
   }
 
   if(cs.length===0)cs.push('当前预警集中在个别指标上，建议对照业务日历排查是否有一次性事项影响');
@@ -334,54 +327,173 @@ function _suggestions(lv,pat,cor,lr,cr,pr,prem,pcr,prod,prodR,back,hrCR){
 
   // 短期（1-2周）
   if(lv.level.indexOf('高风险')>=0){
-    sg.push({term:'短期（1-2周）',text:'可视情况组织专项经营分析会，逐项梳理指标变化，明确关注重点与分工'});
-    sg.push({term:'短期（1-2周）',text:'可考虑梳理近期可落地的改善举措，设定阶段性观察目标'});
+    sg.push({domain:'management',term:'短期（1-2周）',text:'可视情况组织专项经营分析会，逐项梳理指标变化，明确关注重点与分工'});
+    sg.push({domain:'management',term:'短期（1-2周）',text:'可考虑梳理近期可落地的改善举措，设定阶段性观察目标'});
   }
   if(cor.cur!=null&&cor.cur>1.05){
-    sg.push({term:'短期（1-2周）',text:'综合成本率较高，建议关注大额赔案与费用支出的变化情况，识别短期内或可优化的方向'});
+    sg.push({domain:'business',term:'短期（1-2周）',text:'综合成本率较高，建议按险种、渠道和业务来源核查承保质量，识别高成本业务并调整业务获取策略'});
+    sg.push({domain:'claims',term:'短期（1-2周）',text:'综合成本率较高，建议拆分大案、案均赔款和赔付频度，确认赔付端对成本偏离的主要贡献'});
   }
   if(lr.cur!=null&&lr.cur>0.73){
-    sg.push({term:'短期（1-2周）',text:'赔付率偏高，可考虑建立大案跟踪台账，对单笔金额较大的赔案保持关注'});
+    sg.push({domain:'claims',term:'短期（1-2周）',text:'赔付率偏高，可考虑建立大案跟踪台账，对单笔金额较大的赔案保持关注'});
   }
   if(pcr.cur!=null&&pcr.cur<0.60){
-    sg.push({term:'短期（1-2周）',text:'保费达成率与时间进度存在差距，建议分渠道、分险种了解保费缺口的主要分布'});
+    sg.push({domain:'business',term:'短期（1-2周）',text:'保费达成率与时间进度存在差距，建议分渠道、分险种了解保费缺口的主要分布'});
   }
 
   // 中期（1-3月）
   if(pcr.cur!=null&&pcr.cur<0.80){
-    sg.push({term:'中期（1-3月）',text:'保费达成有提升空间，可探讨渠道拓展与产品优化的可能方向，关注达成率改善趋势'});
+    sg.push({domain:'business',term:'中期（1-3月）',text:'保费达成有提升空间，可探讨渠道拓展与产品优化的可能方向，关注达成率改善趋势'});
   }
   if(cr.cur!=null&&cr.cur>0.32){
-    sg.push({term:'中期（1-3月）',text:'可审视费用结构，关注是否存在刚性支出以外的优化空间，参考费用率'+_pct(cr.cur-0.03)+'以下，按月跟踪进度'});
+    sg.push({domain:'management',term:'中期（1-3月）',text:'可审视费用结构，关注是否存在刚性支出以外的优化空间，参考费用率'+_pct(cr.cur-0.03)+'以下，按月跟踪进度'});
   }
   if(prem.delta!=null&&prem.delta<-0.05){
-    sg.push({term:'中期（1-3月）',text:'保费有所回落，可探讨渠道策略是否需要微调，关注'+Math.abs(Math.round(prem.delta*100))+'%的缺口'});
+    sg.push({domain:'business',term:'中期（1-3月）',text:'保费有所回落，可探讨渠道策略是否需要微调，关注'+Math.abs(Math.round(prem.delta*100))+'%的缺口'});
   }
   if(cor.cur!=null&&cor.cur>1.0&&lr.cur!=null&&lr.cur>0.70){
-    sg.push({term:'中期（1-3月）',text:'业务结构或有优化空间，可关注不同险种的赔付表现，作为结构调整的参考'});
+    sg.push({domain:'claims',term:'中期（1-3月）',text:'业务结构或有优化空间，可关注不同险种的赔付表现，作为结构调整的参考'});
   }
   if(prod.cur!=null&&prod.peer!=null&&prod.cur<prod.peer&&prod.peer>0){
     var gapPct=Math.round((prod.peer-prod.cur)/prod.peer*100);
-    sg.push({term:'中期（1-3月）',text:'人均产能与分公司整体水平存在差距'+gapPct+'%，编制与前后台配比或可作为优化参考方向'});
+    sg.push({domain:'efficiency',term:'中期（1-3月）',text:'人均产能与分公司整体水平存在差距'+gapPct+'%，编制与前后台配比或可作为优化参考方向'});
   }
   if(back.cur!=null&&prod.peer!=null&&back.cur<prod.peer){
-    sg.push({term:'中期（1-3月）',text:'后台产能低于分公司整体，后台职能配置与数字化提效或存在优化空间'});
+    sg.push({domain:'efficiency',term:'中期（1-3月）',text:'后台产能低于分公司整体，后台职能配置与数字化提效或存在优化空间'});
   }
   if(hrCR.cur!=null&&hrCR.cur>0.10){
-    sg.push({term:'中期（1-3月）',text:'人力成本保费率相对偏高（'+_pct(hrCR.cur)+'），人力成本增速与保费产出的匹配关系值得关注'});
+    sg.push({domain:'efficiency',term:'中期（1-3月）',text:'人力成本保费率相对偏高（'+_pct(hrCR.cur)+'），人力成本增速与保费产出的匹配关系值得关注'});
   }
 
   // 长期（3-6月）
-  sg.push({term:'长期（3-6月）',text:'可考虑建立关键指标定期回顾机制，便于及时发现问题并形成响应习惯'});
+  sg.push({domain:'management',term:'长期（3-6月）',text:'可考虑建立关键指标定期回顾机制，便于及时发现问题并形成响应习惯'});
   if(pat.some(function(p){return p.name.indexOf('费用')>=0||p.name.indexOf('增长')>=0;})){
-    sg.push({term:'长期（3-6月）',text:'业务策略与考核导向值得定期审视，关注规模与质量之间的平衡'});
+    sg.push({domain:'management',term:'长期（3-6月）',text:'业务策略与考核导向值得定期审视，关注规模与质量之间的平衡'});
   }
 
-  return sg.slice(0,6);
+  var domainOrder=['business','claims','efficiency','management'];
+  var domainLimit={business:2,claims:2,efficiency:2,management:1};
+  var selected=[],seen={};
+  domainOrder.forEach(function(domain){
+    sg.filter(function(item){return item.domain===domain;}).forEach(function(item){
+      if(selected.filter(function(x){return x.domain===domain;}).length>=domainLimit[domain])return;
+      var key=domain+'|'+item.text;
+      if(seen[key])return;
+      seen[key]=true;selected.push(item);
+    });
+  });
+  return selected.slice(0,7);
 }
+
+function _stableHash(value){
+  var text=JSON.stringify(value),hash=2166136261;
+  for(var i=0;i<text.length;i++){hash^=text.charCodeAt(i);hash=Math.imul(hash,16777619);}
+  return (hash>>>0).toString(16);
+}
+function _riskName(level){
+  if(level.indexOf('高风险')>=0)return'高风险';
+  if(level.indexOf('中风险')>=0)return'中风险';
+  if(level.indexOf('关注')>=0)return'关注';
+  return'正常';
+}
+function _scoreFromLevel(level){
+  var m=String(level.desc||'').match(/得分[：:]?\s*(\d+)/);
+  if(m)return Number(m[1]);
+  return _riskName(level.level)==='高风险'?40:(_riskName(level.level)==='中风险'?20:(_riskName(level.level)==='关注'?8:0));
+}
+function _buildDiagnosisModel(bn,alerts){
+  alerts=alerts||[];
+  var configurationErrors=(App.METRIC_CONFIG_ERRORS||[]).slice();
+  alerts=alerts.filter(function(item){
+    if(App.getMetricMeta(item.field))return true;
+    configurationErrors.push({metric:item.field,missing:['metric_metadata'],source:'alert'});
+    return false;
+  });
+  var sn=_snap(bn),branch=_bdata(bn),data=branch.d||{},evidence=[],facts=[],rankingConcerns=[];
+  if(!sn._ok)return null;
+  var lv=_assessLevel(sn,alerts),patterns=_patternAnalysis(sn);
+  var causes=_causesAnalysis(sn,alerts),checks=_investigations(sn,alerts,patterns);
+  var suggestions=_suggestions(lv,patterns,sn.cor,sn.lossRate,sn.costRate,sn.profitRate,sn.premium,sn.premRate,sn.prodPer,sn.prodRate,sn.backProd,sn.hrCostRate);
+  Object.keys(App.METRIC_METADATA||{}).forEach(function(key){
+    var meta=App.getMetricMeta(key),current=data[key];
+    if(!meta||current==null||!isFinite(Number(current)))return;
+    var benchmark=App.getMetricBenchmark(bn,key),rank=_rank(key,bn,meta.direction==='decrease'?'asc':'desc');
+    var id='ev_'+_stableHash([bn,App.currentMonth,meta.metricId,data]);
+    var alert=alerts.find(function(item){return item.field===key;});
+    evidence.push({
+      id:id,metric:key,metricId:meta.metricId,label:meta.label,currentValue:Number(current),
+      benchmarkValue:benchmark.value,differenceValue:benchmark.value==null?null:Number(current)-benchmark.value,
+      benchmarkType:benchmark.type,benchmarkLabel:benchmark.label,benchmarkStrategy:benchmark.strategy,
+      direction:meta.direction,unit:meta.unit,source:'dashboard:'+App.currentMonth,
+      ruleId:alert?alert.ruleId:null,calculationVersion:meta.calculationVersion,
+      severity:alert?alert.severity:null,alertMessage:alert?alert.msg:null,
+      alertThreshold:alert?alert.threshold:null,alertOperator:alert?alert.op:null,
+      rank:rank,trend:App.classifyMetricTrend(bn,key)
+    });
+    var materiallyBehind=false;
+    var comparisonEligible=['ratio','attainment','productivity'].indexOf(meta.category)>=0;
+    if(comparisonEligible&&rank&&rank.total>=5&&rank.pct>=80)materiallyBehind=true;
+    if(comparisonEligible&&benchmark.value!=null&&benchmark.value!==0){
+      var relativeGap=(Number(current)-benchmark.value)/Math.abs(benchmark.value);
+      if(meta.direction==='decrease'&&relativeGap>=0.10)materiallyBehind=true;
+      if(meta.direction==='increase'&&relativeGap<=-0.10)materiallyBehind=true;
+    }
+    if(materiallyBehind)rankingConcerns.push({
+      metric:key,metricId:meta.metricId,label:meta.label,evidenceId:id,rank:rank
+    });
+    if(alert||(App.KEY_SET&&App.KEY_SET.has(key))){
+      var anomalyReason=null;
+      if(alert){
+        anomalyReason=(alert.msg||'触发预警规则')+'；规则条件：'+meta.label+' '+alert.op+' '+_fv(Number(alert.threshold),meta.unit);
+      }else if(materiallyBehind&&rank){
+        anomalyReason='排名偏后：当前 '+rank.rank+'/'+rank.total;
+      }
+      facts.push({
+        text:meta.label+'为'+_fv(Number(current),meta.unit),evidenceId:id,currentValue:Number(current),
+        metricId:meta.metricId,rank:rank,isRiskMetric:!!alert,isAttention:materiallyBehind,
+        severity:alert?alert.severity:(materiallyBehind?'attention':null),
+        anomalyReason:anomalyReason
+      });
+    }
+  });
+  if(!alerts.length&&rankingConcerns.length){
+    lv={
+      level:'关注',color:'#2563eb',
+      desc:'未触发规则预警，但存在明显排名或对标偏离，需要管理关注。'
+    };
+    rankingConcerns.slice(0,3).forEach(function(item){
+      var rankText=item.rank?('，当前排名 '+item.rank.rank+'/'+item.rank.total):'';
+      checks.unshift(item.label+'存在明显对标偏离'+rankText+'，建议核查数据口径和业务驱动项。');
+    });
+  }
+  var evidenceIds=evidence.slice(0,4).map(function(item){return item.id;});
+  return {
+    schemaVersion:'diagnosis-v2',orgId:App.getOrgId(bn,'branch'),orgName:bn,branch:bn,
+    period:App.currentMonth,dataVersion:'data-'+_stableHash(data),
+    ruleVersion:'rules-'+_stableHash(App.ALL_DATA._alertRules||[]),
+    calculationVersion:'calc-v1',score:_scoreFromLevel(lv),riskLevel:_riskName(lv.level),
+    summary:bn+'当前为'+_riskName(lv.level)+'，'+lv.desc,
+    riskFactors:alerts.map(function(a){return {ruleId:a.ruleId,metricId:(App.getMetricMeta(a.field)||{}).metricId,severity:a.severity};}),
+    attentionItems:rankingConcerns.map(function(item){return {type:'benchmark_or_rank',metricId:item.metricId,evidenceId:item.evidenceId};}),
+    configurationErrors:configurationErrors,
+    facts:facts,
+    patterns:patterns.map(function(p){return {name:p.name,trigger:p.desc,businessMeaning:p.action};}),
+    inferences:causes.map(function(text){return {text:text,confidence:'中',evidenceIds:evidenceIds};}),
+    investigations:checks.map(function(text){return {text:text,priority:'中',ownerRole:'相关专业部门'};}),
+    recommendations:suggestions.map(function(item,index){
+      var ev=evidence[index%evidence.length];
+      var domainTitle={business:'业务质量改善',claims:'理赔改善',efficiency:'人效改善',management:'管理机制改善'}[item.domain]||'经营改善';
+      return {id:'rec_'+_stableHash([bn,item.term,item.text]),domain:item.domain||'management',title:domainTitle,action:item.text,period:item.term,ownerRole:'经营管理',metric:ev?ev.metric:null,metricId:ev?ev.metricId:null,direction:ev?ev.direction:'neutral',evidenceIds:ev?[ev.id]:[]};
+    }),
+    limitations:['现有汇总数据仅支持经营假设，确定性根因需结合业务明细核查。'],
+    evidence:evidence
+  };
+}
+window.buildDiagnosisModel=_buildDiagnosisModel;
 
 // ══════════ 报告构建 ══════════
 function _report(bn,alerts){
+  var model=_buildDiagnosisModel(bn,alerts);
   var sn=_snap(bn);
   if(!sn._ok)return {sum:'该分公司无当前数据',body:''};
   var lv=_assessLevel(sn,alerts);
@@ -479,7 +591,7 @@ function _report(bn,alerts){
     '<th style="padding:4px 7px;text-align:right;border:1px solid #e5e7eb">分公司整体</th>'+
     '<th style="padding:4px 7px;text-align:right;border:1px solid #e5e7eb">排名</th>'+
     '<th style="padding:4px 7px;text-align:center;border:1px solid #e5e7eb">同比</th></tr>';
-  ['premRate','profitRate','cor','lossRate','costRate','premium','profit','prodPer','prodRate','backProd','hrCostRate','profitPer'].forEach(function(k){
+  ['premRate','profitRate','cor','lossRate','costRate','prodPer','prodRate','backProd','hrCostRate','profitPer'].forEach(function(k){
     var m=KM[k],s=sn[k];
     if(s.cur==null)return;
     var valColor=m.rd==='asc'?(s.cur>(m.th.bad||999)?'#dc2626':(s.cur>(m.th.warn||999)?'#d97706':'inherit'))
@@ -568,7 +680,7 @@ function _report(bn,alerts){
   });
 
   h+='</div>';
-  return {sum:(lv.level||'')+' '+bn,body:h};
+  return {sum:(lv.level||'')+' '+bn,body:h,model:model};
 }
 
 // ══════════ 渲染 ══════════
