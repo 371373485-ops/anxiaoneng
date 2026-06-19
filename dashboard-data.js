@@ -170,7 +170,8 @@ function initData(){
   try{var s=localStorage.getItem(App.STORAGE_KEY);if(s){var p=JSON.parse(s);App.ALL_DATA=p;App.currentMonth=p.currentMonth||'2026-04';App.currentPlanKey=p.currentPlanKey||'auto';loaded=true;}}
   catch(e){}
   // 🔁 Fallback: restore from disk backup if localStorage is empty
-  if(!loaded||!App.ALL_DATA||Object.keys(App.ALL_DATA.actuals||{}).length===0){
+  var isGithubPages=typeof location!=='undefined'&&/\.github\.io$/i.test(location.hostname||'');
+  if((!loaded||!App.ALL_DATA||Object.keys(App.ALL_DATA.actuals||{}).length===0)&&!isGithubPages){
     try{
       var xhr=new XMLHttpRequest();
     xhr.open('GET','_data_backup.json?t='+Date.now(),false);
