@@ -607,14 +607,23 @@ function injectBranchesCompare(){
 }
 function populateTrendIndicatorSelect(){
   var sel=document.getElementById('trendIndicator');if(!sel)return;
-  if(sel.options.length>1)return; // Already populated
-  var keys=App.ACTUAL_KEYS||[];
-  var seen={};
-  keys.forEach(function(k){
-    var f=App.FIELDS.find(function(x){return x.k===k;});
-    if(!f||seen[f.k])return;seen[f.k]=1;
-    var o=document.createElement('option');o.value=f.k;o.textContent=f.l;sel.appendChild(o);
+  var selected=sel.value;
+  while(sel.options.length>1)sel.remove(1);
+  var groups={},seen={};
+  (App.FIELDS||[]).forEach(function(f){
+    if(!f||!f.k||seen[f.k])return;seen[f.k]=1;
+    var group=f.g||'其他';
+    if(!groups[group]){
+      groups[group]=document.createElement('optgroup');
+      groups[group].label=group;
+      sel.appendChild(groups[group]);
+    }
+    var o=document.createElement('option');
+    o.value=f.k;
+    o.textContent=(f.l||f.k)+(f.u?'（'+f.u+'）':'');
+    groups[group].appendChild(o);
   });
+  if(selected&&seen[selected])sel.value=selected;
   // Populate branch select
   var bs=document.getElementById('trendBranch');if(!bs||bs.options.length>1)return;
   if(App.DATA.branches){
@@ -630,6 +639,9 @@ function renderTrendChart(){
   var fk=sel.value;if(!fk)return;
   var bs=document.getElementById('trendBranch');if(!bs)return;
   var bn=bs.value;
+  var compareSel=document.getElementById('trendCompareType');
+  var compareType=compareSel?compareSel.value:'mom';
+  var hint=document.getElementById('trendCompareHint');
   
   // Get field info
   var field=App.FIELDS.find(function(x){return x.k===fk;});
@@ -639,6 +651,13 @@ function renderTrendChart(){
   var acts=App.ALL_DATA.actuals||{};
   var months=Object.keys(acts).sort();
   if(months.length===0){toast('暂无历史数据，请先导入','info');return;}
+  if(compareType==='yoy'){
+    var currentMonth=(App.currentMonth||months[months.length-1]||'').split('-')[1];
+    months=months.filter(function(month){return month.split('-')[1]===currentMonth;});
+    if(hint)hint.textContent='按'+(parseInt(currentMonth,10)||currentMonth)+'月跨年度对比';
+  }else if(hint){
+    hint.textContent='按连续月份查看变化';
+  }
   
   var labels=[];
   var values=[];
@@ -647,20 +666,24 @@ function renderTrendChart(){
   months.forEach(function(mk){
     var data=acts[mk];
     if(!data||!data.branches)return;
-    var v;
+    var v=null;
     if(bn==='all'){
       // National aggregate
       var na=data.national;
-      v=na&&na.hasOwnProperty(fk)?Number(na[fk]):0;
+      v=na&&na.hasOwnProperty(fk)&&na[fk]!==''&&na[fk]!=null?Number(na[fk]):null;
     }else{
       var b=data.branches.find(function(x){return x.n===bn;});
-      v=b&&b.d&&b.d.hasOwnProperty(fk)?Number(b.d[fk]):0;
+      v=b&&b.d&&b.d.hasOwnProperty(fk)&&b.d[fk]!==''&&b.d[fk]!=null?Number(b.d[fk]):null;
     }
+    if(v==null||!isFinite(v))return;
     labels.push(mk);
     values.push({x:mk,y:v});
   });
   
-  if(values.length===0){toast('所选指标无数据','info');return;}
+  if(values.length===0){
+    toast(compareType==='yoy'?'所选指标没有可用的同月跨年数据':'所选指标无历史数据','info');
+    return;
+  }
   
   // Destroy old chart
   if(__trendChart){__trendChart.destroy();__trendChart=null;}
@@ -669,7 +692,8 @@ function renderTrendChart(){
   var ctx=document.getElementById('trendChart');
   if(!ctx)return;
   
-  var title=field.l+(bn==='all'?' · 全国汇总':' · '+bn);
+  var compareLabel=compareType==='yoy'?'同比':'环比';
+  var title=(field.l||field.k)+' · '+(bn==='all'?'全部汇总':bn)+' · '+compareLabel;
   if(!App.charts)App.charts={};
   __trendChart=new Chart(ctx,{
     type:'line',
@@ -681,7 +705,7 @@ function renderTrendChart(){
     }]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:true,position:'top'},tooltip:{callbacks:{label:function(ctx){return title+': '+fmtVal(ctx.raw,frm);}}}},
-      scales:{x:{title:{display:true,text:'月份'},ticks:{maxRotation:45}},y:{title:{display:true,text:frm},beginAtZero:false}}
+      scales:{x:{title:{display:true,text:compareType==='yoy'?'同比月份（同月跨年）':'环比月份（逐月）'},ticks:{maxRotation:45}},y:{title:{display:true,text:frm},beginAtZero:false}}
     }
   });
 }
