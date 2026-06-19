@@ -173,7 +173,7 @@ function initData(){
   if(!loaded||!App.ALL_DATA||Object.keys(App.ALL_DATA.actuals||{}).length===0){
     try{
       var xhr=new XMLHttpRequest();
-      xhr.open('GET','/_data_backup.json?t='+Date.now(),false);
+    xhr.open('GET','_data_backup.json?t='+Date.now(),false);
       xhr.send();
       if(xhr.status===200){
         var bp=JSON.parse(xhr.responseText);if(bp&&bp.actuals&&Object.keys(bp.actuals).length>0){
