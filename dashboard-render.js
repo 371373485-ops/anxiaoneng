@@ -661,10 +661,13 @@ function renderTrendChart(){
   
   var labels=[];
   var values=[];
-  var frm=field.rd&&field.rd.length>0?field.rd[0]:field.u||'';
+  var frm=field.u||'';
   
   months.forEach(function(mk){
-    var data=acts[mk];
+    // Historical actuals only contain imported source fields. Rebuild the
+    // month with the same calculation pipeline used by the dashboard so
+    // derived metrics (COR, attainment rates, productivity, etc.) are usable.
+    var data=typeof computeMonthData==='function'?computeMonthData(mk):acts[mk];
     if(!data||!data.branches)return;
     var v=null;
     if(bn==='all'){
