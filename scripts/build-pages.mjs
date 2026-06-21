@@ -46,7 +46,7 @@ function removeElementByMarker(html,marker){
 function sharePage(source,basePath){
   let html=source;
   html=html.replace(/<base\s+href="[^"]*"\s*\/?>/i,`<base href="${basePath}">`);
-  if(!html.includes(`<base href="${basePath}">`))throw new Error('Unable to rewrite base path');
+  if(!html.includes(`<base href="${basePath}">`))html=html.replace(/<head>/i,`<head><base href="${basePath}">`);
   html=html.replace(/<script\s+src="xlsx\.full\.min\.js"[^>]*><\/script>\s*/i,'');
   html=html.replace(/<link\s+rel="stylesheet"\s+href="dashboard-publish\.css[^>]*>\s*/i,'');
   for(const name of ['dashboard-export.js','dashboard-publish.js','dashboard-ai.js','dashboard-agent.js','dashboard-diagnosis.js','dashboard-remediation.js']){
