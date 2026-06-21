@@ -47,6 +47,8 @@ function removeElementByMarker(html,marker){
   return html.replace(new RegExp(`<[^>]+${marker}[^>]*>[\\s\\S]*?<\\/[^>]+>`,`gi`),'').replace(new RegExp(`<[^>]+${marker}[^>]*\\/?>`,`gi`),'');
 }
 function sharePage(source,basePath){
+  // DIAGNOSTIC: inject DOM check script at the very start of body
+  source=source.replace(/<div id="pagesUnlockRoot"><\/div>/,'<div id="pagesUnlockRoot"></div><script>var _d=document.getElementById("pagesUnlockRoot");_d.textContent=new Date().toISOString()+" DIAG: root="+!!_d+" pending="+!!(window.__anxiaonengEncryptedSharePending)+" App="+typeof App;</script>');
   let html=source;
   html=html.replace(/<base\s+href="[^"]*"\s*\/?>/i,`<base href="${basePath}">`);
   if(!html.includes(`<base href="${basePath}">`))html=html.replace(/<head>/i,`<head><base href="${basePath}">`);
