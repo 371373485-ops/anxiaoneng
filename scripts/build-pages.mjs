@@ -51,7 +51,18 @@ function sharePage(source,basePath){
   html=html.replace(/<base\s+href="[^"]*"\s*\/?>/i,`<base href="${basePath}">`);
   if(!html.includes(`<base href="${basePath}">`))html=html.replace(/<head>/i,`<head><base href="${basePath}">`);
   html=html.replace(/<meta name="viewport"/i,'<meta name="robots" content="noindex,nofollow"><meta name="viewport"');
-  var trigger="<script>(function(){if(window.__anxiaonengEncryptedSharePending){var app=window.App||{};window.AnxiaonengUnlock.install(app);window.loadSharedDashboard().catch(function(e){console.error(e);});}})();<\/script>";
+  var trigger="<script>"+
+"var d=document.getElementById('pagesUnlockRoot');"+
+"if(window.__anxiaonengEncryptedSharePending){"+
+  "d.innerHTML='<div style=padding:20px;font-family:monospace;font-size:14px>'+"+
+    "'pending=true, token='+window.AnxiaonengUnlock.tokenFromLocation(location)+'<br>'+"+
+    "'Crypto='+!!window.AnxiaonengCrypto+'<br>Unlock='+!!window.AnxiaonengUnlock+'</div>';"+
+  "var app=window.App||{};"+
+  "var ok=window.AnxiaonengUnlock.install(app);"+
+  "d.innerHTML+='install='+ok+' shareMode='+(app&&app.shareMode)+' encrypted='+(app&&app.encryptedShareMode)+'<br>';"+
+  "window.loadSharedDashboard().then(function(r){d.innerHTML+='LOAD_OK';}).catch(function(e){d.innerHTML+='LOAD_FAIL: '+e.message;console.error(e);});"+
+"}else{d.innerHTML='NOT_PENDING';}"+
+"<\\/script>";
   html=html.replace('</body>',trigger+'</body>');
   return html;
 }
