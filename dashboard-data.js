@@ -128,7 +128,7 @@ function getCompareData(scope){
   var d=(App.ALL_DATA&&App.ALL_DATA[mk]&&App.ALL_DATA[mk][App.compareMonth])?App.ALL_DATA[mk][App.compareMonth]:null;
   if(!d){
     // No comparison data - return empty structure (doesn't crash)
-    console.log('No data for compare month:',App.compareMonth);
+    if(App&&App.debug)console.log('No data for compare month:',App.compareMonth);
     return scope==='branches'?[]:{};
   }
   return scope==='branches'?d.branches:(scope==='regions'?d.regions:d.national);
@@ -180,7 +180,7 @@ function initData(){
         var bp=JSON.parse(xhr.responseText);if(bp&&bp.actuals&&Object.keys(bp.actuals).length>0){
           App.ALL_DATA=bp;App.currentMonth=bp.currentMonth||'2026-04';App.currentPlanKey=bp.currentPlanKey||'auto';
           localStorage.setItem(App.STORAGE_KEY,JSON.stringify(bp));
-          console.log('[AutoRestore] Data restored from disk backup ('+Object.keys(bp.actuals).length+' months)');
+          if(App&&App.debug)console.log('[AutoRestore] Data restored from disk backup ('+Object.keys(bp.actuals).length+' months)');
         }
       }
     }catch(e2){}

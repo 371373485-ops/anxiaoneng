@@ -3,7 +3,7 @@ window.onerror=function(msg,url,line,col,err){
   var p=document.getElementById('errPanel');
   if(p){
     p.style.display='block';
-    p.innerHTML='ERROR: '+msg+' (line '+line+':'+col+')<br><small>'+url+'</small>';
+    p.innerHTML='ERROR: '+escapeHtml(msg)+' (line '+line+':'+col+')<br><small>'+escapeHtml(url)+'</small>';
   }
   console.error(msg,err);
   return false;
@@ -192,7 +192,7 @@ function switchTab(t){
 // 批量导入实际数据（支持多文件同时选中）
 var _actualBatchFiles=[];_actualBatchIdx=0;_actualBatchCount=0;var _actualBatchSuccess=0;var _actualBatchFail=0;
 function importExcel(input){
-console.log("importExcel batch, files="+(input.files?input.files.length:0));
+if(App&&App.debug)console.log("importExcel batch, files="+(input.files?input.files.length:0));
 _actualBatchFiles=Array.prototype.slice.call(input.files||[]);
 _actualBatchIdx=0;_actualBatchCount=_actualBatchFiles.length;_actualBatchSuccess=0;_actualBatchFail=0;
 if(_actualBatchCount===0)return;
@@ -285,7 +285,7 @@ reader.readAsArrayBuffer(file);
 // 批量导入计划数据（支持多文件同时选中）
 var _planBatchFiles=[];var _planBatchIdx=0;var _planBatchCount=0;var _planBatchSuccess=0;var _planBatchFail=0;
 function importPlanExcel(input){
-console.log("importPlanExcel batch, files="+(input.files?input.files.length:0));
+if(App&&App.debug)console.log("importPlanExcel batch, files="+(input.files?input.files.length:0));
 _planBatchFiles=Array.prototype.slice.call(input.files||[]);
 _planBatchIdx=0;_planBatchCount=_planBatchFiles.length;_planBatchSuccess=0;_planBatchFail=0;
 if(_planBatchCount===0)return;
@@ -628,17 +628,17 @@ function clearAllData(){
   }
   var b=document.getElementById('btnCompare');
   if(b){
-    console.log('bindBtn: btnCompare found, attaching click');
+    if(App&&App.debug)console.log('bindBtn: btnCompare found, attaching click');
     b.addEventListener('click',function(e){e.preventDefault();
       try{toggleCompareMode();}catch(err){showError('对比模式错误: '+err.message);}
     });
-  }else{console.log('bindBtn: btnCompare NOT FOUND');}
+  }else{if(App&&App.debug)console.log('bindBtn: btnCompare NOT FOUND');}
 })();
 
 // --- Robust initialization ---
 (function init(){
   if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',init);return;}
-  console.log('init: DOM ready, App version check:',typeof App);
+  if(App&&App.debug)console.log('init: DOM ready, App version check:',typeof App);
   try{
     if(typeof App==='undefined'){showError('App 对象未定义，请检查 dashboard-data.js 是否正常加载');return;}
     if(App.encryptedShareMode)return;
@@ -650,7 +650,7 @@ function clearAllData(){
     if (typeof runAlerts === 'function') runAlerts();
     updateYearUI();
     if(typeof updateMonthDropdown==='function')updateMonthDropdown();
-    console.log('init OK, month=',App.currentMonth);
+    if(App&&App.debug)console.log('init OK, month=',App.currentMonth);
   }catch(e){
     showError('看板初始化失败: '+e.message);
     console.error('init error:',e);
