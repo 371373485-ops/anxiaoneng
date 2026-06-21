@@ -1,0 +1,51 @@
+name: Deploy encrypted GitHub Pages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Test local encryption module
+        run: node --test tests/test_pages_crypto.mjs
+
+      - name: Test strict Pages build
+        run: node --test tests/test_pages_build.mjs
+
+      - name: Build static Pages artifact from locally encrypted files
+        env:
+          PAGES_BASE_PATH: /${{ github.event.repository.name }}/
+        run: node scripts/build-pages.mjs
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: pages-dist
+
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
