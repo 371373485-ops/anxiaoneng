@@ -62,6 +62,8 @@ function sharePage(source,basePath){
   html=html.replace(/<div id="tab-ai"[\s\S]*?<\/div>/i,'');
   html=html.replace(/<meta name="viewport"/i,'<meta name="robots" content="noindex,nofollow"><meta name="viewport"');
   if(/dashboard-(?:publish|ai|agent|diagnosis|remediation|export)\.js|xlsx\.full\.min\.js|\.xlsx"/.test(html))throw new Error('Share page still contains forbidden management assets');
+  var trigger="<script>(function(){if(window.__anxiaonengEncryptedSharePending){var app=window.App||{};window.AnxiaonengUnlock.install(app);window.loadSharedDashboard().catch(function(e){console.error(e);});}})();<\/script>";
+  html=html.replace('</body>',trigger+'</body>');
   return html;
 }
 function assertExactKeys(value,expected,label){
