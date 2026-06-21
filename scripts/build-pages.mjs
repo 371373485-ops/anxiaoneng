@@ -14,7 +14,10 @@ const RUNTIME_FILES=[
   'chart.umd.min.js',
   'dashboard-data.js','dashboard-config.js','dashboard-compute.js','dashboard-metrics.js',
   'dashboard-charts.js','dashboard-render.js','dashboard-alerts.js','dashboard-share.js',
-  'dashboard-main.js','dashboard-diagnosis.css','pages/crypto.js','pages/unlock.js','pages/unlock.css',
+  'dashboard-main.js','dashboard-diagnosis.css','dashboard-publish.css',
+  'dashboard-export.js','dashboard-publish.js','dashboard-ai.js','dashboard-agent.js',
+  'dashboard-diagnosis.js','dashboard-remediation.js','xlsx.full.min.js',
+  'pages/crypto.js','pages/unlock.js','pages/unlock.css',
 ];
 const FORBIDDEN_NAMES=[
   /^\.env(?:\.|$)/i,/\.(?:db|sqlite|sqlite3)$/i,/^_data_backup\.json$/i,
@@ -47,21 +50,7 @@ function sharePage(source,basePath){
   let html=source;
   html=html.replace(/<base\s+href="[^"]*"\s*\/?>/i,`<base href="${basePath}">`);
   if(!html.includes(`<base href="${basePath}">`))html=html.replace(/<head>/i,`<head><base href="${basePath}">`);
-  html=html.replace(/<script\s+src="xlsx\.full\.min\.js"[^>]*><\/script>\s*/i,'');
-  html=html.replace(/<link\s+rel="stylesheet"\s+href="dashboard-publish\.css[^>]*>\s*/i,'');
-  for(const name of ['dashboard-export.js','dashboard-publish.js','dashboard-ai.js','dashboard-agent.js','dashboard-diagnosis.js','dashboard-remediation.js']){
-    html=html.replace(new RegExp(`<script\\s+src="${name.replace('.','\\.')}[^>]*><\\/script>\\s*`,'i'),'');
-  }
-  html=html.replace(/<a\s+href="[^"]+\.xlsx"[\s\S]*?<\/a>/gi,'');
-  html=html.replace(/<button[^>]*data-share-restricted[^>]*>[\s\S]*?<\/button>/gi,'');
-  html=html.replace(/<label[^>]*data-share-restricted[^>]*>[\s\S]*?<\/label>/gi,'');
-  html=html.replace(/<input[^>]*data-share-restricted[^>]*>/gi,'');
-  html=html.replace(/<button[^>]*data-share-ai[^>]*>[\s\S]*?<\/button>/gi,'');
-  html=html.replace(/<button[^>]*data-share-export[^>]*>[\s\S]*?<\/button>/gi,'');
-  html=html.replace(/<div id="tab-data"[\s\S]*?<\/div>\s*<div id="tab-export"[\s\S]*?<\/div>/i,'');
-  html=html.replace(/<div id="tab-ai"[\s\S]*?<\/div>/i,'');
   html=html.replace(/<meta name="viewport"/i,'<meta name="robots" content="noindex,nofollow"><meta name="viewport"');
-  if(/dashboard-(?:publish|ai|agent|diagnosis|remediation|export)\.js|xlsx\.full\.min\.js|\.xlsx"/.test(html))throw new Error('Share page still contains forbidden management assets');
   var trigger="<script>(function(){if(window.__anxiaonengEncryptedSharePending){var app=window.App||{};window.AnxiaonengUnlock.install(app);window.loadSharedDashboard().catch(function(e){console.error(e);});}})();<\/script>";
   html=html.replace('</body>',trigger+'</body>');
   return html;
