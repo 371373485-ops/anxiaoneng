@@ -47,34 +47,23 @@ function removeElementByMarker(html,marker){
   return html.replace(new RegExp(`<[^>]+${marker}[^>]*>[\\s\\S]*?<\\/[^>]+>`,`gi`),'').replace(new RegExp(`<[^>]+${marker}[^>]*\\/?>`,`gi`),'');
 }
 function sharePage(source,basePath){
-  let html='<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><base href="'+basePath+'"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><link rel="stylesheet" href="pages/unlock.css?v=1"><title>分公司经营与效能数据看板</title></head><body><div id="pagesUnlockRoot"></div>'+
-'<script src="pages/crypto.js?v=1"><\/script>'+
-'<script src="pages/unlock.js?v=1"><\/script>'+
-'<script>'+
-'(function(){'+
-'var scope="pagesUnlockRoot";'+
-'function msg(t){var d=document.getElementById(scope);if(d)d.innerHTML="<div style=padding:40px;text-align:center;font:16px/1.8 system-ui,sans-serif;color:#333>"+t+"</div>";}'+
-'var U=window.AnxiaonengUnlock,C=window.AnxiaonengCrypto;'+
-'if(!U||!C){msg("模块加载失败");return;}'+
-'if(!U.shouldInstall(window.location)){msg("非分享链接");return;}'+
-'var token=U.tokenFromLocation(window.location),base="'+basePath+'";'+
-'var url="pages/data/"+encodeURIComponent(token)+".json";'+
-'var ctrl=U.createController({cryptoApi:C,fetch:window.fetch.bind(window),wait:function(ms){return new Promise(function(r){setTimeout(r,ms);})},location:window.location,document:document});'+
-'ctrl.load(url).then(function(){'+
-'  var host=document.getElementById(scope);'+
-'  host.innerHTML="<section class=pages-unlock role=dialog><div class=pages-unlock-card><div class=pages-unlock-mark>\u{1F510}</div><h1>\u89E3\u9501\u53EA\u8BFB\u5206\u4EAB</h1><p>\u8BF7\u8F93\u5165\u7BA1\u7406\u8005\u53D1\u9001\u7684\u8BBF\u95EE\u5BC6\u7801\u3002</p><form id=pagesUnlockForm><label for=pagesUnlockPassword>\u8BBF\u95EE\u5BC6\u7801</label><input id=pagesUnlockPassword type=password minlength=16 required><button type=submit>\u89E3\u9501\u770B\u677F</button><p id=pagesUnlockError class=pages-unlock-error></p></form></div></section>";'+
-'  var form=host.querySelector("#pagesUnlockForm"),pw=host.querySelector("#pagesUnlockPassword"),err=host.querySelector("#pagesUnlockError"),btn=form.querySelector("button");'+
-'  form.addEventListener("submit",function(e){e.preventDefault();var p=pw.value;pw.value="";err.textContent="";btn.disabled=true;'+
-'    ctrl.unlock(p).then(function(data){'+
-'      try{sessionStorage.setItem("__share_data",JSON.stringify(data));}catch(ex){}'+
-'      document.getElementById(scope).innerHTML="<div style=text-align:center;padding:50px;font-size:18px>\u89E3\u9501\u6210\u529F\uFF0C\u8DF3\u8F6C\u4E2D...</div>";'+
-'      setTimeout(function(){window.location.href="'+basePath+'";},300);'+
-'    }).catch(function(){err.textContent=U.ERROR_MESSAGE;btn.disabled=false;pw.focus();});'+
-'  });'+
-'  pw.focus();'+
-'}).catch(function(e){msg("\u52A0\u8F7D\u5931\u8D25: "+(e.message||e));});'+
-'})();'+
-'<\/script></body></html>';
+  let html=source;
+  html=html.replace(/<base\s+href="[^"]*"\s*\/?>/i,`<base href="${basePath}">`);
+  if(!html.includes(`<base href="${basePath}">`))html=html.replace(/<head>/i,`<head><base href="${basePath}">`);
+  html=html.replace(/<meta name="viewport"/i,'<meta name="robots" content="noindex,nofollow"><meta name="viewport"');
+  var trigger="<script>"+
+"var d=document.getElementById('pagesUnlockRoot');"+
+"if(window.__anxiaonengEncryptedSharePending){"+
+  "d.innerHTML='<div style=padding:20px;font-family:monospace;font-size:14px>'+"+
+    "'pending=true, token='+window.AnxiaonengUnlock.tokenFromLocation(location)+'<br>'+"+
+    "'Crypto='+!!window.AnxiaonengCrypto+'<br>Unlock='+!!window.AnxiaonengUnlock+'</div>';"+
+  "var app=window.App||{};"+
+  "var ok=window.AnxiaonengUnlock.install(app);"+
+  "d.innerHTML+='install='+ok+' shareMode='+(app&&app.shareMode)+' encrypted='+(app&&app.encryptedShareMode)+'<br>';"+
+  "window.loadSharedDashboard().then(function(r){d.innerHTML+='LOAD_OK';}).catch(function(e){d.innerHTML+='LOAD_FAIL: '+e.message;console.error(e);});"+
+"}else{d.innerHTML='NOT_PENDING';}"+
+"<\\/script>";
+  html=html.replace('</body>',trigger+'</body>');
   return html;
 }
 function assertExactKeys(value,expected,label){

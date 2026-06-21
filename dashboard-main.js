@@ -642,9 +642,6 @@ function clearAllData(){
   try{
     if(typeof App==='undefined'){showError('App 对象未定义，请检查 dashboard-data.js 是否正常加载');return;}
     if(App.encryptedShareMode)return;
-    // Support share unlock redirect: load data from sessionStorage
-    var _sd=sessionStorage.getItem('__share_data');
-    if(_sd){try{var _p=JSON.parse(_sd);App.ALL_DATA=_p;App.currentMonth=_p.currentMonth||'';App.currentPlanKey=_p.currentPlanKey||'auto';App.currentYear=(App.currentMonth||'').split('-')[0]||'';App.shareMode=false;sessionStorage.removeItem('__share_data');}catch(e){console.warn('share data parse failed',e);}}
     // Show boot success briefly
     var ep=document.getElementById('errPanel');
     if(ep){ep.style.display='block';ep.style.background='#efe';ep.style.color='#060';ep.style.borderTop='2px solid green';ep.textContent='看板启动成功 | App: OK | currentMonth: '+(App.currentMonth||'未设置');setTimeout(function(){if(ep.textContent.indexOf('启动成功')>=0)ep.style.display='none';},3000);}
