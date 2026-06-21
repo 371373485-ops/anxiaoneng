@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><base href="/anxiaoneng/">
+<meta charset="UTF-8"><meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"><meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+>
+<title>分公司经营与效能数据看板 - 2026年4月</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="dashboard-diagnosis.css?v=2061812">
+<link rel="stylesheet" href="dashboard-publish.css?v=2062001">
+<link rel="stylesheet" href="pages/unlock.css?v=1">
+<script src="chart.umd.min.js"></script>
+<script src="xlsx.full.min.js"></script>
+<style>
+:root{--bg:#f0f2f5;--card:#fff;--text:#1a1a2e;--muted:#888;--blue:#3b82f6;--green:#10b981;--red:#ef4444;--purple:#8b5cf6;--amber:#f59e0b}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+.header{background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);color:#fff;padding:12px 24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.header h1{font-size:20px;font-weight:600}
+.header .sub{font-size:12px;opacity:.7}
+.toolbar{display:flex;gap:8px;align-items:center}
+.toolbar button,.toolbar .btn-file{padding:6px 14px;border:1px solid rgba(255,255,255,.3);border-radius:6px;background:rgba(255,255,255,.1);color:#fff;cursor:pointer;font-size:12px;transition:.2s}
+.toolbar button:hover,.toolbar .btn-file:hover{background:rgba(255,255,255,.2)}
+.toolbar select{color:#fff;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:6px;padding:5px 8px;font-size:12px;cursor:pointer}
+.toolbar select option{color:#1a1a2e;background:#fff}
+.toolbar input[type=file]{display:none}
+.nav{display:flex;background:var(--card);padding:0 24px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.nav button{padding:12px 20px;border:none;background:none;font-size:14px;cursor:pointer;color:var(--muted);border-bottom:3px solid transparent}
+.nav button:hover{color:var(--text)}
+.nav button.active{color:#0f3460;border-bottom-color:#0f3460;font-weight:600}
+.main{padding:20px 24px;max-width:1600px;margin:0 auto}
+.tab{display:none}.tab.active{display:block;animation:fadeIn .25s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:20px}
+.kpi-card{background:var(--card);border-radius:8px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,.06);border-left:4px solid var(--blue)}
+.kpi-card.c-green{border-left-color:var(--green)}.kpi-card.c-red{border-left-color:var(--red)}.kpi-card.c-purple{border-left-color:var(--purple)}.kpi-card.c-amber{border-left-color:var(--amber)}
+.kpi-card .kl{font-size:12px;color:var(--muted);margin-bottom:4px}
+.kpi-card .kv{font-size:22px;font-weight:700}
+
+.section{margin-bottom:16px}
+.sec-header{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--card);border-radius:8px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.06);user-select:none}
+.sec-header:hover{background:#f8f9ff}
+.sec-header .arrow{transition:.2s;font-size:10px;color:var(--muted)}
+.sec-header.open .arrow{transform:rotate(90deg)}
+h4.open .arrow{transform:rotate(90deg)}
+.sec-header h3{font-size:14px;font-weight:600}
+.sec-header .badge{font-size:11px;background:#e0e7ff;color:#3730a3;padding:2px 8px;border-radius:10px}
+.sec-body{display:none;padding:12px 0}
+.sec-body.open{display:block}
+.sec-group{margin-bottom:10px}
+
+.tbl-wrap{overflow-x:auto;background:var(--card);border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.06);margin-bottom:12px;max-height:70vh;overflow-y:auto;background-image:linear-gradient(to right,var(--card) 30%,transparent),linear-gradient(to left,var(--card) 30%,transparent),radial-gradient(farthest-side at 0 50%,rgba(0,0,0,.12),transparent),radial-gradient(farthest-side at 100% 50%,rgba(0,0,0,.12),transparent);background-position:0 0,100% 0,0 0,100% 0;background-repeat:no-repeat;background-size:40px 100%,40px 100%,14px 100%,14px 100%;background-attachment:local,local,scroll,scroll}
+.tbl-wrap table th{position:sticky;top:0;z-index:9;background:#f0f4ff}
+.tbl-wrap table th:nth-child(1){left:0;z-index:8}
+.tbl-wrap table td:nth-child(1){position:sticky;left:0;z-index:4;background:var(--card)}
+.tbl-wrap tr:nth-child(even) td{background:#fafafa}
+.tbl-wrap tr:nth-child(even) td:nth-child(1){background:#fafafa}
+.tbl-wrap tr:nth-child(even) td:nth-child(2){background:#fafafa}
+.tbl-wrap tr:nth-child(even) td:nth-child(3){background:#fafafa}
+.tbl-wrap tr:hover td{background:#f0f4ff}
+.tbl-wrap tr:hover td:nth-child(1){background:#f0f4ff}
+.tbl-wrap tr:hover td:nth-child(2){background:#f0f4ff}
+.tbl-wrap tr:hover td:nth-child(3){background:#f0f4ff}
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
+th{text-align:left;padding:8px 10px;background:#f8f9fa;color:var(--muted);font-weight:600;border-bottom:2px solid #e5e7eb;white-space:nowrap}
+td{padding:7px 10px;border-bottom:1px solid #f0f0f0;white-space:nowrap}
+tr:hover td{background:#f8f9ff}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.hi-green{color:var(--green);font-weight:600}
+.hi-red{color:var(--red);font-weight:600}
+/* 责任区核心指标表 & 分公司明细表 & 分公司详情表 — 统一黑色字体 */
+#branches-table .hi-green,#branches-table .hi-red,#regions-key-table .hi-green,#regions-key-table .hi-red,#branch-detail-view .hi-green,#branch-detail-view .hi-red{color:#1a1a2e!important;font-weight:400}
+.computed{color:var(--muted);font-size:11px}
+
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:12px}
+.chart-grid.compare-mode{grid-template-columns:1fr;max-width:900px}
+.chart-grid.compare-mode .chart-wrap{min-height:340px}
+.chart-card{background:var(--card);border-radius:8px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.chart-card h4{font-size:12px;margin-bottom:10px;color:var(--muted);font-weight:600}
+.chart-wrap{position:relative;min-height:260px}
+
+.region-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.region-card{background:var(--card);border-radius:8px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.region-card h4{font-size:13px;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid var(--blue)}
+.region-card .metric{display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px solid #f5f5f5}
+.region-card .metric .mv{font-weight:600}
+
+.search-bar{display:flex;gap:8px;margin-bottom:16px;align-items:center}
+.search-bar input,.search-bar select{padding:6px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px}
+.search-bar input{width:200px}
+
+.more-toggle{display:flex;align-items:center;gap:6px;padding:8px 0;cursor:pointer;color:var(--muted);font-size:12px;user-select:none}
+.more-toggle:hover{color:var(--blue)}
+.more-toggle .mt-arrow{transition:.2s;font-size:10px}
+.more-toggle.open .mt-arrow{transform:rotate(90deg)}
+.more-body{display:none}
+.more-body.open{display:block}
+.branch-charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+.branch-charts .chart-card{background:var(--bg2);border-radius:10px;padding:14px 16px;border:1px solid var(--border);margin-bottom:0!important}
+.branch-charts .chart-card h4{font-size:13px;margin:0 0 10px 0;color:var(--text);font-weight:600}
+.branch-charts .chart-wrap{background:#fafbfc;border-radius:6px;padding:4px}
+
+@media(max-width:1200px){.chart-grid{grid-template-columns:1fr}}
+@media(max-width:1000px){.region-grid{grid-template-columns:repeat(2,1fr)}.kpi-row{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:600px){.region-grid{grid-template-columns:1fr}.kpi-row{grid-template-columns:repeat(2,1fr)}}
+
+.month-bar{display:flex;align-items:center;gap:8px}
+.month-bar select{padding:4px 10px;border:1px solid rgba(255,255,255,.3);border-radius:6px;background:rgba(255,255,255,.1);color:#fff;font-size:13px;cursor:pointer;outline:none}
+.month-bar select option{color:#333;background:#fff}
+.month-bar .btn-reset{padding:4px 10px;border:1px solid rgba(255,255,255,.15);border-radius:6px;background:transparent;color:rgba(255,255,255,.6);cursor:pointer;font-size:11px}
+.month-bar .btn-reset:hover{color:#fff;border-color:rgba(255,255,255,.5)}
+
+.plan-bar{display:flex;align-items:center;gap:6px}
+.month-bar select#planSelect{padding:4px 8px;border:1px solid rgba(255,255,255,.2);border-radius:6px;background:rgba(255,255,255,.08);color:rgba(255,255,255,.7);font-size:12px;cursor:pointer;outline:none;max-width:180px}
+.month-bar select#planSelect option{color:#333;background:#fff}
+
+.btn-dl{display:inline-block;background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.2);padding:4px 12px;border-radius:6px;font-size:12px;text-decoration:none;cursor:pointer}.btn-dl:hover{background:rgba(255,255,255,.2)}
+
+/* Branch Detail */
+.breadcrumb{margin-bottom:16px;font-size:13px}
+.breadcrumb a{color:var(--primary);cursor:pointer;text-decoration:none}
+.breadcrumb a:hover{text-decoration:underline}
+.branch-header{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+.branch-header h2{margin:0;font-size:22px}
+.badge-rank{display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:600}
+.badge-rank.top{background:#d4edda;color:#155724}
+.badge-rank.mid{background:#fff3cd;color:#856404}
+.badge-rank.low{background:#f8d7da;color:#721c24}
+.back-btn{display:inline-flex;align-items:center;gap:4px;padding:6px 14px;border:none;border-radius:6px;background:var(--bg2);color:var(--text);cursor:pointer;font-size:13px;margin-bottom:16px}
+.back-btn:hover{background:var(--border)}
+.kpi-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:20px}
+.kpi-card{background:var(--bg2);border-radius:8px;padding:14px 16px;border-left:3px solid var(--primary)}
+.kpi-card h4{font-size:12px;color:var(--text2);margin:0 0 8px 0}
+.kpi-card .val{font-size:24px;font-weight:700;margin-bottom:4px}
+.kpi-card .avg{font-size:12px;color:var(--text2);margin-bottom:6px}
+.kpi-card .diff{font-size:12px;margin-bottom:4px}
+.kpi-card .rank{font-size:11px;color:var(--text2)}
+.diff-up{color:#16a34a}
+.diff-down{color:#dc2626}
+.rank-bar{display:flex;align-items:center;gap:6px}
+.rank-bar .bar-track{flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+.rank-bar .bar-fill{height:100%;border-radius:2px;transition:width .3s}
+.col-rank{width:60px;text-align:center}
+.clickable-row{cursor:pointer;transition:background .15s}
+.clickable-row:hover{background:rgba(59,130,246,.06)}
+
+
+.sortable{cursor:pointer;user-select:none;white-space:nowrap}
+.sortable:hover{background:rgba(59,130,246,.08)}
+.mt-arrow{display:inline-block;font-size:10px;transition:transform .2s}
+.more-toggle.open .mt-arrow{transform:rotate(90deg)}
+
+
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:10000;padding:10px 24px;border-radius:8px;font-size:13px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,.15);animation:toastIn .3s ease,toastOut .3s ease 2.5s forwards;pointer-events:none}
+.toast-success{background:#d4edda;color:#155724;border:1px solid #c3e6cb}
+.toast-error{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}
+.toast-info{background:#d1ecf1;color:#0c5460;border:1px solid #bee5eb}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(-20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+@keyframes toastOut{from{opacity:1}to{opacity:0;transform:translateX(-50%) translateY(-10px)}}
+
+/* Data management */
+.data-year{margin-bottom:24px}
+.data-year h3{font-size:15px;margin-bottom:10px;color:#1a1a2e}
+.month-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:8px;margin-bottom:8px}
+.month-cell{background:var(--card);border-radius:6px;padding:10px 8px;text-align:center;font-size:11px;box-shadow:0 1px 3px rgba(0,0,0,.04);cursor:default;transition:.15s}
+.month-cell.has-data{background:#e8f5e9;border:1px solid #a5d6a7;color:#2e7d32;font-weight:600}
+.month-cell.no-data{background:#fafafa;border:1px dashed #e0e0e0;color:#bbb}
+.month-cell:hover{transform:translateY(-1px);box-shadow:0 3px 8px rgba(0,0,0,.08)}
+.month-cell .mon{font-size:18px;font-weight:700;display:block;margin-bottom:2px}
+.month-cell .yr{font-size:10px;opacity:.6}
+.plan-list{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.plan-card{background:var(--card);border-radius:8px;padding:10px 14px;box-shadow:0 1px 3px rgba(0,0,0,.04);display:flex;align-items:center;gap:10px;font-size:12px}
+.plan-card .vers{font-weight:600;color:#0f3460;font-size:14px}
+.plan-card .info{color:var(--muted);font-size:11px}
+.plan-card .plan-actions{margin-left:auto;display:flex;gap:4px}
+.data-section{margin-bottom:20px}
+.data-section h4{font-size:13px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px}
+.data-actions{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.btn-sm{padding:4px 10px;font-size:11px;border-radius:4px;border:1px solid #ddd;background:#fff;cursor:pointer;transition:.15s}
+.btn-sm:hover{background:#f5f5f5}
+.btn-sm.danger{color:#c62828;border-color:#ef9a9a}
+.btn-sm.danger:hover{background:#ffebee}
+.btn-sm.warn{color:#e65100;border-color:#ffcc80}
+.btn-sm.warn:hover{background:#fff3e0}
+.trend-show-btn{padding:6px 16px;border:1px solid #2563eb;border-radius:6px;background:#2563eb;color:#fff;cursor:pointer;font-size:12px;font-weight:600;transition:.15s}
+.trend-show-btn:hover{background:#1d4ed8;border-color:#1d4ed8}
+.trend-show-btn:focus-visible{outline:2px solid #93c5fd;outline-offset:2px}
+.trend-summary{margin-top:12px;padding:12px 14px;border-left:3px solid #2563eb;border-radius:6px;background:#f5f8ff;color:var(--text);font-size:12px;line-height:1.7}
+.trend-summary strong{color:#1d4ed8}
+.import-time{font-size:10px;color:var(--muted)}
+
+/* KPI card delta badge */
+.kpi-delta{font-size:10px;margin-top:4px;padding:2px 6px;border-radius:4px;background:rgba(0,0,0,.04);display:inline-block}
+/* Compare column styling */
+.cmp-hdr{background:#e8f0fe!important;color:#1e40af;font-weight:600}
+.cmp-data{color:#666;background:rgba(59,130,246,.04)}
+.cmp-delta{font-variant-numeric:tabular-nums}
+/* Overview section row highlight in compare mode */
+:root{--cmp-bg:rgba(239,246,255,.5)}
+tr:nth-child(even) .cmp-delta{background:rgba(239,246,255,.6)!important}
+tr:nth-child(even) .cmp-data{background:rgba(59,130,246,.06)!important}
+/* Chart grid in compare mode — increased spacing */
+.chart-grid.compare-mode .chart-wrap{min-height:420px;margin-bottom:24px}
+.chart-grid.compare-mode .chart-card{padding:14px 18px}
+.chart-grid.compare-mode canvas{max-height:380px}
+/* Branches table compare column — warm highlight */
+td.cmp-delta{transition:background .2s}
+.tbl-wrap tbody tr:hover td.cmp-delta{background:#fef3c7!important}
+.alert-bar{position:sticky;top:0;z-index:100;background:#fff;border-bottom:1px solid #fee2e2;box-shadow:0 2px 8px rgba(0,0,0,.06)}.alert-bar .alert-summary{padding:8px 16px;color:#991b1b;user-select:none}.alert-bar .alert-detail{padding:0 16px 8px}.alert-bar .alert-toggle{font-size:10px;margin-left:8px;color:#999}.alert-item{transition:background .2s}.alert-item:hover{filter:brightness(.97)}
+/* Export tab */
+.exp-section{background:var(--card);border-radius:8px;padding:16px 20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.exp-section h3{font-size:14px;color:#1e3a5f;margin-bottom:10px}
+.exp-check{display:inline-flex;align-items:center;gap:4px;font-size:12px;padding:3px 8px;border:1px solid #e5e7eb;border-radius:6px;margin:2px 4px 2px 0;cursor:pointer;white-space:nowrap;user-select:none;transition:.15s}
+.exp-check:hover{border-color:var(--blue);background:#eff6ff}
+.exp-check input[type=checkbox]{accent-color:var(--blue)}
+.exp-sel-all{padding:2px 10px;border:1px solid #d1d5db;border-radius:4px;background:#f9fafb;cursor:pointer;font-size:11px;color:#6b7280;margin-right:4px;transition:.15s}
+.exp-sel-all:hover{background:#e5e7eb;color:#374151}
+.exp-sel-card{padding:1px 8px;font-size:10px;border:1px solid rgba(0,0,0,.12);border-radius:3px;background:rgba(255,255,255,.7);cursor:pointer;transition:.15s}
+.exp-sel-card:hover{background:#fff;border-color:rgba(0,0,0,.25)}
+.exp-check-card:hover{background:rgba(255,255,255,.6) !important}
+.exp-btn-primary{padding:8px 20px;background:var(--blue);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;transition:.2s}
+.exp-btn-primary:hover{filter:brightness(1.1)}
+.exp-branch-label{min-width:110px}
+
+/* ========== 移动端适配 ========== */
+@media(max-width:768px){
+  /* ── Header & Toolbar ── */
+  .header{padding:10px 12px;flex-direction:column;align-items:flex-start}
+  .header h1{font-size:16px}
+  .header .sub{font-size:10px;display:block;margin-top:2px}
+  .toolbar{flex-wrap:wrap;gap:4px;font-size:11px}
+  .toolbar button,.toolbar .btn-file{padding:4px 8px;font-size:10px;border-radius:4px}
+  .toolbar select{padding:3px 6px;font-size:10px}
+  .toolbar a.btn-dl{padding:3px 8px;font-size:10px}
+  .toolbar .month-bar select,.toolbar .plan-bar select{font-size:10px;padding:3px 6px}
+  .toolbar #btnCompare{padding:5px 10px;font-size:11px}
+  .toolbar label{font-size:10px}
+
+  /* ── Compare bar ── */
+  #compareBar{flex-wrap:wrap;padding:6px 10px;gap:4px;font-size:11px}
+  #compareBar select{padding:2px 6px;font-size:10px}
+  #compareBar button{padding:2px 6px;font-size:10px}
+
+  /* ── Navigation ── */
+  .nav{padding:0 8px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .nav button{padding:8px 10px;font-size:11px;white-space:nowrap;flex-shrink:0}
+
+  /* ── Main content ── */
+  .main{padding:12px 8px}
+
+  /* ── KPI cards ── */
+  .kpi-row{grid-template-columns:1fr 1fr;gap:8px}
+  .kpi-card{padding:10px 12px}
+  .kpi-card .kv{font-size:18px}
+  .kpi-card .kl{font-size:10px}
+
+  /* ── Section headers ── */
+  .sec-header{padding:8px 10px}
+  .sec-header h3{font-size:12px}
+
+  /* ── Region grid ── */
+  .region-grid{grid-template-columns:1fr;gap:8px}
+  .region-card{padding:10px 12px}
+  .region-card h4{font-size:11px}
+  .region-card .metric{font-size:10px}
+
+  /* ── Chart grid ── */
+  .chart-grid{grid-template-columns:1fr;gap:10px}
+  .chart-card{padding:8px 10px}
+  .chart-card h4{font-size:11px}
+  .chart-wrap{min-height:200px}
+  .chart-grid.compare-mode .chart-wrap{min-height:240px}
+
+  /* ── Branch search ── */
+  .search-bar{flex-wrap:wrap;gap:4px}
+  .search-bar input{width:100%}
+  .search-bar select{font-size:11px;padding:4px 8px}
+
+  /* ── Branch table ── */
+  .tbl-wrap{max-height:55vh;font-size:10px}
+  .tbl-wrap table{font-size:10px}
+  .tbl-wrap th,.tbl-wrap td{padding:5px 6px}
+  /* ── Branch detail ── */
+  .branch-header{flex-wrap:wrap;gap:6px}
+  .branch-header h2{font-size:16px}
+  .kpi-cards{grid-template-columns:1fr 1fr;gap:8px}
+  .kpi-card .val{font-size:18px}
+  .branch-charts{grid-template-columns:1fr}
+
+  /* ── Trend section ── */
+  #trend-chart-wrap{height:220px}
+
+  /* ── Data management ── */
+  .data-year h3{font-size:13px}
+  .month-grid{grid-template-columns:repeat(6,1fr);gap:4px}
+  .month-cell{padding:6px 4px;font-size:9px}
+  .month-cell .mon{font-size:14px}
+  .plan-card{width:100%}
+
+  /* ── Export tab ── */
+  .exp-section{padding:10px 12px;margin-bottom:10px}
+  .exp-section h3{font-size:12px}
+  .exp-check{padding:2px 6px;font-size:10px}
+  .exp-sel-all{padding:1px 6px;font-size:9px}
+  .exp-btn-primary{padding:6px 14px;font-size:13px;width:100%}
+
+  /* ── Alert bar ── */
+  .alert-bar .alert-summary{padding:6px 10px;font-size:11px}
+  .alert-bar .alert-detail{padding:0 10px 6px;font-size:10px}
+
+  /* ── Breadcrumb ── */
+  .breadcrumb{font-size:11px}
+
+  /* ── Toast ── */
+  .toast{font-size:11px;padding:8px 16px}
+}
+
+@media(max-width:480px){
+  .kpi-row{grid-template-columns:1fr}
+  .kpi-cards{grid-template-columns:1fr}
+  .month-grid{grid-template-columns:repeat(3,1fr)}
+  .nav button{font-size:10px;padding:6px 8px}
+  .header h1{font-size:14px}
+  .toolbar button,.toolbar select{font-size:9px}
+}
+.share-banner{display:none;align-items:center;gap:18px;flex-wrap:wrap;padding:10px 24px;background:#eff6ff;border-bottom:1px solid #bfdbfe;color:#1e3a8a;font-size:12px}
+.share-banner .share-badge{font-weight:700;background:#2563eb;color:#fff;padding:4px 10px;border-radius:999px}
+.share-banner span b{color:#1e40af;margin-left:4px}
+.share-empty{max-width:620px;margin:80px auto;padding:40px;text-align:center;background:#fff;border:1px solid #dbeafe;border-radius:14px;box-shadow:0 8px 30px rgba(30,64,175,.08)}
+.share-empty-icon{font-size:44px;margin-bottom:12px}.share-empty h2{font-size:20px;margin-bottom:10px}.share-empty p{color:#475569;margin-bottom:8px}.share-empty small{color:#94a3b8}
+.share-mode .toolbar [data-share-restricted],.share-mode [data-share-ai]{display:none!important}</style>
+</head>
+<body>
+<div class="header">
+<div><h1>分公司经营与效能数据看板</h1><span style="font-size:11px;color:rgba(255,255,255,.4);margin-left:10px">v13</span><div class="sub"><span id="monthLabel"></span><span id="headerComparePeriodLabel" style="display:none;font-size:11px;color:rgba(147,197,253,.9);margin-left:6px"></span><span> · 31家分公司 · 4大责任区</span></div></div>
+
+<div class="toolbar"><label style="font-size:12px;opacity:.8">年度</label><select id="yearSelect" onchange="setDataYear(this.value)"></select><label style="font-size:12px;opacity:.8;margin-left:8px">月份</label><select id="dataMonth" onchange="setDataMonth(this.value)"><option value="1">1月</option><option value="2">2月</option><option value="3">3月</option><option value="4" selected>4月</option><option value="5">5月</option><option value="6">6月</option><option value="7">7月</option><option value="8">8月</option><option value="9">9月</option><option value="10">10月</option><option value="11">11月</option><option value="12">12月</option></select>
+<span style="opacity:.3;margin:0 4px">|</span>
+<select id="planSelect" onchange="switchPlan(this.value)" style="margin-left:6px;padding:5px 8px;color:#fff;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:6px;font-size:12px;cursor:pointer" title="选择计划版本"><option value="auto" selected>计划: 自动</option></select>
+<span style="opacity:.3;margin:0 4px">|</span>
+<button id="btnCompare" style="margin-left:8px;font-size:13px;opacity:.85;padding:8px 16px;background:rgba(59,130,246,.25);border:1px solid rgba(147,197,253,.4);border-radius:8px;color:#fff;cursor:pointer;transition:.2s;font-weight:600">🔍 对比模式</button>
+<span style="opacity:.3;margin:0 4px">|</span>
+<button class="btn" data-share-restricted onclick="document.getElementById('actualFileInput').click()">📥 导入实际</button>
+<a href="安效能_实际数据导入模板.xlsx" download class="btn-dl" data-share-restricted>实际模板</a>
+<a href="安效能_计划数据导入模板.xlsx" download class="btn-dl" data-share-restricted>计划模板</a>
+<button class="btn" data-share-restricted onclick="document.getElementById('planFileInput').click()">📅 导入计划</button>
+<button class="btn" data-share-restricted onclick="exportData()">💾 导出备份</button>
+<button class="btn" data-share-restricted onclick="exportShareData()" title="导出数据为JSON文件">📤 导出分享数据</button>
+<button class="btn" data-share-restricted onclick="encryptShareData()" title="一键加密并下载，用于GitHub Pages分享">🔒 加密分享数据</button>
+<label class="btn-file" data-share-restricted style="cursor:pointer">📂 恢复备份<input type="file" accept=".json" onchange="importData(this)" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden"></label>
+</div>
+</div>
+<div id="shareBanner" class="share-banner"><span class="share-badge">只读分享</span><span>数据周期 <b id="sharePeriod">—</b></span><span>数据版本 <b id="shareVersion">—</b></span><span>发布时间 <b id="sharePublishedAt">—</b></span><span>分享模式 <b id="shareModeLabel">—</b></span></div>
+<div id="statusBar" style="display:none;background:rgba(76,175,80,.2);color:#4caf50;padding:4px 16px;font-size:12px;text-align:center"></div>
+<input type="file" id="actualFileInput" data-share-restricted accept=".xlsx,.xls" multiple onchange="toast('正在导入实际数据...','info');importExcel(this)" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden">
+<input type="file" id="planFileInput" data-share-restricted accept=".xlsx,.xls" multiple onchange="toast('正在导入计划数据...','info');importPlanExcel(this)" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden">
+
+<div id="compareBar" style="display:none;background:rgba(59,130,246,.08);border-bottom:1px solid rgba(59,130,246,.15);padding:6px 24px;align-items:center;gap:6px"><span style="font-size:12px;color:rgba(59,130,246,.9);font-weight:600;margin-right:4px">🔍 对比期</span><select id="compareYear" onchange="refreshCompareMonths();setComparePeriod()" style="padding:3px 8px;font-size:12px;border:1px solid rgba(59,130,246,.3);border-radius:4px;background:#fff;margin-right:2px"></select><span style="font-size:12px;color:#666">年</span><select id="compareMonth" onchange="setComparePeriod()" style="padding:3px 8px;font-size:12px;border:1px solid rgba(59,130,246,.3);border-radius:4px;background:#fff"></select><span style="font-size:12px;color:#666">月</span><button class="btn-sm" onclick="quickCompare('prevMonth')" style="margin-left:8px;color:#2563eb;border-color:#93c5fd;font-size:11px;padding:3px 8px">vs 上月</button><button class="btn-sm" onclick="quickCompare('prevYear')" style="color:#7c3aed;border-color:#c4b5fd;font-size:11px;padding:3px 8px">vs 去年同期</button><span id="barComparePeriodLabel" style="font-size:11px;color:rgba(59,130,246,.6);margin-left:6px"></span></div>
+
+<div class="nav">
+<button class="active" onclick="switchTab('overview')">📊 分公司整体总览</button>
+<button onclick="switchTab('regions')">📈 责任区对比<span id="regions-badge" style="display:none;background:#dc2626;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:4px;vertical-align:top">0</span></button>
+<button onclick="switchTab('branches')">📋 各分公司明细<span id="branches-badge" style="display:none;background:#dc2626;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:4px;vertical-align:top">0</span></button>
+<button data-share-restricted onclick="switchTab('data')">📦 数据管理</button>
+<button onclick="switchTab('guide')">📖 指标说明</button>
+<button data-share-export onclick="switchTab('export')">📥 数据导出（测试）</button>
+<button data-share-ai onclick="switchTab('ai')">🧭 智能经营诊断<span id="ai-badge" style="display:none;background:#667eea;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:4px;vertical-align:top">0</span></button>
+</div>
+<div id="alert-bar" class="alert-bar" style="display:none"></div>
+<style>.alert-detail{max-height:60vh;overflow-y:auto;padding:4px 0}.alert-summary:hover{opacity:.85}
+.tbl-wrap td.cmp-col{position:relative;z-index:0}
+/* s0/s1/s2/s3 冻结列 — 依赖 table-layout:fixed + JS 动态设宽 */
+.tbl-wrap .s0{position:sticky;left:0;z-index:8}
+.tbl-wrap .s1{position:sticky;z-index:7}
+.tbl-wrap .s2{position:sticky;z-index:7;box-shadow:4px 0 8px rgba(0,0,0,.08)}
+</style>
+<div class="main">
+<div id="tab-overview" class="tab active"><div id="overview-kpi" class="kpi-row"></div><div id="overview-sections"></div></div>
+<div id="tab-regions" class="tab"><div id="regions-kpi" class="region-grid"></div><div id="regions-key-table"></div><div id="regions-charts"></div><div id="regions-detail"></div></div>
+<div id="tab-guide" class="tab"></div>
+<div id="tab-data" class="tab"><div id="data-panel"></div></div>
+<div id="tab-export" class="tab"></div>
+<div id="tab-branches" class="tab">
+<div id="branches-list-view"><div class="search-bar"><input type="text" id="branchSearch" placeholder="搜索分公司..." oninput="renderBranches()"><select id="branchGroup" onchange="renderBranches();if(window.App&&App.isCompareMode&&typeof applyCompareMode==='function')applyCompareMode()"><option value="all">全部指标</option><option value="保费">保费类</option><option value="效益">效益类</option><option value="效能">效能类</option><option value="人员">人员类</option></select><select id="branchRegion" onchange="renderBranches();if(window.App&&App.isCompareMode&&typeof applyCompareMode==='function')applyCompareMode()"><option value="all">全部责任区</option><option value="第一责任区">第一责任区</option><option value="第二责任区">第二责任区</option><option value="第三责任区">第三责任区</option><option value="第四责任区">第四责任区</option></select><span class="hint-text" style="font-size:11px;color:var(--text2);margin-left:8px">点击分公司行查看详情与排名</span></div><div id="branches-table" class="tbl-wrap"></div></div>
+<div id="branch-detail-view" style="display:none"><button class="back-btn" onclick="hideBranchDetail()">← 返回分公司列表</button><div id="branch-detail-content"></div></div>
+<div id="trend-section"><h3 style="margin-bottom:10px;font-size:15px">📈 多期趋势</h3><div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap"><span style="font-size:12px;color:var(--muted)">指标</span><select id="trendIndicator"><option value="">选择指标...</option></select><span style="font-size:12px;color:var(--muted)">分公司</span><select id="trendBranch"><option value="all">全部汇总</option></select><span style="font-size:12px;color:var(--muted)">时间对比</span><select id="trendCompareType"><option value="mom">环比（本年逐月）</option><option value="yoy">同比（同月跨年）</option></select><button type="button" id="trendShowButton" class="trend-show-btn" onclick="renderTrendChart()">显示趋势</button><span id="trendCompareHint" style="font-size:11px;color:var(--muted)">选择条件后点击“显示趋势”</span></div><div id="trend-chart-wrap" style="position:relative;height:320px"><canvas id="trendChart"></canvas></div><div id="trendSummary" class="trend-summary" style="display:none" aria-live="polite"></div></div>
+</div>
+<div id="tab-ai" class="tab"><div id="ai-content"></div></div>
+
+</div>
+<div id="pagesUnlockRoot"></div>
+<script src="pages/crypto.js?v=1"></script>
+<script src="pages/unlock.js?v=1"></script>
+<script src="dashboard-data.js?v=2062101"></script>
+<script src="dashboard-share.js?v=2062101"></script>
+<script src="dashboard-config.js?v=204253"></script>
+<script src="dashboard-compute.js?v=204253"></script>
+<script src="dashboard-metrics.js?v=2061803"></script>
+<script src="dashboard-charts.js?v=204253"></script>
+<script src="dashboard-render.js?v=2061906"></script>
+<script src="dashboard-alerts.js?v=204253"></script>
+<script src="dashboard-export.js?v=2062002"></script>
+<script src="dashboard-publish.js?v=2062001"></script>
+<script src="dashboard-main.js?v=2062002"></script>
+<script src="dashboard-ai.js?v=204312"></script>
+<script src="dashboard-agent.js?v=2061903"></script>
+<script src="dashboard-diagnosis.js?v=2061901"></script>
+<script src="dashboard-remediation.js?v=2061802"></script>
+<div id="errPanel" style="position:fixed;bottom:0;left:0;right:0;background:#fee;color:#c00;padding:8px 16px;font-size:12px;font-family:monospace;display:none;z-index:9999;max-height:120px;overflow:auto;white-space:pre-wrap;border-top:2px solid red"></div>
+<script>(function(){if(window.__anxiaonengEncryptedSharePending){var app=window.App||{};window.AnxiaonengUnlock.install(app);window.loadSharedDashboard().catch(function(e){console.error(e);});}})();</script></body>
+</html>
