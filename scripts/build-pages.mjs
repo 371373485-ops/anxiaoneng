@@ -77,6 +77,7 @@ function sharePage(source,basePath){
 '<\/script></body></html>';
   return html;
 }
+function assertExactKeys(value,expected,label){
   const actual=Object.keys(value||{}).sort(),wanted=[...expected].sort();
   if(actual.length!==wanted.length||actual.some((key,index)=>key!==wanted[index]))throw new Error(`Unexpected ${label} fields`);
 }
