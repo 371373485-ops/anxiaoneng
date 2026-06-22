@@ -29,7 +29,7 @@ def _get_api_key():
 
 ZHIPU_API_KEY = _get_api_key()
 ZHIPU_API_URL = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
-ZHIPU_MODEL = os.environ.get("ZAI_MODEL", "glm-4-flash")
+ZHIPU_MODEL = os.environ.get("ZAI_MODEL", "glm-4-plus")
 MAX_TOKENS = int(os.environ.get("ZAI_MAX_TOKENS", "4096"))
 
 SYSTEM_PROMPT = """你是一个专业的保险公司经营分析助手，服务于华安保险的管理层。你的职责是：
@@ -157,6 +157,9 @@ def _match_metrics(question):
     for f in matched:
         if f['k'] not in seen:
             seen.add(f['k']); result.append(f)
+    # 只在匹配到过多指标时截断（broad问题如"经营情况"会匹配整组）
+    if len(result) > 8:
+        result = result[:8]
     return result
 
 def _filter_metrics(data, matched_keys, period, org):
@@ -198,11 +201,13 @@ def _extract_data_for_question(question, data):
         'metrics': [{'key': f['k'], 'label': f['l'], 'unit': f['u'], 'group': f['g']} for f in matched_fields],
         'years': years
     }}
+    # 月份限制：按用户问的时间范围给数据，不人为截断
+    max_periods = 24
     for mk in sorted(merged.keys()):
         yr = mk.split('-')[0]
         if yr not in years:
             continue
-        if len(result['periods']) >= 6:
+        if len(result['periods']) >= max_periods:
             break
         mdata = merged[mk]
         period_data = {'period': mk}
@@ -236,6 +241,109 @@ def _extract_data_for_question(question, data):
                     if rdata:
                         period_data['regions'][rn] = _filter_metrics(rdata, matched_keys, mk, rn)
         result['periods'][mk] = period_data
+    return result
+
+
+def _format_data_table(extracted, data):
+    """将提取的数据子集格式化为紧凑文本表格，大幅减少 token 消耗"""
+    lines = []
+    query = extracted.get('query', {})
+    periods = extracted.get('periods', {})
+    branches = query.get('branches', [])
+    regions = query.get('regions', [])
+    all_b = query.get('allBranches', False)
+    metrics = query.get('metrics', [])
+
+    if not metrics:
+        lines.append('（暂无匹配指标数据）')
+        return '\n'.join(lines)
+
+    # 构建指标 key→label 映射
+    mlabel = {m['key']: m['label'] for m in metrics}
+    munit = {m['key']: m['unit'] for m in metrics}
+    mkeys = [m['key'] for m in metrics]
+
+    # 按组织维度分组收集数据
+    sorted_pks = sorted(periods.keys())
+
+    if branches:
+        for bn in branches:
+            lines.append(f'\n【{bn}】')
+            # 表头：月份 + 指标1 | 指标2 | ...
+            header = ['月份'] + [mlabel.get(k, k) for k in mkeys]
+            lines.append(' | '.join(header))
+            lines.append(' | '.join(['---'] * len(header)))
+            for pk in sorted_pks:
+                pdata = periods.get(pk, {}).get('branches', {}).get(bn, {})
+                if not pdata: continue
+                row = [pk.split('-')[1] if '-' in pk else pk]  # 只显示月
+                for k in mkeys:
+                    v = pdata.get(k)
+                    if v is None: row.append('-')
+                    elif munit.get(k) == '%': row.append(f'{v*100:.2f}%')
+                    elif munit.get(k) == '人': row.append(f'{v:.0f}人')
+                    else: row.append(f'{v:.2f}')
+                lines.append(' | '.join(row))
+    elif regions:
+        for rn in regions:
+            lines.append(f'\n【{rn}】')
+            header = ['月份'] + [mlabel.get(k, k) for k in mkeys]
+            lines.append(' | '.join(header))
+            lines.append(' | '.join(['---'] * len(header)))
+            for pk in sorted_pks:
+                pdata = periods.get(pk, {}).get('regions', {}).get(rn, {})
+                if not pdata: continue
+                row = [pk.split('-')[1] if '-' in pk else pk]
+                for k in mkeys:
+                    v = pdata.get(k)
+                    if v is None: row.append('-')
+                    elif munit.get(k) == '%': row.append(f'{v*100:.2f}%')
+                    elif munit.get(k) == '人': row.append(f'{v:.0f}人')
+                    else: row.append(f'{v:.2f}')
+                lines.append(' | '.join(row))
+    else:
+        # 全国汇总
+        lines.append('\n【全国汇总】')
+        header = ['月份'] + [mlabel.get(k, k) for k in mkeys]
+        lines.append(' | '.join(header))
+        lines.append(' | '.join(['---'] * len(header)))
+        for pk in sorted_pks:
+            pdata = periods.get(pk, {}).get('national', {})
+            if not pdata: continue
+            row = [pk.split('-')[1] if '-' in pk else pk]
+            for k in mkeys:
+                v = pdata.get(k)
+                if v is None: row.append('-')
+                elif munit.get(k) == '%': row.append(f'{v*100:.2f}%')
+                elif munit.get(k) == '人': row.append(f'{v:.0f}人')
+                else: row.append(f'{v:.2f}')
+            lines.append(' | '.join(row))
+        # 责任区（如果有且数据不多）
+        if regions or all_b:
+            region_names = ['第一责任区','第二责任区','第三责任区','第四责任区']
+            for rn in region_names:
+                has_data = any(rn in periods.get(pk, {}).get('regions', {}) for pk in sorted_pks)
+                if not has_data: continue
+                lines.append(f'\n【{rn}】')
+                header = ['月份'] + [mlabel.get(k, k) for k in mkeys]
+                lines.append(' | '.join(header))
+                lines.append(' | '.join(['---'] * len(header)))
+                for pk in sorted_pks:
+                    pdata = periods.get(pk, {}).get('regions', {}).get(rn, {})
+                    if not pdata: continue
+                    row = [pk.split('-')[1] if '-' in pk else pk]
+                    for k in mkeys:
+                        v = pdata.get(k)
+                        if v is None: row.append('-')
+                        elif munit.get(k) == '%': row.append(f'{v*100:.2f}%')
+                        elif munit.get(k) == '人': row.append(f'{v:.0f}人')
+                        else: row.append(f'{v:.2f}')
+                    lines.append(' | '.join(row))
+
+    result = '\n'.join(lines)
+    # 如果结果太大（>8KB），截断提示
+    if len(result) > 8000:
+        result = result[:8000] + '\n...（数据较多，以上为摘要，如需完整数据请指定更精确的指标或时间范围）'
     return result
 
 
@@ -405,7 +513,7 @@ class H(http.server.SimpleHTTPRequestHandler):
                 req.add_header('Authorization', f'Bearer {ZHIPU_API_KEY}')
                 req.add_header('Content-Type', 'application/json')
                 ctx = ssl.create_default_context()
-                resp = urllib.request.urlopen(req, context=ctx, timeout=60)
+                resp = urllib.request.urlopen(req, context=ctx, timeout=180)
                 result = json.loads(resp.read().decode('utf-8'))
                 ai_text = result.get('choices', [{}])[0].get('message', {}).get('content', '')
                 interpretation = {
@@ -594,7 +702,7 @@ class H(http.server.SimpleHTTPRequestHandler):
                 "messages": messages,
                 "stream": True,
                 "temperature": 0.7,
-                "max_tokens": 4096
+                "max_tokens": 32768
             }).encode('utf-8')
 
             req = urllib.request.Request(ZHIPU_API_URL, data=payload, method='POST')
@@ -610,7 +718,7 @@ class H(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
 
             try:
-                resp = urllib.request.urlopen(req, context=ctx, timeout=60)
+                resp = urllib.request.urlopen(req, context=ctx, timeout=180)
                 for line in resp:
                     line = line.decode('utf-8').strip()
                     if not line.startswith('data:'):
@@ -665,27 +773,32 @@ class H(http.server.SimpleHTTPRequestHandler):
             with open(backup_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             data_subset = _extract_data_for_question(question, data)
-            data_json = json.dumps(data_subset, ensure_ascii=False, indent=2)
+            data_table = _format_data_table(data_subset, data)
             system_prompt = SYSTEM_PROMPT + """
 
 ## 个性化分析规则
 - 你正在分析华安保险分公司的经营数据
-- 数据以 JSON 格式提供，包含按月份组织的指标数据
-- 比率类指标（如综合成本率、赔付率、达成率）用小数表示，0.95=95%
-- 绝对值类指标（如保费、利润）单位为万元
-- 人数类指标单位为人
-- 回答时必须使用提供的真实数据，禁止编造任何数字
+- 数据以下方表格形式提供，已按用户问题智能筛选
+- 表格中百分比已转为百分数（如98.47%），金额单位为万元，人数单位为人
+- 回答时必须使用表格中的真实数据，禁止编造任何数字
 - 如果数据不足以回答问题，明确说明"平台暂无此数据"
-- 分析要有深度，不只是罗列数字，要解读趋势变化和可能的原因"""
-            user_prompt = f"""以下是看板中的经营数据（JSON 格式）：
+- 分析要有深度，不只是罗列数字，要解读趋势变化和可能的原因
+- 所有引用的数据必须保留2位小数，百分比类带%号，金额类带万元单位
+- 无论用户问什么时间范围、什么指标、什么机构、什么比较方式，都要基于数据给出完整回答
+- 可以做同比、环比、排名、趋势、计划达成等任何分析维度
+- 如果用户问的指标在数据中存在，必须找到并使用，不要说查不到
+- **回答风格：极度精简**。数据用紧凑表格呈现（不要重复原始表格，只列关键对比/变化），每个指标1-2句话总结趋势+异常。绝不写长段落。整体回答控制在800字以内。"""
+            user_prompt = f"""以下是看板中的经营数据（已按你的问题筛选并整理为表格）：
 
-{data_json}
+{data_table}
 
 请回答用户的问题。要求：
-1. 所有引用的数字必须来自以上数据，禁止编造
+1. 所有引用的数字必须来自以上表格，禁止编造
 2. 趋势分析需明确标注各期数值和变化方向
 3. 对比分析需计算差值并说明含义
 4. 如数据覆盖范围不足（如只有 1 个月），明确说明局限性
+5. **回答要极度精简**：数据用紧凑表格，每个指标1-2句话。不要重复原始表格，只列关键对比和变化。整体控制在800字以内。
+6. 数据格式：2位小数+单位（98.47%、5,023.50万元）
 
 【用户问题】{question}"""
             messages = [
@@ -695,46 +808,27 @@ class H(http.server.SimpleHTTPRequestHandler):
             payload = json.dumps({
                 "model": ZHIPU_MODEL,
                 "messages": messages,
-                "stream": True,
+                "stream": False,
                 "temperature": 0.3,
-                "max_tokens": 4096
+                "max_tokens": 32768
             }).encode('utf-8')
             req = urllib.request.Request(ZHIPU_API_URL, data=payload, method='POST')
             req.add_header('Authorization', f'Bearer {ZHIPU_API_KEY}')
             req.add_header('Content-Type', 'application/json')
             ctx = ssl.create_default_context()
-            self.send_response(200)
-            self.send_header('Content-Type', 'text/event-stream')
-            self.send_header('Cache-Control', 'no-cache')
-            self._send_cors()
-            self.end_headers()
             try:
-                resp = urllib.request.urlopen(req, context=ctx, timeout=60)
-                for line in resp:
-                    line = line.decode('utf-8').strip()
-                    if not line.startswith('data:'):
-                        continue
-                    data_str = line[5:].strip()
-                    if data_str == '[DONE]':
-                        self.wfile.write(b'data: [DONE]\n\n')
-                        self.wfile.flush()
-                        break
-                    try:
-                        chunk = json.loads(data_str)
-                        delta = chunk.get('choices', [{}])[0].get('delta', {})
-                        content = delta.get('content', '')
-                        if content:
-                            out = json.dumps({'content': content}, ensure_ascii=False)
-                            self.wfile.write(f'data: {out}\n\n'.encode('utf-8'))
-                            self.wfile.flush()
-                    except json.JSONDecodeError:
-                        continue
+                resp = urllib.request.urlopen(req, context=ctx, timeout=180)
+                body = resp.read().decode('utf-8')
+                result = json.loads(body)
+                content = result.get('choices', [{}])[0].get('message', {}).get('content', '')
+                if not content:
+                    content = '（AI 未返回内容，请重试）'
+                self._send_json({'content': content})
             except urllib.error.HTTPError as e:
                 err_body = e.read().decode('utf-8', errors='replace')
-                err_msg = json.dumps({'error': f'API请求失败({e.code}): {err_body[:200]}'}, ensure_ascii=False)
-                self.wfile.write(f'data: {err_msg}\n\n'.encode('utf-8'))
-                self.wfile.write(b'data: [DONE]\n\n')
-                self.wfile.flush()
+                self._send_json({'error': f'API请求失败({e.code}): {err_body[:300]}'}, 500)
+            except Exception as e:
+                self._send_json({'error': f'请求异常: {str(e)}'}, 500)
         except Exception as e:
             print(f'[AI Analyze Error] {e}', flush=True)
             try:
@@ -793,7 +887,7 @@ class H(http.server.SimpleHTTPRequestHandler):
             # 流式转发 GLM 输出
             full_text = []
             try:
-                resp = urllib.request.urlopen(req, context=ctx, timeout=60)
+                resp = urllib.request.urlopen(req, context=ctx, timeout=180)
                 for line in resp:
                     line = line.decode('utf-8').strip()
                     if not line.startswith('data:'):

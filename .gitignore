@@ -61,3 +61,24 @@ report_*.html
 Thumbs.db
 .vscode/
 .idea/
+
+# Temp scripts and scratch files
+_*.py
+_*.js
+_*.html
+ui_mockup*.html
+dashboard-clean.css
+architecture_analysis.md
+prd_*.md
+ui_renovation_plan.md
+pages-dist/
+ops/
+.env
+.env.*
+compose.production.yml
+.dockerignore
+_agent_runs.json
+_diagnoses.json
+_payload_debug.json
+_remediation_tasks.json
+*.xlsx

@@ -687,6 +687,10 @@ function _report(bn,alerts){
 window._renderRulesReport = function(){
   var ct=document.getElementById('ai-content');
   if(!ct)return;
+  // 如果已经渲染过且用户有 AI 交互内容（深度解读/问答），切换 tab 时不重建
+  if(ct.getAttribute('data-rendered')==='1' && (ct.querySelector('#ai-deep-content') && ct.querySelector('#ai-deep-content').innerHTML.trim() || ct.querySelector('#ai-chat-messages') && ct.querySelector('#ai-chat-messages').children.length>0)){
+    return;
+  }
   var results=App._alertResults||[];
   if(!results.length){
     ct.innerHTML='<div style="display:flex;align-items:center;justify-content:center;padding:80px 20px;min-height:300px;text-align:center"><div><div style="font-size:48px;margin-bottom:12px">✅</div><div style="font-size:16px;font-weight:600;color:var(--text)">当前无预警触发</div><div style="font-size:12px;color:var(--muted);margin-top:8px">在「数据管理」→ 「预警规则」中启用规则后，切换 Tab 即可自动分析</div></div></div>';
@@ -704,7 +708,6 @@ window._renderRulesReport = function(){
   var nonBranchAlerts=results.filter(function(r){return !r.branchName;});
 
   var bns=Object.keys(branchMap);
-  // 筛选：至少1条error 或 至少3条warn，避免报告过于冗长
   bns=bns.filter(function(bn){
     var errs=branchMap[bn].filter(function(r){return r.severity==='error';}).length;
     var warns=branchMap[bn].filter(function(r){return r.severity==='warn';}).length;
@@ -719,87 +722,145 @@ window._renderRulesReport = function(){
   });
 
   var reps=[];
-  bns.forEach(function(bn){reps.push(_report(bn,branchMap[bn]));});
+  bns.forEach(function(bn){reps.push({name:bn,report:_report(bn,branchMap[bn]),alerts:branchMap[bn]});});
 
-  // 总体评估
-  var highRisk=reps.filter(function(r){return r.sum.indexOf('高风险')>=0;}).length;
-  var midRisk=reps.filter(function(r){return r.sum.indexOf('中风险')>=0;}).length;
+  var highRisk=reps.filter(function(r){return r.report.sum.indexOf('高风险')>=0;}).length;
+  var midRisk=reps.filter(function(r){return r.report.sum.indexOf('中风险')>=0;}).length;
 
   var h='';
-  // 总览
-  h+='<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">';
-  h+='<div style="flex:1;min-width:110px;padding:10px 8px;background:linear-gradient(135deg,#fef2f2,#fee2e2);border-radius:10px;text-align:center"><div style="font-size:28px;font-weight:800;color:#dc2626">'+
-    highRisk+'</div><div style="font-size:11px;color:#991b1b;margin-top:2px">高风险</div></div>';
-  h+='<div style="flex:1;min-width:110px;padding:10px 8px;background:linear-gradient(135deg,#fffbeb,#fef3c7);border-radius:10px;text-align:center"><div style="font-size:28px;font-weight:800;color:#d97706">'+
-    midRisk+'</div><div style="font-size:11px;color:#92400e;margin-top:2px">中风险</div></div>';
-  h+='<div style="flex:1;min-width:110px;padding:10px 8px;background:linear-gradient(135deg,#f8fafc,#e2e8f0);border-radius:10px;text-align:center"><div style="font-size:28px;font-weight:800;color:#475569">'+
-    reps.length+'</div><div style="font-size:11px;color:#64748b;margin-top:2px">涉及分公司</div></div>';
-  h+='<div style="flex:1;min-width:110px;padding:10px 8px;background:linear-gradient(135deg,#f0fdf4,#dcfce7);border-radius:10px;text-align:center"><div style="font-size:28px;font-weight:800;color:#16a34a">'+
-    results.length+'</div><div style="font-size:11px;color:#166534;margin-top:2px">告警总数</div></div>';
-  h+='<div style="flex:1;min-width:110px;padding:10px 8px;background:linear-gradient(135deg,#eff6ff,#dbeafe);border-radius:10px;text-align:center"><div style="font-size:13px;font-weight:800;color:#2563eb">'+
-    formatMonth(App.currentMonth)+'</div><div style="font-size:11px;color:#1e40af;margin-top:2px">报告周期</div></div>';
+
+  // ═══ 顶部：总览 + 个性化分析（醒目位置）═══
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">';
+
+  // 左侧：风险总览
+  h+='<div style="background:var(--card,#fff);border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:16px">';
+  h+='<div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--text)">📋 风险总览</div>';
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap">';
+  h+='<div style="flex:1;min-width:80px;padding:10px 8px;background:#fef2f2;border-radius:8px;text-align:center"><div style="font-size:24px;font-weight:800;color:#dc2626">'+highRisk+'</div><div style="font-size:11px;color:#991b1b">高风险</div></div>';
+  h+='<div style="flex:1;min-width:80px;padding:10px 8px;background:#fffbeb;border-radius:8px;text-align:center"><div style="font-size:24px;font-weight:800;color:#d97706">'+midRisk+'</div><div style="font-size:11px;color:#92400e">中风险</div></div>';
+  h+='<div style="flex:1;min-width:80px;padding:10px 8px;background:#f0fdf4;border-radius:8px;text-align:center"><div style="font-size:24px;font-weight:800;color:#16a34a">'+results.length+'</div><div style="font-size:11px;color:#166534">告警总数</div></div>';
+  h+='<div style="flex:1;min-width:80px;padding:10px 8px;background:#eff6ff;border-radius:8px;text-align:center"><div style="font-size:12px;font-weight:800;color:#2563eb">'+formatMonth(App.currentMonth)+'</div><div style="font-size:11px;color:#1e40af">报告周期</div></div>';
+  h+='</div>';
+  var overallText='';
+  if(highRisk>0)overallText='⚠️ '+highRisk+'家高风险，建议优先关注。';
+  if(midRisk>0)overallText+=' '+midRisk+'家中风险，需持续跟踪。';
+  if(!overallText)overallText='当前各分公司经营指标总体平稳。';
+  h+='<div style="margin-top:10px;font-size:12px;color:var(--muted,#888)">'+overallText+'</div>';
   h+='</div>';
 
-  // 顶部总结语
-  var overallText='';
-  if(highRisk>0)overallText='⚠️ '+highRisk+'家分公司处于高风险状态，建议优先关注并组织专项分析。';
-  if(midRisk>0)overallText+=' '+midRisk+'家处于中风险，需持续跟踪。';
-  if(!overallText)overallText='当前各分公司经营指标总体平稳。';
-  h+='<div style="margin-bottom:10px;padding:10px 16px;background:#f8f9fa;border-radius:6px;font-size:12px;color:var(--text)">📋 <b>总体评估：</b>'+overallText+'</div>';
-
-  // 报告
-  reps.forEach(function(rep){
-    h+='<details open style="margin-bottom:8px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden">';
-    h+='<summary style="padding:10px 14px;cursor:pointer;background:#fafafa;font-weight:800;font-size:16px;user-select:none">'+
-      _eh(rep.sum)+'</summary><div style="padding:0 12px 6px">'+rep.body+'</div></details>';
+  // 右侧：个性化分析（醒目位置）
+  h+='<div style="background:var(--card,#fff);border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:16px">';
+  h+='<div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)">💬 个性化 AI 分析</div>';
+  h+='<p style="font-size:11px;color:var(--muted,#888);margin-bottom:10px">基于看板全量数据，输入分析需求，AI 精准读取数据并生成报告</p>';
+  h+='<div id="ai-ca-msgs" style="min-height:40px;max-height:200px;overflow-y:auto;margin-bottom:10px;font-size:12px;line-height:1.6"></div>';
+  // 快捷问题
+  var CA_QUICK=[
+    {icon:'📊',title:'全国经营概览',q:'请分析2026年全国整体经营情况，包括保费达成、利润和COR表现'},
+    {icon:'🏢',title:'责任区对比',q:'请对比四个责任区2026年的综合成本率、赔付率和费用率差异'},
+    {icon:'📈',title:'趋势分析',q:'请分析全国综合成本率近两年的变化趋势'},
+    {icon:'👥',title:'人效诊断',q:'请分析各责任区2026年人均产能和人均利润的差异'}
+  ];
+  h+='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">';
+  CA_QUICK.forEach(function(q){
+    h+='<button class="ai-qc" onclick="quickAnalyze(\''+q.q.replace(/'/g,'\\\'')+'\')" style="padding:4px 10px;border:1px solid var(--border,#d1d5db);border-radius:6px;background:var(--card,#fff);cursor:pointer;font-size:11px;color:var(--text)">'+q.icon+' '+q.title+'</button>';
   });
+  h+='</div>';
+  h+='<div style="display:flex;gap:6px">';
+  h+='<input id="ai-ca-input" placeholder="如：请分析河南分公司近三年综合成本率变化情况" style="flex:1;padding:8px 12px;border:1px solid var(--border,#d1d5db);border-radius:6px;font-size:12px;background:var(--card,#fff);color:var(--text)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();sendAnalyze();}" autocomplete="off">';
+  h+='<button onclick="sendAnalyze()" style="padding:8px 16px;background:#1E3A5F;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:12px">发送</button>';
+  h+='</div>';
+  h+='</div>';
+  h+='</div>'; // end grid
 
-  // 全国/责任区
+  // ═══ 分公司选择器 + 规则报告 + AI深度解读 ═══
+  h+='<div style="background:var(--card,#fff);border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:16px;margin-bottom:16px">';
+
+  // 全国/责任区级告警（放在分公司选择器前面）
   if(nonBranchAlerts.length){
-    h+='<div style="margin-top:8px;padding:12px 18px;background:#f8f9fa;border-radius:8px">';
-    h+='<div style="font-weight:700;font-size:13px;margin-bottom:8px">📊 全国/责任区级告警</div>';
+    h+='<div style="margin-bottom:14px;padding:12px 16px;background:#f8f9fa;border-radius:8px">';
+    h+='<div style="font-weight:700;font-size:12px;margin-bottom:6px">📊 全国/责任区级告警</div>';
     nonBranchAlerts.forEach(function(r){
       var u=_fi(r.field).u||'',sev=r.severity==='error'?'🔴':(r.severity==='warn'?'🟠':'🔵');
-      h+='<div style="padding:2px 0;font-size:11px">'+_eh(sev)+' <b>'+_eh(r.regionName||'全国')+'</b> · '+
-        _eh(r.fieldLabel||r.field)+'：'+_eh(_fv(r.currentValue,u))+'（阈值 '+_eh(_fv(r.threshold,u))+'）</div>';
+      h+='<div style="padding:2px 0;font-size:11px">'+_eh(sev)+' <b>'+_eh(r.regionName||'全国')+'</b> · '+_eh(r.fieldLabel||r.field)+'：'+_eh(_fv(r.currentValue,u))+'</div>';
     });
     h+='</div>';
   }
 
-  h+='<div style="padding:12px 14px;background:#f8f9fa;border-radius:6px;font-size:10px;color:var(--muted);margin-top:12px">';
-  h+='⚙️ 基于多维风险矩阵+经营模式识别+同业对标自动生成 · 周期：'+formatMonth(App.currentMonth)+' · 仅供管理参考</div>';
-
-  // ── AI 深度解读区域 ──
-  h += '<div id="ai-deep-reading" style="margin-top:16px;border-top:2px solid #e5e7eb;padding-top:16px">';
-  h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
-  h += '<h3 style="font-size:15px;font-weight:700">🤖 AI 深度解读</h3>';
-  h += '<button id="ai-deep-btn" onclick="generateDeepReading()" style="padding:6px 16px;border:1px solid #7c3aed;border-radius:6px;background:#f5f3ff;color:#7c3aed;cursor:pointer;font-size:12px;font-weight:600">生成 AI 深度解读</button>';
-  h += '</div>';
-  h += '<div id="ai-deep-content" style="min-height:60px;font-size:13px;line-height:1.7;color:var(--text)"></div>';
-  h += '</div>';
-
-  // ── 个性化分析区域 ──
-  h += '<div id="ai-custom-analysis" style="margin-top:20px;border-top:2px solid #e5e7eb;padding-top:16px">';
-  h += '<h3 style="font-size:15px;font-weight:700;margin-bottom:8px">💬 个性化分析</h3>';
-  h += '<p style="font-size:12px;color:var(--muted);margin-bottom:10px">基于看板全量数据，输入你的分析需求。AI 会精准读取数据并生成分析报告。</p>';
-  h += '<div id="ai-ca-msgs" style="min-height:60px;margin-bottom:12px;font-size:13px;line-height:1.7"></div>';
-  var CA_QUICK = [
-    {icon:'📊', title:'全国经营概览', q:'请分析2026年全国整体经营情况，包括保费达成、利润和COR表现'},
-    {icon:'🏢', title:'责任区对比', q:'请对比四个责任区2026年的综合成本率、赔付率和费用率差异'},
-    {icon:'📈', title:'趋势分析', q:'请分析全国综合成本率近两年的变化趋势'},
-    {icon:'👥', title:'人效诊断', q:'请分析各责任区2026年人均产能和人均利润的差异'}
-  ];
-  h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">';
-  CA_QUICK.forEach(function(q){
-    h += '<button class="ai-qc" onclick="quickAnalyze(\''+q.q.replace(/'/g,'\\\'')+'\')" style="padding:5px 12px;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer;font-size:12px">'+q.icon+' '+q.title+'</button>';
+  // 分公司选择器（解决页面太长问题）
+  h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">';
+  h+='<span style="font-size:13px;font-weight:700;color:var(--text)">🏥 分公司诊断</span>';
+  h+='<select id="ai-branch-select" onchange="switchDiagnosisBranch(this.value)" style="padding:6px 12px;border:1px solid var(--border,#d1d5db);border-radius:6px;font-size:12px;background:var(--card,#fff);color:var(--text);cursor:pointer;min-width:180px">';
+  reps.forEach(function(rep,i){
+    h+='<option value="'+i+'">'+_eh(rep.report.sum.replace(/^(🔴|🟠|🔵|🟢)\s*/, '').substring(0,30))+'...</option>';
   });
-  h += '</div>';
-  h += '<div style="display:flex;gap:8px">';
-  h += '<input id="ai-ca-input" placeholder="如：请分析河南分公司近三年综合成本率变化情况" style="flex:1;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px" onkeydown="if(event.key===\'Enter\'){event.preventDefault();sendAnalyze();}" autocomplete="off">';
-  h += '<button onclick="sendAnalyze()" style="padding:8px 20px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px">发送</button>';
-  h += '</div></div>';
+  h+='</select>';
+  h+='<span style="font-size:11px;color:var(--muted,#888)">共 '+reps.length+' 家有风险的分公司</span>';
+  h+='</div>';
+
+  // 分公司报告容器（只显示选中的一家）
+  h+='<div id="ai-branch-report"></div>';
+
+  h+='<div style="padding:10px 12px;font-size:10px;color:var(--muted,#888);margin-top:8px">⚙️ 基于多维风险矩阵+经营模式识别+同业对标自动生成 · 仅供管理参考</div>';
+
+  h+='</div>';
 
   ct.innerHTML=h;
+  ct.setAttribute('data-rendered','1');
+
+  // 默认显示第一家
+  if(reps.length>0){
+    showDiagnosisBranch(0,reps);
+  }
+};
+
+// ═══ 分公司切换：只显示选中的分公司报告 + 一对一AI深度解读 ═══
+window.switchDiagnosisBranch=function(idx){
+  var results=App._alertResults||[];
+  var branchMap={};
+  results.filter(function(r){return r.branchName;}).forEach(function(r){
+    if(!branchMap[r.branchName])branchMap[r.branchName]=[];
+    branchMap[r.branchName].push(r);
+  });
+  var bns=Object.keys(branchMap).filter(function(bn){
+    var errs=branchMap[bn].filter(function(r){return r.severity==='error';}).length;
+    var warns=branchMap[bn].filter(function(r){return r.severity==='warn';}).length;
+    return errs>=1||warns>=3;
+  });
+  bns.sort(function(a,b){
+    var ea=branchMap[a].filter(function(r){return r.severity==='error';}).length;
+    var eb=branchMap[b].filter(function(r){return r.severity==='error';}).length;
+    var wa=branchMap[a].filter(function(r){return r.severity==='warn';}).length;
+    var wb=branchMap[b].filter(function(r){return r.severity==='warn';}).length;
+    return (eb*2+wb)-(ea*2+wa);
+  });
+  var reps=[];
+  bns.forEach(function(bn){reps.push({name:bn,report:_report(bn,branchMap[bn]),alerts:branchMap[bn]});});
+  showDiagnosisBranch(parseInt(idx)||0,reps);
+};
+
+window.showDiagnosisBranch=function(idx,reps){
+  var container=document.getElementById('ai-branch-report');
+  if(!container||!reps[idx])return;
+  var rep=reps[idx];
+  var bn=rep.name;
+
+  var h='';
+  // 规则报告
+  h+='<details open style="margin-bottom:12px;border:1px solid var(--border,#e5e7eb);border-radius:8px;overflow:hidden">';
+  h+='<summary style="padding:10px 14px;cursor:pointer;background:#f8f9fa;font-weight:700;font-size:14px;user-select:none">'+_eh(rep.report.sum)+'</summary>';
+  h+='<div style="padding:0 12px 6px">'+rep.report.body+'</div>';
+  h+='</details>';
+
+  // 一对一AI深度解读
+  h+='<div id="ai-deep-reading" style="margin-top:12px;border-top:1px solid var(--border,#e5e7eb);padding-top:12px">';
+  h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
+  h+='<span style="font-size:13px;font-weight:700;color:var(--text)">🤖 AI 深度解读 · '+_eh(bn)+'</span>';
+  h+='<button id="ai-deep-btn" onclick="generateDeepReading(\''+bn.replace(/'/g,'\\\'')+'\')" style="padding:6px 14px;border:1px solid #1E3A5F;border-radius:6px;background:#1E3A5F;color:#fff;cursor:pointer;font-size:11px;font-weight:600">生成 AI 深度解读</button>';
+  h+='</div>';
+  h+='<div id="ai-deep-content" style="min-height:40px;font-size:12px;line-height:1.7;color:var(--text)"></div>';
+  h+='</div>';
+
+  container.innerHTML=h;
 };
 
 // ══════════ AI 深度解读 + 个性化分析 ══════════
@@ -826,52 +887,63 @@ function fmtAI(text){
   return '<p style="margin:6px 0">'+html+'</p>';
 }
 
-window.generateDeepReading=function(){
+window.generateDeepReading=function(branchName){
   var btn=document.getElementById('ai-deep-btn');
   var ct=document.getElementById('ai-deep-content');
   if(!btn||!ct)return;
+  if(!branchName){ct.innerHTML='<span style="color:var(--muted)">请先选择分公司</span>';return;}
   btn.disabled=true;btn.textContent='生成中…';
-  ct.innerHTML='<span style="color:var(--muted)">正在分析诊断数据...</span>';
+  ct.innerHTML='<span style="color:var(--muted)">正在分析 '+branchName+' 的诊断数据...</span>';
 
   var results=App._alertResults||[];
-  var branchMap={};
-  results.filter(function(r){return r.branchName;}).forEach(function(r){
-    if(!branchMap[r.branchName])branchMap[r.branchName]=[];
-    branchMap[r.branchName].push(r);
-  });
-  var bns=Object.keys(branchMap).filter(function(bn){
-    var errs=branchMap[bn].filter(function(r){return r.severity==='error';}).length;
-    var warns=branchMap[bn].filter(function(r){return r.severity==='warn';}).length;
-    return errs>=1||warns>=3;
-  });
-  var diagnoses=bns.map(function(bn){
-    var model=(typeof _buildDiagnosisModel==='function')?_buildDiagnosisModel(bn,branchMap[bn]):null;
-    if(!model)return null;
-    return {
-      branch:bn,riskLevel:model.riskLevel,summary:model.summary,
-      facts:(model.facts||[]).slice(0,8),
-      patterns:(model.patterns||[]).slice(0,5),
-      inferences:(model.inferences||[]).slice(0,6),
-      recommendations:(model.recommendations||[]).slice(0,5)
-    };
-  }).filter(Boolean);
+  var branchAlerts=results.filter(function(r){return r.branchName===branchName;});
+  var model=(typeof _buildDiagnosisModel==='function')?_buildDiagnosisModel(branchName,branchAlerts):null;
+
+  var CORE_METRICS=['保费实际合计','时间进度计划达成率','经营利润','时间进度达成率','综合成本率实际（整体利润口径）','已赚赔付率实际','已赚费用率实际','整体人均产能实际','整体人均利润实际','整体人力成本保费率实际'];
+  var branchData=(App.DATA.branches||[]).find(function(b){return b.n===branchName;});
+  var currentMetrics={};
+  if(branchData&&branchData.d){CORE_METRICS.forEach(function(mk){var v=Number(branchData.d[mk]);if(!isNaN(v)&&v!=null)currentMetrics[mk]=v;});}
+  var nationalAvg={};
+  var nat=App.DATA.national||{};
+  CORE_METRICS.forEach(function(mk){var v=Number(nat[mk]);if(!isNaN(v)&&v!=null)nationalAvg[mk]=v;});
+  var allMonths=Object.keys(App.ALL_DATA._merged||{}).sort();
+  var recentMonths=allMonths.slice(-6);
+  var trendData={};
+  CORE_METRICS.forEach(function(mk){trendData[mk]=[];});
+  recentMonths.forEach(function(mk){var mdata=(App.ALL_DATA._merged||{})[mk];if(!mdata||!mdata.branches)return;var b=mdata.branches.find(function(x){return x.n===branchName;});if(b&&b.d){CORE_METRICS.forEach(function(metric){var v=Number(b.d[metric]);if(!isNaN(v)&&v!=null)trendData[metric].push({month:mk,value:v});});}});
+  var triggeredAlerts=branchAlerts.map(function(a){return{field:a.fieldLabel||a.field,severity:a.severity,value:a.currentValue,threshold:a.threshold};});
+
+  // 预格式化数据：让 AI 直接引用，不需要自己转换
+  function _fmtAI(v,unit){
+    if(v==null||isNaN(v))return null;
+    if(unit==='%')return(v*100).toFixed(2)+'%';
+    if(unit==='人')return v.toFixed(0)+'人';
+    if(unit==='万元/人')return v.toFixed(2)+'万/人';
+    return v.toFixed(2)+'万元';
+  }
+  var _mdef={};
+  CORE_METRICS.forEach(function(mk){var fi=(App.FIELDS||[]).find(function(f){return f.k===mk;});if(fi)_mdef[mk]=fi;});
+  var currentMetricsFmt={};
+  CORE_METRICS.forEach(function(mk){var v=Number(branchData&&branchData.d?branchData.d[mk]:null);var u=(_mdef[mk]||{}).u||'';var f=_fmtAI(v,u);if(f)currentMetricsFmt[mk]=f;});
+  var nationalAvgFmt={};
+  CORE_METRICS.forEach(function(mk){var v=Number(nat[mk]);var u=(_mdef[mk]||{}).u||'';var f=_fmtAI(v,u);if(f)nationalAvgFmt[mk]=f;});
+  var trendDataFmt={};
+  CORE_METRICS.forEach(function(mk){trendDataFmt[mk]=(trendData[mk]||[]).map(function(item){var u=(_mdef[mk]||{}).u||'';return{month:item.month,value:_fmtAI(item.value,u)};});});
+  var triggeredAlertsFmt=triggeredAlerts.map(function(a){var fi=(App.FIELDS||[]).find(function(f){return f.k===a.field;});var u=fi?fi.u:'';return{field:a.field,severity:a.severity,value:_fmtAI(a.value,u),threshold:_fmtAI(a.threshold,u)};});
 
   var context={
-    period:App.currentMonth,
-    totalBranches:(App.DATA.branches||[]).length,
-    alertCount:results.length,
-    highRiskCount:diagnoses.filter(function(d){return d.riskLevel==='高风险';}).length,
-    midRiskCount:diagnoses.filter(function(d){return d.riskLevel==='中风险';}).length,
-    diagnoses:diagnoses
+    period:App.currentMonth,branch:branchName,
+    nationalAverage:nationalAvgFmt,currentMetrics:currentMetricsFmt,trends:trendDataFmt,
+    triggeredAlerts:triggeredAlertsFmt,
+    diagnosis:model?{riskLevel:model.riskLevel,summary:model.summary,
+      patterns:(model.patterns||[]).map(function(p){return{name:p.name,desc:p.trigger};}),
+      inferences:(model.inferences||[]).slice(0,6).map(function(i){return i.text;}),
+      recommendations:(model.recommendations||[]).slice(0,5).map(function(r){return{title:r.title,action:r.action,period:r.period};})
+    }:null,
+    metricDefs:CORE_METRICS.map(function(mk){var fi=(App.FIELDS||[]).find(function(f){return f.k===mk;});return{key:mk,label:fi?fi.l:mk,unit:fi?fi.u:'',direction:fi?fi.rd:''};})
   };
 
-  var question='请基于以上诊断数据，生成深度的经营分析报告。要求：\n'+
-    '1. 整体风险态势研判（高风险/中风险机构数量、主要风险类型分布）\n'+
-    '2. 逐个分析高风险分公司：风险根因、关键指标偏离程度、经营模式诊断\n'+
-    '3. 共性问题识别（多家分公司共同存在的结构性问题）\n'+
-    '4. 改进建议（按优先级排序，每条建议需有具体行动方案）\n'+
-    '5. 所有数据必须严格使用上下文中提供的数值，禁止编造或修改任何数字\n'+
-    '6. 如果上下文数据不足以下结论，明确说明"数据不足以判断"';
+  var question='你是财产保险经营分析专家。以下是'+branchName+'在'+App.currentMonth+'的经营数据、近6个月趋势及规则诊断结果（JSON）。\\n\\n**重要：数据已格式化好——百分比类已是"98.47%"格式，金额类已是"5,023.50万元"格式，人数类已是"123人"格式。直接引用这些值，不要自己做任何转换。**\\n\\n请对该分公司做**一对一深度分析报告**。\\n\\n**关键要求：规则报告已经做了以下内容——指标逐项罗列、排名对比、经营模式标注、归因分解、分级建议。你的深度解读严禁重复这些内容。你应该说规则报告没说的东西：**\\n\\n1. **矛盾信号推理**：规则报告只会标注"增长陷阱"模式，你要做的是——为什么会出现这个矛盾？最可能的原因是什么？需要核查什么来验证？给出推理链条而非模式名称\\n2. **趋势走向预判**：规则报告只看当前月数据，你要做的是——基于6个月趋势序列，哪些指标在加速恶化？哪些在减速改善？如果趋势延续，下个月可能是什么值？何时会突破临界点？\\n3. **不可见的风险**：规则报告只能看到已触发的预警，你要做的是——当前看似正常但趋势在恶化的指标有哪些？哪些指标虽然没触发预警但已经接近阈值？\\n4. **业务经验判断**：基于财险经营经验，该分公司的指标组合是否暗示特定的业务问题（如渠道结构变化、核保标准放松、大案集中等）？给出判断依据和需要核实的数据\\n5. **差异化行动方案**：规则报告给的是通用建议，你要给的是——针对该分公司的具体指标组合，第一步应该做什么？预期效果是什么？如果无效的备选方案是什么？\\n\\n⚠️ 直接引用 context 中的格式化值，保持原始格式（2位小数+单位）。禁止编造数据。如数据不足明确说明。';
 
   fetch('/ai/chat',{
     method:'POST',
@@ -933,25 +1005,11 @@ window.sendAnalyze=function(){
     body:JSON.stringify({question:question})
   }).then(function(response){
     if(!response.ok)throw new Error('请求失败('+response.status+')');
-    var reader=response.body.getReader(),decoder=new TextDecoder(),buffer='',text='',started=false;
-    function read(){
-      return reader.read().then(function(res){
-        if(res.done)return;
-        buffer+=decoder.decode(res.value,{stream:true});
-        var lines=buffer.split('\n');buffer=lines.pop();
-        lines.forEach(function(line){
-          if(line.indexOf('data: ')!==0)return;
-          var dataStr=line.slice(6).trim();
-          if(dataStr==='[DONE]')return;
-          try{var data=JSON.parse(dataStr);
-            if(data.error)throw new Error(data.error);
-            if(data.content){if(!started){started=true;el.innerHTML='';}text+=data.content;el.innerHTML=fmtAI(text);}
-          }catch(e){}
-        });
-        el.scrollTop=el.scrollHeight;return read();
-      });
-    }
-    return read();
+    return response.json();
+  }).then(function(data){
+    if(data.error)throw new Error(data.error);
+    el.innerHTML=fmtAI(data.content||'（无内容）');
+    el.scrollTop=el.scrollHeight;
   }).catch(function(e){
     el.innerHTML='<span style="color:#dc2626">分析失败：'+e.message+'</span>';
   });

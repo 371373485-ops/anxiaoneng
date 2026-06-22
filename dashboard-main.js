@@ -47,9 +47,9 @@ function resolvePlanKey(){
   return best||(y+'-v1');
 }
 
-function switchMonth(m){App.currentMonth=m;App.ALL_DATA.currentMonth=m;App.currentYear=m.split('-')[0];refreshMergedData();saveAllData();updateMonthUI();updatePlanUI();if(typeof updateMonthDropdown==='function')updateMonthDropdown();updateYearUI();destroyCharts();if(typeof runAlerts==='function')runAlerts();switchTab('overview');}
+function switchMonth(m){App.currentMonth=m;App.ALL_DATA.currentMonth=m;App.currentYear=m.split('-')[0];refreshMergedData();saveAllData();updateMonthUI();updatePlanUI();if(typeof updateMonthDropdown==='function')updateMonthDropdown();updateYearUI();destroyCharts();var _aict=document.getElementById('ai-content');if(_aict)_aict.removeAttribute('data-rendered');if(typeof runAlerts==='function')runAlerts();switchTab('overview');}
 
-function switchPlan(pk){App.currentPlanKey=pk;App.ALL_DATA.currentPlanKey=pk;refreshMergedData();saveAllData();updatePlanUI();destroyCharts();if(typeof runAlerts==='function')runAlerts();switchTab('overview');}
+function switchPlan(pk){App.currentPlanKey=pk;App.ALL_DATA.currentPlanKey=pk;refreshMergedData();saveAllData();updatePlanUI();destroyCharts();var _aict=document.getElementById('ai-content');if(_aict)_aict.removeAttribute('data-rendered');if(typeof runAlerts==='function')runAlerts();switchTab('overview');}
 
 function updateMonthUI(){
   var lb=document.getElementById('monthLabel');

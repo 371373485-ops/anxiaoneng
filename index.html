@@ -5,9 +5,9 @@
 >
 <title>分公司经营与效能数据看板 - 2026年4月</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="dashboard-diagnosis.css?v=2062101">
-<link rel="stylesheet" href="dashboard-publish.css?v=2062101">
-<link rel="stylesheet" href="pages/unlock.css?v=2062101">
+<link rel="stylesheet" href="dashboard-diagnosis.css?v=20260623">
+<link rel="stylesheet" href="dashboard-publish.css?v=20260623">
+<link rel="stylesheet" href="pages/unlock.css?v=20260623">
 <script src="chart.umd.min.js"></script>
 <script src="xlsx.full.min.js"></script>
 <style>
@@ -17,11 +17,52 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei
 .header{background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);color:#fff;padding:12px 24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
 .header h1{font-size:20px;font-weight:600}
 .header .sub{font-size:12px;opacity:.7}
-.toolbar{display:flex;gap:8px;align-items:center}
-.toolbar button,.toolbar .btn-file{padding:6px 14px;border:1px solid rgba(255,255,255,.3);border-radius:6px;background:rgba(255,255,255,.1);color:#fff;cursor:pointer;font-size:12px;transition:.2s}
-.toolbar button:hover,.toolbar .btn-file:hover{background:rgba(255,255,255,.2)}
-.toolbar select{color:#fff;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:6px;padding:5px 8px;font-size:12px;cursor:pointer}
+/* ── Toolbar System ── */
+.toolbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;line-height:1}
+.toolbar__group{display:inline-flex;align-items:center;gap:6px}
+.toolbar__sep{width:1px;height:20px;background:rgba(255,255,255,.2);flex-shrink:0}
+.toolbar label{font-size:12px;color:rgba(255,255,255,.7);white-space:nowrap}
+/* Unified control: same height for button/a/label/select */
+.toolbar button,
+.toolbar .btn-file,
+.toolbar .btn-dl,
+.toolbar select{
+  height:32px;
+  padding:0 12px;
+  border:1px solid rgba(255,255,255,.25);
+  border-radius:6px;
+  background:rgba(255,255,255,.08);
+  color:#fff;
+  font-size:12px;
+  cursor:pointer;
+  transition:background .15s,border-color .15s;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  white-space:nowrap;
+  line-height:1;
+  text-decoration:none;
+  box-sizing:border-box;
+  font-family:inherit;
+  appearance:none;
+  -webkit-appearance:none
+}
+.toolbar button:hover,
+.toolbar .btn-file:hover,
+.toolbar .btn-dl:hover{
+  background:rgba(255,255,255,.18);
+  border-color:rgba(255,255,255,.4)
+}
+.toolbar select:hover{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.4)}
 .toolbar select option{color:#1a1a2e;background:#fff}
+/* Compare button accent */
+#btnCompare{
+  background:rgba(59,130,246,.22);
+  border-color:rgba(99,179,237,.45);
+  font-weight:600;
+  letter-spacing:.3px
+}
+#btnCompare:hover{background:rgba(59,130,246,.35);border-color:rgba(147,197,253,.6)}
 .toolbar input[type=file]{display:none}
 .nav{display:flex;background:var(--card);padding:0 24px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
 .nav button{padding:12px 20px;border:none;background:none;font-size:14px;cursor:pointer;color:var(--muted);border-bottom:3px solid transparent}
@@ -114,7 +155,7 @@ tr:hover td{background:#f8f9ff}
 .month-bar select#planSelect{padding:4px 8px;border:1px solid rgba(255,255,255,.2);border-radius:6px;background:rgba(255,255,255,.08);color:rgba(255,255,255,.7);font-size:12px;cursor:pointer;outline:none;max-width:180px}
 .month-bar select#planSelect option{color:#333;background:#fff}
 
-.btn-dl{display:inline-block;background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.2);padding:4px 12px;border-radius:6px;font-size:12px;text-decoration:none;cursor:pointer}.btn-dl:hover{background:rgba(255,255,255,.2)}
+.btn-dl{display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 10px;background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:6px;font-size:12px;text-decoration:none;cursor:pointer;white-space:nowrap;line-height:1}.btn-dl:hover{background:rgba(255,255,255,.2)}
 
 /* Branch Detail */
 .breadcrumb{margin-bottom:16px;font-size:13px}
@@ -228,13 +269,11 @@ td.cmp-delta{transition:background .2s}
   .header{padding:10px 12px;flex-direction:column;align-items:flex-start}
   .header h1{font-size:16px}
   .header .sub{font-size:10px;display:block;margin-top:2px}
-  .toolbar{flex-wrap:wrap;gap:4px;font-size:11px}
-  .toolbar button,.toolbar .btn-file{padding:4px 8px;font-size:10px;border-radius:4px}
-  .toolbar select{padding:3px 6px;font-size:10px}
-  .toolbar a.btn-dl{padding:3px 8px;font-size:10px}
-  .toolbar .month-bar select,.toolbar .plan-bar select{font-size:10px;padding:3px 6px}
-  .toolbar #btnCompare{padding:5px 10px;font-size:11px}
-  .toolbar label{font-size:10px}
+  .toolbar{gap:4px}
+  .toolbar__group{gap:4px}
+  .toolbar button,.toolbar .btn-file,.toolbar .btn-dl,.toolbar select{height:28px;padding:0 8px;font-size:11px;border-radius:4px}
+  .toolbar label{font-size:11px}
+  .toolbar__sep{height:16px}
 
   /* ── Compare bar ── */
   #compareBar{flex-wrap:wrap;padding:6px 10px;gap:4px;font-size:11px}
@@ -321,7 +360,7 @@ td.cmp-delta{transition:background .2s}
   .month-grid{grid-template-columns:repeat(3,1fr)}
   .nav button{font-size:10px;padding:6px 8px}
   .header h1{font-size:14px}
-  .toolbar button,.toolbar select{font-size:9px}
+  .toolbar button,.toolbar .btn-file,.toolbar .btn-dl,.toolbar select{font-size:9px;height:26px;padding:0 6px}
 }
 .share-banner{display:none;align-items:center;gap:18px;flex-wrap:wrap;padding:10px 24px;background:#eff6ff;border-bottom:1px solid #bfdbfe;color:#1e3a8a;font-size:12px}
 .share-banner .share-badge{font-weight:700;background:#2563eb;color:#fff;padding:4px 10px;border-radius:999px}
@@ -334,21 +373,15 @@ td.cmp-delta{transition:background .2s}
 <div class="header">
 <div><h1>分公司经营与效能数据看板</h1><span style="font-size:11px;color:rgba(255,255,255,.4);margin-left:10px">v13</span><div class="sub"><span id="monthLabel"></span><span id="headerComparePeriodLabel" style="display:none;font-size:11px;color:rgba(147,197,253,.9);margin-left:6px"></span><span> · 31家分公司 · 4大责任区</span></div></div>
 
-<div class="toolbar"><label style="font-size:12px;opacity:.8">年度</label><select id="yearSelect" onchange="setDataYear(this.value)"></select><label style="font-size:12px;opacity:.8;margin-left:8px">月份</label><select id="dataMonth" onchange="setDataMonth(this.value)"><option value="1">1月</option><option value="2">2月</option><option value="3">3月</option><option value="4" selected>4月</option><option value="5">5月</option><option value="6">6月</option><option value="7">7月</option><option value="8">8月</option><option value="9">9月</option><option value="10">10月</option><option value="11">11月</option><option value="12">12月</option></select>
-<span style="opacity:.3;margin:0 4px">|</span>
-<select id="planSelect" onchange="switchPlan(this.value)" style="margin-left:6px;padding:5px 8px;color:#fff;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:6px;font-size:12px;cursor:pointer" title="选择计划版本"><option value="auto" selected>计划: 自动</option></select>
-<span style="opacity:.3;margin:0 4px">|</span>
-<button id="btnCompare" style="margin-left:8px;font-size:13px;opacity:.85;padding:8px 16px;background:rgba(59,130,246,.25);border:1px solid rgba(147,197,253,.4);border-radius:8px;color:#fff;cursor:pointer;transition:.2s;font-weight:600">🔍 对比模式</button>
-<span style="opacity:.3;margin:0 4px">|</span>
-<button class="btn" data-share-restricted onclick="document.getElementById('actualFileInput').click()">📥 导入实际</button>
+<div class="toolbar"><div class="toolbar__group"><label>年度</label><select id="yearSelect" onchange="setDataYear(this.value)"></select><label>月份</label><select id="dataMonth" onchange="setDataMonth(this.value)"><option value="1">1月</option><option value="2">2月</option><option value="3">3月</option><option value="4" selected>4月</option><option value="5">5月</option><option value="6">6月</option><option value="7">7月</option><option value="8">8月</option><option value="9">9月</option><option value="10">10月</option><option value="11">11月</option><option value="12">12月</option></select></div><span class="toolbar__sep"></span><div class="toolbar__group"><select id="planSelect" onchange="switchPlan(this.value)" title="选择计划版本"><option value="auto" selected>计划: 自动</option></select></div><span class="toolbar__sep"></span><div class="toolbar__group"><button id="btnCompare">🔍 对比模式</button></div><span class="toolbar__sep"></span><div class="toolbar__group"><button class="btn" data-share-restricted onclick="document.getElementById('actualFileInput').click()">📥 导入实际</button>
+<button class="btn" data-share-restricted onclick="document.getElementById('planFileInput').click()">📅 导入计划</button>
 <a href="安效能_实际数据导入模板.xlsx" download class="btn-dl" data-share-restricted>实际模板</a>
 <a href="安效能_计划数据导入模板.xlsx" download class="btn-dl" data-share-restricted>计划模板</a>
-<button class="btn" data-share-restricted onclick="document.getElementById('planFileInput').click()">📅 导入计划</button>
 <button class="btn" data-share-restricted onclick="exportData()">💾 导出备份</button>
 <button class="btn" data-share-restricted onclick="exportShareData()" title="导出数据为JSON文件">📤 导出分享数据</button>
 <button class="btn" data-share-restricted onclick="encryptShareData()" title="一键加密并下载，用于GitHub Pages分享">🔒 加密分享数据</button>
-<label class="btn-file" data-share-restricted style="cursor:pointer">📂 恢复备份<input type="file" accept=".json" onchange="importData(this)" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden"></label>
-</div>
+<label class="btn-file" data-share-restricted>📂 恢复备份<input type="file" accept=".json" onchange="importData(this)" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden"></label>
+</div></div>
 </div>
 <div id="shareBanner" class="share-banner"><span class="share-badge">只读分享</span><span>数据周期 <b id="sharePeriod">—</b></span><span>数据版本 <b id="shareVersion">—</b></span><span>发布时间 <b id="sharePublishedAt">—</b></span><span>分享模式 <b id="shareModeLabel">—</b></span></div>
 <div id="statusBar" style="display:none;background:rgba(76,175,80,.2);color:#4caf50;padding:4px 16px;font-size:12px;text-align:center"></div>
@@ -389,22 +422,22 @@ td.cmp-delta{transition:background .2s}
 
 </div>
 <div id="pagesUnlockRoot"></div>
-<script src="pages/crypto.js?v=2062101"></script>
-<script src="pages/unlock.js?v=2062101"></script>
-<script src="dashboard-data.js?v=2062101"></script>
-<script src="dashboard-share.js?v=2062101"></script>
-<script src="dashboard-config.js?v=2062101"></script>
-<script src="dashboard-compute.js?v=2062101"></script>
-<script src="dashboard-metrics.js?v=2062101"></script>
-<script src="dashboard-charts.js?v=2062101"></script>
-<script src="dashboard-render.js?v=2062101"></script>
-<script src="dashboard-alerts.js?v=2062101"></script>
-<script src="dashboard-export.js?v=2062101"></script>
-<script src="dashboard-publish.js?v=2062101"></script>
-<script src="dashboard-ai.js?v=2062101"></script>
-<script src="dashboard-agent.js?v=2062101"></script>
-<script src="dashboard-diagnosis.js?v=2062101"></script>
-<script src="dashboard-remediation.js?v=2062101"></script>
-<script src="dashboard-main.js?v=2062101"></script>
+<script src="pages/crypto.js?v=20260623"></script>
+<script src="pages/unlock.js?v=20260623"></script>
+<script src="dashboard-data.js?v=20260623"></script>
+<script src="dashboard-share.js?v=20260623"></script>
+<script src="dashboard-config.js?v=20260623"></script>
+<script src="dashboard-compute.js?v=20260623"></script>
+<script src="dashboard-metrics.js?v=20260623"></script>
+<script src="dashboard-charts.js?v=20260623"></script>
+<script src="dashboard-render.js?v=20260623"></script>
+<script src="dashboard-alerts.js?v=20260623"></script>
+<script src="dashboard-export.js?v=20260623"></script>
+<script src="dashboard-publish.js?v=20260623"></script>
+<script src="dashboard-ai.js?v=20260623"></script>
+<script src="dashboard-agent.js?v=20260623"></script>
+<script src="dashboard-diagnosis.js?v=20260623"></script>
+<script src="dashboard-remediation.js?v=20260623"></script>
+<script src="dashboard-main.js?v=20260623"></script>
 </body>
 </html>

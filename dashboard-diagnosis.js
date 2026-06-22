@@ -228,15 +228,14 @@ function persistDiagnosis(){
 }
 
 window.renderAITab=function(){
-  checkHealth().then(function(){
-    if(!D.apiAvailable){
-      if(typeof window._renderRulesReport==='function'){
-        window._renderRulesReport();
-      }
-      return;
-    }
-    render();
-  });
+  // 诊断模块未完善，直接使用规则报告+AI问答
+  if(typeof window._renderRulesReport==='function'){
+    window._renderRulesReport();
+  }else{
+    // fallback: 如果规则报告不存在，渲染简单提示
+    var ct=document.getElementById('ai-content');
+    if(ct)ct.innerHTML='<div style="padding:40px;text-align:center;color:var(--muted)">AI 功能加载中...</div>';
+  }
 };
 window.selectDiagnosisBranch=function(name){D.selectedBranch=name;D.diagnosis=null;D.interpretation=null;D.healthChecked=false;render();};
 window.syncDiagnosisSnapshot=function(){
