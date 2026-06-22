@@ -17,7 +17,7 @@ AUTH_TOKEN = os.getenv("API_AUTH_TOKEN", "")
 async def lifespan(_app):
     if os.getenv("APP_ENV", "development").lower() == "production":
         if AUTH_MODE not in {"proxy", "token"}:
-            raise RuntimeError("生产环境 AUTH_MODE 必须是 proxy 或 token")
+            raise RuntimeError("生产环境 AUTH_MODE 必须�?proxy �?token")
         if AUTH_MODE == "token" and not AUTH_TOKEN:
             raise RuntimeError("token 鉴权模式必须配置 API_AUTH_TOKEN")
     db.init_db()
@@ -52,7 +52,9 @@ from .routers.evaluation import router as evaluation_router
 from .routers.remediation import router as remediation_router
 from .routers.audit import router as audit_router
 from .routers.agent import router as agent_router
+from .routers.ai import router as ai_router
 
+app.include_router(ai_router)
 app.include_router(health_router)
 app.include_router(data_router)
 app.include_router(diagnosis_router)
