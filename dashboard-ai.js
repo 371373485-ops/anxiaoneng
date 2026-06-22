@@ -3,6 +3,11 @@
 // 零外部依赖，只读 App.* 数据
 
 (function(){
+// 分享模式（GitHub Pages）下无后端，禁用 AI 请求
+var SHARE_MODE=(location.pathname.includes('/share/')||document.body.classList.contains('share-mode')||!window._server_py);
+function _aiUnavailable(){
+  return SHARE_MODE;
+}
 'use strict';
 
 // ══════════ 工具 ══════════
@@ -892,6 +897,7 @@ window.generateDeepReading=function(branchName){
   var ct=document.getElementById('ai-deep-content');
   if(!btn||!ct)return;
   if(!branchName){ct.innerHTML='<span style="color:var(--muted)">请先选择分公司</span>';return;}
+  if(_aiUnavailable()){ct.innerHTML='<div style="padding:24px;text-align:center;color:var(--muted)"><div style="font-size:36px;margin-bottom:8px">🔒</div><div style="font-size:14px;font-weight:600;margin-bottom:4px">AI 深度解读在分享模式下不可用</div><div style="font-size:12px">此功能需要后端服务支持，请在本地完整环境中使用</div></div>';btn.disabled=false;btn.textContent='深度解读';return;}
   btn.disabled=true;btn.textContent='生成中…';
   ct.innerHTML='<span style="color:var(--muted)">正在分析 '+branchName+' 的诊断数据...</span>';
 
@@ -988,6 +994,7 @@ window.sendAnalyze=function(){
   if(!input)return;
   var question=input.value.trim();
   if(!question)return;
+  if(_aiUnavailable()){msgs.insertAdjacentHTML('beforeend','<div style="margin-bottom:12px;color:var(--muted);padding:8px 14px;background:#f5f5f5;border-radius:8px;font-size:13px">🔒 分享模式下 AI 问答不可用，请在本地完整环境中使用</div>');return;}
   input.value='';
   var msgs=document.getElementById('ai-ca-msgs');
   if(!msgs)return;
