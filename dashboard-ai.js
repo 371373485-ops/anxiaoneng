@@ -684,7 +684,7 @@ function _report(bn,alerts){
 }
 
 // ══════════ 渲染 ══════════
-window.renderAITab = function(){
+window._renderRulesReport = function(){
   var ct=document.getElementById('ai-content');
   if(!ct)return;
   var results=App._alertResults||[];
@@ -768,7 +768,193 @@ window.renderAITab = function(){
 
   h+='<div style="padding:12px 14px;background:#f8f9fa;border-radius:6px;font-size:10px;color:var(--muted);margin-top:12px">';
   h+='⚙️ 基于多维风险矩阵+经营模式识别+同业对标自动生成 · 周期：'+formatMonth(App.currentMonth)+' · 仅供管理参考</div>';
+
+  // ── AI 深度解读区域 ──
+  h += '<div id="ai-deep-reading" style="margin-top:16px;border-top:2px solid #e5e7eb;padding-top:16px">';
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
+  h += '<h3 style="font-size:15px;font-weight:700">🤖 AI 深度解读</h3>';
+  h += '<button id="ai-deep-btn" onclick="generateDeepReading()" style="padding:6px 16px;border:1px solid #7c3aed;border-radius:6px;background:#f5f3ff;color:#7c3aed;cursor:pointer;font-size:12px;font-weight:600">生成 AI 深度解读</button>';
+  h += '</div>';
+  h += '<div id="ai-deep-content" style="min-height:60px;font-size:13px;line-height:1.7;color:var(--text)"></div>';
+  h += '</div>';
+
+  // ── 个性化分析区域 ──
+  h += '<div id="ai-custom-analysis" style="margin-top:20px;border-top:2px solid #e5e7eb;padding-top:16px">';
+  h += '<h3 style="font-size:15px;font-weight:700;margin-bottom:8px">💬 个性化分析</h3>';
+  h += '<p style="font-size:12px;color:var(--muted);margin-bottom:10px">基于看板全量数据，输入你的分析需求。AI 会精准读取数据并生成分析报告。</p>';
+  h += '<div id="ai-ca-msgs" style="min-height:60px;margin-bottom:12px;font-size:13px;line-height:1.7"></div>';
+  var CA_QUICK = [
+    {icon:'📊', title:'全国经营概览', q:'请分析2026年全国整体经营情况，包括保费达成、利润和COR表现'},
+    {icon:'🏢', title:'责任区对比', q:'请对比四个责任区2026年的综合成本率、赔付率和费用率差异'},
+    {icon:'📈', title:'趋势分析', q:'请分析全国综合成本率近两年的变化趋势'},
+    {icon:'👥', title:'人效诊断', q:'请分析各责任区2026年人均产能和人均利润的差异'}
+  ];
+  h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">';
+  CA_QUICK.forEach(function(q){
+    h += '<button class="ai-qc" onclick="quickAnalyze(\''+q.q.replace(/'/g,'\\\'')+'\')" style="padding:5px 12px;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer;font-size:12px">'+q.icon+' '+q.title+'</button>';
+  });
+  h += '</div>';
+  h += '<div style="display:flex;gap:8px">';
+  h += '<input id="ai-ca-input" placeholder="如：请分析河南分公司近三年综合成本率变化情况" style="flex:1;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px" onkeydown="if(event.key===\'Enter\'){event.preventDefault();sendAnalyze();}" autocomplete="off">';
+  h += '<button onclick="sendAnalyze()" style="padding:8px 20px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px">发送</button>';
+  h += '</div></div>';
+
   ct.innerHTML=h;
+};
+
+// ══════════ AI 深度解读 + 个性化分析 ══════════
+
+function fmtAI(text){
+  if(!text)return '';
+  var html=text;
+  // 代码块
+  html=html.replace(/```([\s\S]*?)```/g,function(m,c){return '<pre style="background:#f5f5f5;padding:10px;border-radius:4px;overflow-x:auto;font-size:12px">'+c.replace(/</g,'&lt;')+'</pre>';});
+  // 标题
+  html=html.replace(/^### (.+)$/gm,'<h4 style="font-size:13px;font-weight:700;margin:10px 0 4px">$1</h4>');
+  html=html.replace(/^## (.+)$/gm,'<h3 style="font-size:14px;font-weight:700;margin:12px 0 6px">$1</h3>');
+  html=html.replace(/^# (.+)$/gm,'<h2 style="font-size:15px;font-weight:700;margin:14px 0 8px">$1</h2>');
+  // 粗体
+  html=html.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
+  // 列表
+  html=html.replace(/^- (.+)$/gm,'<li style="margin-left:18px;list-style:disc">$1</li>');
+  html=html.replace(/^\d+\. (.+)$/gm,'<li style="margin-left:18px;list-style:decimal">$1</li>');
+  // 换行
+  html=html.replace(/\n\n/g,'</p><p style="margin:6px 0">');
+  html=html.replace(/\n/g,'<br>');
+  // 清理多余空标签
+  html=html.replace(/<br><\/p><p/g,'</p><p');
+  return '<p style="margin:6px 0">'+html+'</p>';
+}
+
+window.generateDeepReading=function(){
+  var btn=document.getElementById('ai-deep-btn');
+  var ct=document.getElementById('ai-deep-content');
+  if(!btn||!ct)return;
+  btn.disabled=true;btn.textContent='生成中…';
+  ct.innerHTML='<span style="color:var(--muted)">正在分析诊断数据...</span>';
+
+  var results=App._alertResults||[];
+  var branchMap={};
+  results.filter(function(r){return r.branchName;}).forEach(function(r){
+    if(!branchMap[r.branchName])branchMap[r.branchName]=[];
+    branchMap[r.branchName].push(r);
+  });
+  var bns=Object.keys(branchMap).filter(function(bn){
+    var errs=branchMap[bn].filter(function(r){return r.severity==='error';}).length;
+    var warns=branchMap[bn].filter(function(r){return r.severity==='warn';}).length;
+    return errs>=1||warns>=3;
+  });
+  var diagnoses=bns.map(function(bn){
+    var model=(typeof _buildDiagnosisModel==='function')?_buildDiagnosisModel(bn,branchMap[bn]):null;
+    if(!model)return null;
+    return {
+      branch:bn,riskLevel:model.riskLevel,summary:model.summary,
+      facts:(model.facts||[]).slice(0,8),
+      patterns:(model.patterns||[]).slice(0,5),
+      inferences:(model.inferences||[]).slice(0,6),
+      recommendations:(model.recommendations||[]).slice(0,5)
+    };
+  }).filter(Boolean);
+
+  var context={
+    period:App.currentMonth,
+    totalBranches:(App.DATA.branches||[]).length,
+    alertCount:results.length,
+    highRiskCount:diagnoses.filter(function(d){return d.riskLevel==='高风险';}).length,
+    midRiskCount:diagnoses.filter(function(d){return d.riskLevel==='中风险';}).length,
+    diagnoses:diagnoses
+  };
+
+  var question='请基于以上诊断数据，生成深度的经营分析报告。要求：\n'+
+    '1. 整体风险态势研判（高风险/中风险机构数量、主要风险类型分布）\n'+
+    '2. 逐个分析高风险分公司：风险根因、关键指标偏离程度、经营模式诊断\n'+
+    '3. 共性问题识别（多家分公司共同存在的结构性问题）\n'+
+    '4. 改进建议（按优先级排序，每条建议需有具体行动方案）\n'+
+    '5. 所有数据必须严格使用上下文中提供的数值，禁止编造或修改任何数字\n'+
+    '6. 如果上下文数据不足以下结论，明确说明"数据不足以判断"';
+
+  fetch('/ai/chat',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({question:question,context:context})
+  }).then(function(response){
+    if(!response.ok)throw new Error('请求失败('+response.status+')');
+    var reader=response.body.getReader(),decoder=new TextDecoder(),buffer='',text='',started=false;
+    ct.innerHTML='';
+    function read(){
+      return reader.read().then(function(res){
+        if(res.done){btn.disabled=false;btn.textContent='重新生成';return;}
+        buffer+=decoder.decode(res.value,{stream:true});
+        var lines=buffer.split('\n');buffer=lines.pop();
+        lines.forEach(function(line){
+          if(line.indexOf('data: ')!==0)return;
+          var dataStr=line.slice(6).trim();
+          if(dataStr==='[DONE]')return;
+          try{var data=JSON.parse(dataStr);
+            if(data.error)throw new Error(data.error);
+            if(data.content){if(!started){started=true;ct.innerHTML='';}text+=data.content;ct.innerHTML=fmtAI(text);}
+          }catch(e){}
+        });
+        ct.scrollTop=ct.scrollHeight;return read();
+      });
+    }
+    return read();
+  }).catch(function(e){
+    ct.innerHTML='<span style="color:#dc2626">生成失败：'+e.message+'</span>';
+    btn.disabled=false;btn.textContent='生成 AI 深度解读';
+  });
+};
+
+window.quickAnalyze=function(q){
+  var input=document.getElementById('ai-ca-input');
+  if(input)input.value=q;
+  sendAnalyze();
+};
+
+window.sendAnalyze=function(){
+  var input=document.getElementById('ai-ca-input');
+  if(!input)return;
+  var question=input.value.trim();
+  if(!question)return;
+  input.value='';
+  var msgs=document.getElementById('ai-ca-msgs');
+  if(!msgs)return;
+  msgs.insertAdjacentHTML('beforeend',
+    '<div style="text-align:right;margin-bottom:8px"><span style="display:inline-block;padding:8px 14px;background:#2563eb;color:#fff;border-radius:12px 12px 2px 12px;font-size:13px">'+question.replace(/</g,'&lt;')+'</span></div>');
+  var aiId='ai-ca-'+Date.now();
+  msgs.insertAdjacentHTML('beforeend',
+    '<div id="'+aiId+'" style="margin-bottom:12px"><span style="color:var(--muted)">分析中...</span></div>');
+  var el=document.getElementById(aiId);
+  el.innerHTML='<span class="ai-dots">●●●</span>';
+
+  fetch('/ai/analyze',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({question:question})
+  }).then(function(response){
+    if(!response.ok)throw new Error('请求失败('+response.status+')');
+    var reader=response.body.getReader(),decoder=new TextDecoder(),buffer='',text='',started=false;
+    function read(){
+      return reader.read().then(function(res){
+        if(res.done)return;
+        buffer+=decoder.decode(res.value,{stream:true});
+        var lines=buffer.split('\n');buffer=lines.pop();
+        lines.forEach(function(line){
+          if(line.indexOf('data: ')!==0)return;
+          var dataStr=line.slice(6).trim();
+          if(dataStr==='[DONE]')return;
+          try{var data=JSON.parse(dataStr);
+            if(data.error)throw new Error(data.error);
+            if(data.content){if(!started){started=true;el.innerHTML='';}text+=data.content;el.innerHTML=fmtAI(text);}
+          }catch(e){}
+        });
+        el.scrollTop=el.scrollHeight;return read();
+      });
+    }
+    return read();
+  }).catch(function(e){
+    el.innerHTML='<span style="color:#dc2626">分析失败：'+e.message+'</span>';
+  });
 };
 
 // ── 徽章 ──

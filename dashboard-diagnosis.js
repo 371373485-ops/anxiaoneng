@@ -153,7 +153,15 @@ function renderRuleDiagnosis(diagnosis){
     }).join(''):'<p class="fact-empty">当前未发现需要特别提示的组合经营特征。</p>')+'</div>'+
     '<div><h4>待核查</h4>'+diagnosis.investigations.map(function(item){return '<p>'+esc(typeof item==='string'?item:item.text)+'</p>';}).join('')+'</div>'+
     '<div><h4>管理建议</h4><p class="section-purpose">按执行领域归类，便于明确牵头责任。</p>'+recommendationGroups(diagnosis.recommendations)+'</div></div>'+
-    '<div class="limitations"><b>数据局限：</b>'+diagnosis.limitations.map(esc).join('；')+'</div></section>';
+    '<div class="limitations"><b>数据局限：</b>'+diagnosis.limitations.map(esc).join('；')+'</div>'+
+    // ── 一对一 AI 深度解读 ──
+    '<div id="ai-deep-'+esc(diagnosis.branch)+'" style="margin-top:12px;border-top:1px solid #e5e7eb;padding-top:12px">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'+
+    '<h4 style="font-size:13px;font-weight:700">🤖 AI 深度解读 · '+esc(diagnosis.branch)+'</h4>'+
+    '<button id="ai-deep-btn-'+esc(diagnosis.branch)+'" onclick="generateBranchDeepReading(\''+esc(diagnosis.branch)+'\')" style="padding:5px 14px;border:1px solid #7c3aed;border-radius:6px;background:#f5f3ff;color:#7c3aed;cursor:pointer;font-size:12px;font-weight:600">生成 AI 深度解读</button>'+
+    '</div>'+
+    '<div id="ai-deep-content-'+esc(diagnosis.branch)+'" style="min-height:40px;font-size:13px;line-height:1.7;color:var(--text)"></div></div>'+
+    '</section>';
 }
 function renderInterpretation(payload){
   if(!payload)return '<section class="diagnosis-card ai-panel"><div class="diagnosis-card-head"><div><small>按需生成</small><h3>AI深度解读</h3></div><button class="btn" '+(!D.aiEnabled?'disabled title="生成式AI未启用"':'onclick="generateInterpretation()"')+'>生成AI深度解读</button></div><p class="empty-copy">'+(D.aiEnabled?'AI将基于已保存的诊断快照和证据生成结构化解读。':'当前仅提供规则诊断；配置内部后端并启用AI后可生成深度解读。')+'</p></section>';
@@ -185,24 +193,31 @@ function render(){
     D.conversationId='conv_'+stableHash([D.selectedBranch,App.currentMonth,D.diagnosis.dataVersion]);
   }
   ct.innerHTML=statusBar()+
-    '<div class="diagnosis-toolbar"><div><label>诊断机构</label><select id="diagnosis-branch" onchange="selectDiagnosisBranch(this.value)">'+names.map(function(name){return '<option '+(name===D.selectedBranch?'selected':'')+'>'+esc(name)+'</option>';}).join('')+'</select></div><button class="btn-sm" onclick="syncDiagnosisSnapshot()">同步诊断快照</button><button class="btn-sm" onclick="renderRemediationWorkspace()">整改任务</button></div>'+
+    '<div class="diagnosis-toolbar"><div><label>诊断机构</label><select id="diagnosis-branch" onchange="selectDiagnosisBranch(this.value)">'+names.map(function(name){return '<option '+(name===D.selectedBranch?'selected':'')+'>'+esc(name)+'</option>';}).join('')+'</select></div><button class="btn-sm" onclick="syncDiagnosisSnapshot()">同步诊断快照</button></div>'+
     '<div class="diagnosis-summary-row"><div><strong>'+names.filter(function(name){return buildDiagnosis(name).riskLevel==='高风险';}).length+'</strong><span>高风险机构</span></div><div><strong>'+names.filter(function(name){return buildDiagnosis(name).riskLevel==='中风险';}).length+'</strong><span>中风险机构</span></div><div><strong>'+names.length+'</strong><span>涉及机构</span></div><div><strong>'+(App._alertResults||[]).length+'</strong><span>告警总数</span></div></div>'+
-    renderRuleDiagnosis(D.diagnosis)+renderInterpretation(D.interpretation)+
-    renderChat()+'<div id="agent-workspace"></div><div id="diagnosis-drawer" class="diagnosis-drawer" aria-live="polite"></div>';
+    renderRuleDiagnosis(D.diagnosis)+
+    // 个性化分析（全局功能）
+    '<section class="diagnosis-card" style="margin-top:16px"><div class="diagnosis-card-head"><div><small>全量数据 · 自然语言提问</small><h3>💬 个性化分析</h3></div></div>'+
+    '<p style="font-size:12px;color:var(--muted);margin-bottom:10px">基于看板全量数据，输入分析需求，AI 会精准读取数据并生成报告。</p>'+
+    '<div id="ai-ca-msgs" style="min-height:60px;margin-bottom:12px;font-size:13px;line-height:1.7"></div>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'+
+    [{icon:'📊',t:'全国经营概览',q:'请分析'+(App.currentMonth||'').split('-')[0]+'年全国整体经营情况，包括保费达成、利润和COR表现'},
+     {icon:'🏢',t:'责任区对比',q:'请对比四个责任区'+(App.currentMonth||'').split('-')[0]+'年的综合成本率、赔付率和费用率差异'},
+     {icon:'📈',t:'趋势分析',q:'请分析全国综合成本率近两年的变化趋势'},
+     {icon:'👥',t:'人效诊断',q:'请分析各责任区'+(App.currentMonth||'').split('-')[0]+'年人均产能和人均利润的差异'}
+    ].map(function(q){return '<button class="btn-sm" onclick="document.getElementById(\'ai-ca-input\').value=\''+q.q.replace(/'/g,'\\\'')+'\';sendAnalyze()" style="border:1px solid #d1d5db;background:#fff">'+q.icon+' '+q.t+'</button>';}).join('')+
+    '</div>'+
+    '<div style="display:flex;gap:8px"><input id="ai-ca-input" placeholder="如：请分析河南分公司近三年综合成本率变化情况" style="flex:1;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px" onkeydown="if(event.key===\'Enter\'){event.preventDefault();sendAnalyze();}" autocomplete="off"><button class="btn" onclick="sendAnalyze()">发送</button></div></section>'+
+    '<div id="diagnosis-drawer" class="diagnosis-drawer" aria-live="polite"></div>';
   if(window.renderAgentWorkspace)window.renderAgentWorkspace();
 }
 function checkHealth(){
   if(D.healthChecked)return Promise.resolve();
   D.healthChecked=true;
-  return fetch('/diagnosis-backend.json',{cache:'no-store'}).then(function(r){
+  return fetch('/api/health',{headers:identityHeaders()}).then(function(r){
     if(!r.ok)throw new Error('offline');return r.json();
-  }).then(function(capability){
-    if(!capability.enabled)return null;
-    return fetch('/api/health',{headers:identityHeaders()}).then(function(r){
-      if(!r.ok)throw new Error('offline');return r.json();
-    });
   }).then(function(body){
-    D.apiAvailable=!!body;D.aiEnabled=!!(body&&body.aiEnabled);D.model=body&&body.model;
+    D.apiAvailable=!!body&&!!body.ok;D.aiEnabled=!!(body&&body.aiEnabled);D.model=body&&body.model;
   }).catch(function(){D.apiAvailable=false;D.aiEnabled=false;});
 }
 function persistDiagnosis(){
@@ -212,8 +227,18 @@ function persistDiagnosis(){
   });
 }
 
-window.renderAITab=function(){checkHealth().then(render);};
-window.selectDiagnosisBranch=function(name){D.selectedBranch=name;D.diagnosis=null;D.interpretation=null;render();};
+window.renderAITab=function(){
+  checkHealth().then(function(){
+    if(!D.apiAvailable){
+      if(typeof window._renderRulesReport==='function'){
+        window._renderRulesReport();
+      }
+      return;
+    }
+    render();
+  });
+};
+window.selectDiagnosisBranch=function(name){D.selectedBranch=name;D.diagnosis=null;D.interpretation=null;D.healthChecked=false;render();};
 window.syncDiagnosisSnapshot=function(){
   persistDiagnosis().then(function(){toast('诊断快照与证据已保存','success');render();}).catch(function(e){toast(e.message,'error');});
 };
@@ -248,6 +273,56 @@ window.sendDiagnosisQuestion=function(){
   log.insertAdjacentHTML('beforeend','<div class="chat-message user">'+esc(question)+'</div><div class="chat-message assistant"><span class="chat-stream"></span></div>');
   var stream=log.querySelector('.chat-message:last-child .chat-stream');input.value='';
   D.controller=new AbortController();
+
+  // ── 直接调 /ai/chat（统一路径，不依赖 /api/conversations） ──
+  if(true){
+    var ctx={
+      period:D.diagnosis&&D.diagnosis.period,
+      branch:D.diagnosis&&D.diagnosis.branch,
+      riskLevel:D.diagnosis&&D.diagnosis.riskLevel,
+      summary:D.diagnosis&&D.diagnosis.summary,
+      facts:(D.diagnosis&&D.diagnosis.facts||[]).slice(0,10),
+      patterns:(D.diagnosis&&D.diagnosis.patterns||[]).slice(0,5),
+      inferences:(D.diagnosis&&D.diagnosis.inferences||[]).slice(0,8),
+      recommendations:(D.diagnosis&&D.diagnosis.recommendations||[]).slice(0,5)
+    };
+    fetch('/ai/chat',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      signal:D.controller.signal,
+      body:JSON.stringify({question:question,context:ctx})
+    }).then(function(response){
+      if(!response.ok)throw new Error('AI请求失败('+response.status+')');
+      var reader=response.body.getReader(),decoder=new TextDecoder(),buffer='';
+      function read(){
+        return reader.read().then(function(result){
+          if(result.done)return;
+          buffer+=decoder.decode(result.value,{stream:true});
+          var lines=buffer.split('\n');buffer=lines.pop();
+          lines.forEach(function(line){
+            if(line.indexOf('data: ')!==0)return;
+            var dataStr=line.slice(6).trim();
+            if(dataStr==='[DONE]')return;
+            try{
+              var data=JSON.parse(dataStr);
+              if(data.error)throw new Error(data.error);
+              if(data.content)stream.textContent+=data.content;
+            }catch(e){}
+          });
+          log.scrollTop=log.scrollHeight;return read();
+        });
+      }
+      return read();
+    }).then(function(){D.controller=null;})
+    .catch(function(e){
+      if(e.name==='AbortError')return;
+      stream.textContent='请求失败：'+e.message;
+      D.controller=null;
+    });
+    return;
+  }
+
+  // ── 原有路径：通过 /api/conversations ──
   persistDiagnosis().then(function(diagnosis){
     return fetch('/api/conversations/'+encodeURIComponent(D.conversationId)+'/messages',{
       method:'POST',headers:identityHeaders(),signal:D.controller.signal,
@@ -278,4 +353,129 @@ window.sendDiagnosisQuestion=function(){
 };
 window.getDiagnosisWorkspace=function(){return D;};
 window.buildStructuredDiagnosis=buildDiagnosis;
+
+// ══════════ AI 深度解读（一对一）+ 个性化分析 ══════════
+
+function fmtAI(text){
+  if(!text)return '';
+  var html=text;
+  html=html.replace(/```([\s\S]*?)```/g,function(m,c){return '<pre style="background:#f5f5f5;padding:10px;border-radius:4px;overflow-x:auto;font-size:12px">'+c.replace(/</g,'&lt;')+'</pre>';});
+  html=html.replace(/^### (.+)$/gm,'<h4 style="font-size:13px;font-weight:700;margin:10px 0 4px">$1</h4>');
+  html=html.replace(/^## (.+)$/gm,'<h3 style="font-size:14px;font-weight:700;margin:12px 0 6px">$1</h3>');
+  html=html.replace(/^# (.+)$/gm,'<h2 style="font-size:15px;font-weight:700;margin:14px 0 8px">$1</h2>');
+  html=html.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
+  html=html.replace(/^- (.+)$/gm,'<li style="margin-left:18px;list-style:disc">$1</li>');
+  html=html.replace(/^\d+\. (.+)$/gm,'<li style="margin-left:18px;list-style:decimal">$1</li>');
+  html=html.replace(/\n\n/g,'</p><p style="margin:6px 0">');
+  html=html.replace(/\n/g,'<br>');
+  return '<p style="margin:6px 0">'+html+'</p>';
+}
+
+window.generateBranchDeepReading=function(branchName){
+  var btnId='ai-deep-btn-'+branchName;
+  var ctId='ai-deep-content-'+branchName;
+  var btn=document.getElementById(btnId);
+  var ct=document.getElementById(ctId);
+  if(!btn||!ct)return;
+  btn.disabled=true;btn.textContent='生成中…';
+  ct.innerHTML='<span style="color:var(--muted)">正在分析 '+branchName+' 的诊断数据...</span>';
+
+  var diag=buildDiagnosis(branchName);
+  var ctx={
+    period:App.currentMonth,
+    branch:branchName,
+    riskLevel:diag.riskLevel,
+    summary:diag.summary,
+    facts:(diag.facts||[]).slice(0,8),
+    patterns:(diag.patterns||[]).slice(0,5),
+    inferences:(diag.inferences||[]).slice(0,6),
+    recommendations:(diag.recommendations||[]).slice(0,5)
+  };
+  var question='请基于以上诊断数据，为'+branchName+'生成深度经营分析报告。要求：\n'+
+    '1. 风险根因分析：关键指标偏离程度及根本原因\n'+
+    '2. 经营模式诊断：COR分解（赔付率vs费用率贡献）、人效分析\n'+
+    '3. 与分公司整体的对比：哪些指标显著劣于均值\n'+
+    '4. 改进建议：按优先级排序，每条需有具体行动方案和预期效果\n'+
+    '5. 所有数据必须严格使用上下文中提供的数值，禁止编造或修改任何数字';
+
+  fetch('/ai/chat',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({question:question,context:ctx})
+  }).then(function(response){
+    if(!response.ok)throw new Error('请求失败('+response.status+')');
+    var reader=response.body.getReader(),decoder=new TextDecoder(),buffer='',text='',started=false;
+    ct.innerHTML='';
+    function read(){
+      return reader.read().then(function(res){
+        if(res.done){btn.disabled=false;btn.textContent='重新生成';return;}
+        buffer+=decoder.decode(res.value,{stream:true});
+        var lines=buffer.split('\n');buffer=lines.pop();
+        lines.forEach(function(line){
+          if(line.indexOf('data: ')!==0)return;
+          var dataStr=line.slice(6).trim();
+          if(dataStr==='[DONE]')return;
+          try{var data=JSON.parse(dataStr);
+            if(data.error)throw new Error(data.error);
+            if(data.content){if(!started){started=true;ct.innerHTML='';}text+=data.content;ct.innerHTML=fmtAI(text);}
+          }catch(e){}
+        });
+        ct.scrollTop=ct.scrollHeight;return read();
+      });
+    }
+    return read();
+  }).catch(function(e){
+    ct.innerHTML='<span style="color:#dc2626">生成失败：'+e.message+'</span>';
+    btn.disabled=false;btn.textContent='生成 AI 深度解读';
+  });
+};
+
+window.sendAnalyze=function(){
+  var input=document.getElementById('ai-ca-input');
+  if(!input)return;
+  var question=input.value.trim();
+  if(!question)return;
+  input.value='';
+  var msgs=document.getElementById('ai-ca-msgs');
+  if(!msgs)return;
+  msgs.insertAdjacentHTML('beforeend',
+    '<div style="text-align:right;margin-bottom:8px"><span style="display:inline-block;padding:8px 14px;background:#2563eb;color:#fff;border-radius:12px 12px 2px 12px;font-size:13px">'+question.replace(/</g,'&lt;')+'</span></div>');
+  var aiId='ai-ca-'+Date.now();
+  msgs.insertAdjacentHTML('beforeend',
+    '<div id="'+aiId+'" style="margin-bottom:12px"><span style="color:var(--muted)">正在解析问题并查询数据...</span></div>');
+  var el=document.getElementById(aiId);
+
+  // sessionId 持久化
+  var sid=localStorage.getItem('ai-agent-sid')||'';
+
+  fetch('/ai/agent',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({question:question,sessionId:sid})
+  }).then(function(response){
+    if(!response.ok)throw new Error('请求失败('+response.status+')');
+    var reader=response.body.getReader(),decoder=new TextDecoder(),buffer='',text='',started=false;
+    function read(){
+      return reader.read().then(function(res){
+        if(res.done)return;
+        buffer+=decoder.decode(res.value,{stream:true});
+        var lines=buffer.split('\n');buffer=lines.pop();
+        lines.forEach(function(line){
+          if(line.indexOf('data: ')!==0)return;
+          var dataStr=line.slice(6).trim();
+          if(dataStr==='[DONE]')return;
+          try{var data=JSON.parse(dataStr);
+            if(data.error)throw new Error(data.error);
+            if(data.sessionId){localStorage.setItem('ai-agent-sid',data.sessionId);return;}
+            if(data.content){if(!started){started=true;el.innerHTML='';}text+=data.content;el.innerHTML=fmtAI(text);}
+          }catch(e){}
+        });
+        el.scrollTop=el.scrollHeight;return read();
+      });
+    }
+    return read();
+  }).catch(function(e){
+    el.innerHTML='<span style="color:#dc2626">分析失败：'+e.message+'</span>';
+  });
+};
 })();
