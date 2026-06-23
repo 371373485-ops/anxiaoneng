@@ -43,6 +43,11 @@ if(!document.getElementById('trend-css')){
     '.trend-table-wrap td{padding:4px 8px;border-bottom:1px solid #f0f0f0;white-space:nowrap}',
     '.trend-table-wrap td.num{text-align:right}',
     '.trend-table-wrap .rank-tag{color:#9ca3af;font-size:11px}',
+  '',
+  '.trend-analysis-box{margin-top:12px;padding:12px 14px;background:#f8f9fa;border-radius:8px;border-left:3px solid #2563eb}',
+  '.trend-analysis-title{font-size:13px;font-weight:600;margin-bottom:8px;color:#1e3a5f}',
+  '.trend-analysis-item{font-size:12px;line-height:1.7;color:#374151;padding:3px 0}',
+  '.trend-analysis-item:not(:last-child){border-bottom:1px dashed #e5e7eb;padding-bottom:6px;margin-bottom:6px}',
     '',
     '@media(max-width:768px){',
     '  .trend-toolbar{flex-direction:column;align-items:flex-start;gap:8px;padding:10px 12px}',
@@ -278,6 +283,9 @@ function renderCardHTML(card, fieldGroups, branchNames, allMonths){
   h += '<div id="'+s.id+'-table" class="trend-table-wrap"></div>';
   h += '</div>';
   
+  // 分析描述
+  h += '<div id="'+s.id+'-analysis"></div>';
+  
   h += '</div>';
   return h;
 }
@@ -403,6 +411,7 @@ function renderCardChart(card){
   });
   
   renderDataTable(card, months);
+  renderAnalysis(card, months);
 }
 
 // ── 渲染表格 ──
@@ -444,6 +453,82 @@ function renderDataTable(card, months){
   });
   
   h += '</tbody></table>';
+  el.innerHTML = h;
+}
+
+// ── 生成趋势分析描述 ──
+function generateAnalysis(card, months){
+  var unit = metricUnit(card.metric);
+  var isPct = unit === '%';
+  var f = (App.FIELDS || []).find(function(x){ return x.k === card.metric; }) || {};
+  var direction = f.rd || 'desc';
+  var metricName = f.l || card.metric;
+  
+  function fv(v){
+    if(v == null) return null;
+    return isPct ? (v*100).toFixed(2)+'%' : v.toFixed(2);
+  }
+  
+  var allOrgs = [{name: card.branch, isMain: true}].concat(
+    card.compareBranches.map(function(bn){ return {name: bn, isMain: false}; })
+  );
+  var analyses = [];
+  
+  allOrgs.forEach(function(org){
+    var vals = months.map(function(m){ return getMetricValue(m, org.name, card.metric); });
+    var validVals = vals.filter(function(v){ return v != null && !isNaN(v); });
+    if(validVals.length < 2){
+      analyses.push(org.name + '：数据不足，无法分析趋势。');
+      return;
+    }
+    var first = validVals[0];
+    var last = validVals[validVals.length - 1];
+    var change = last - first;
+    var changePct = first !== 0 ? (change / Math.abs(first) * 100) : 0;
+    var maxVal = Math.max.apply(null, validVals);
+    var minVal = Math.min.apply(null, validVals);
+    var avgVal = validVals.reduce(function(a,b){ return a+b; }, 0) / validVals.length;
+    var range = maxVal - minVal;
+    var isImproving = direction === 'desc' ? change > 0 : change < 0;
+    var trendDir;
+    if (Math.abs(changePct) < 2) trendDir = '基本持平';
+    else if (isImproving) trendDir = '呈改善趋势';
+    else trendDir = '呈恶化趋势';
+    var volatility = avgVal !== 0 ? (range / Math.abs(avgVal) * 100) : 0;
+    var volatilityDesc = volatility < 5 ? '波动较小，走势平稳' : volatility < 15 ? '有一定波动' : '波动较大';
+    var rankText = '';
+    var isBranch = org.name !== '全国' && org.name !== '整体';
+    if(isBranch){
+      var firstRank = getOrgRank(org.name, months[0], card.metric, direction);
+      var lastRank = getOrgRank(org.name, months[months.length-1], card.metric, direction);
+      if(firstRank && lastRank){
+        var total = getBranchesInRegion('全国').length;
+        if(firstRank === lastRank) rankText = '排名稳定在第' + firstRank + '/' + total + '名';
+        else if(lastRank < firstRank) rankText = '排名从第' + firstRank + '上升至第' + lastRank + '/' + total + '名';
+        else rankText = '排名从第' + firstRank + '下滑至第' + lastRank + '/' + total + '名';
+      }
+    }
+    var text = org.name + '：' + metricName + '从' + fv(first) + '变为' + fv(last);
+    if(Math.abs(changePct) >= 0.1) text += '（变化' + (changePct > 0 ? '+' : '') + changePct.toFixed(1) + '%）';
+    text += '，' + trendDir + '。';
+    text += '期间最高' + fv(maxVal) + '，最低' + fv(minVal) + '，平均' + fv(avgVal) + '，' + volatilityDesc + '。';
+    if(rankText) text += rankText + '。';
+    analyses.push(text);
+  });
+  return analyses;
+}
+
+// ── 渲染分析描述 ──
+function renderAnalysis(card, months){
+  var el = document.getElementById(card.id + '-analysis');
+  if(!el) return;
+  var analyses = generateAnalysis(card, months);
+  var h = '<div class="trend-analysis-box">';
+  h += '<div class="trend-analysis-title">📋 趋势分析描述</div>';
+  analyses.forEach(function(text){
+    h += '<div class="trend-analysis-item">' + text + '</div>';
+  });
+  h += '</div>';
   el.innerHTML = h;
 }
 

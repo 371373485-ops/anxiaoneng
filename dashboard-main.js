@@ -178,7 +178,7 @@ function switchTab(t){
     try{destroyCharts();}catch(e2){}
     if(t==='overview')try{renderOverview();}catch(e3){showError('概览渲染失败: '+e3.message);}
     if(t==='regions')try{renderRegions();}catch(e3){showError('责任区渲染失败: '+e3.message);}
-    if(t==='branches'){hideBranchDetail();try{renderBranches();setTimeout(function(){populateTrendIndicatorSelect();if(document.getElementById('trendIndicator').value)renderTrendChart();},100);}catch(e3){showError('分公司渲染失败: '+e3.message);}}
+    if(t==='branches'){hideBranchDetail();try{renderBranches();}catch(e3){showError('分公司渲染失败: '+e3.message);}}
     if(t==='export')try{renderExportTab();}catch(e3){showError('数据导出渲染失败: '+e3.message);}
     if(t==='data')try{renderDataTab();}catch(e3){showError('数据管理渲染失败: '+e3.message);}
     if(t==='guide')try{renderGuideTab();}catch(e3){showError('指标说明渲染失败: '+e3.message);}
