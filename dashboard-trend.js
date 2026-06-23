@@ -7,6 +7,63 @@
 
 var COLORS = ['#2563eb','#dc2626','#059669','#d97706','#7c3aed','#0891b2','#db2777','#65a30d'];
 
+// 注入 CSS（含移动端适配）
+if(!document.getElementById('trend-css')){
+  var style = document.createElement('style');
+  style.id = 'trend-css';
+  style.textContent = [
+    '.trend-toolbar{background:var(--card);border-radius:8px;padding:12px 16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06);display:flex;align-items:center;justify-content:space-between}',
+    '.trend-toolbar h3{font-size:15px;font-weight:700}',
+    '.trend-toolbar .tb-right{display:flex;gap:8px;align-items:center}',
+    '.trend-toolbar select{padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;min-width:160px}',
+    '.trend-toolbar button{padding:6px 16px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600}',
+    '',
+    '.trend-card{background:var(--card);border-radius:8px;padding:16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)}',
+    '.trend-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}',
+    '.trend-card-head .ch-left{display:flex;align-items:center;gap:8px}',
+    '.trend-card-head .ch-icon{font-size:16px}',
+    '.trend-card-head select.trend-metric-sel{padding:4px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;font-weight:600;min-width:160px}',
+    '.trend-card-head .trend-close-btn{padding:4px 10px;border:1px solid #fecaca;border-radius:6px;background:#fff5f5;color:#dc2626;cursor:pointer;font-size:12px}',
+    '',
+    '.trend-filters{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px}',
+    '.trend-filters .tf-group label{font-size:11px;color:var(--muted);display:block;margin-bottom:2px}',
+    '.trend-filters select,.trend-filters input{padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;min-width:120px}',
+    '.trend-filters .tf-custom{display:flex;gap:4px}',
+    '',
+    '.trend-compare-tags{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}',
+    '.trend-compare-tags .ct-tag{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:11px;color:#fff}',
+    '.trend-compare-tags .ct-tag button{border:none;background:none;cursor:pointer;color:#fff;font-size:12px;padding:0}',
+    '',
+    '.trend-chart-table{display:flex;gap:16px;align-items:stretch}',
+    '.trend-chart-wrap{flex:1.5;min-width:0;position:relative;height:360px}',
+    '.trend-table-wrap{flex:1;max-height:360px;overflow-y:auto;min-width:0}',
+    '.trend-table-wrap table{width:100%;border-collapse:collapse;font-size:12px}',
+    '.trend-table-wrap th{padding:5px 8px;text-align:left;border-bottom:2px solid #e5e7eb;white-space:nowrap;background:#f8f9fa}',
+    '.trend-table-wrap th.num{text-align:right}',
+    '.trend-table-wrap td{padding:4px 8px;border-bottom:1px solid #f0f0f0;white-space:nowrap}',
+    '.trend-table-wrap td.num{text-align:right}',
+    '.trend-table-wrap .rank-tag{color:#9ca3af;font-size:11px}',
+    '',
+    '@media(max-width:768px){',
+    '  .trend-toolbar{flex-direction:column;align-items:flex-start;gap:8px;padding:10px 12px}',
+    '  .trend-toolbar .tb-right{width:100%;flex-wrap:wrap}',
+    '  .trend-toolbar select{min-width:0;flex:1;font-size:12px}',
+    '  .trend-toolbar button{font-size:12px;padding:6px 12px;white-space:nowrap}',
+    '  .trend-card{padding:12px}',
+    '  .trend-card-head .trend-metric-sel{min-width:0;font-size:12px;flex:1}',
+    '  .trend-card-head .trend-close-btn{font-size:11px;padding:3px 8px}',
+    '  .trend-filters{gap:6px}',
+    '  .trend-filters select,.trend-filters input{min-width:0;font-size:11px;padding:4px 6px}',
+    '  .trend-chart-table{flex-direction:column;gap:12px}',
+    '  .trend-chart-wrap{height:240px;flex:none;width:100%}',
+    '  .trend-table-wrap{max-height:none;overflow-x:auto;flex:none;width:100%}',
+    '  .trend-table-wrap table{font-size:10px}',
+    '  .trend-table-wrap th,.trend-table-wrap td{padding:3px 4px}',
+    '}'
+  ].join('\n');
+  document.head.appendChild(style);
+}
+
 // ── 可用月份 ──
 function getAvailableMonths(){
   var merged = (App.ALL_DATA && App.ALL_DATA._merged) || {};
@@ -49,11 +106,6 @@ function fmtMonth(m){
   return m.split('-')[1] + '月';
 }
 
-function metricLabel(key){
-  var f = (App.FIELDS || []).find(function(x){ return x.k === key; });
-  return f ? f.l : key;
-}
-
 function metricUnit(key){
   var f = (App.FIELDS || []).find(function(x){ return x.k === key; });
   return f ? (f.u || '') : '';
@@ -85,7 +137,7 @@ function getMonths(preset, customStart, customEnd){
 
 // ══════════ 图表卡片 ══════════
 
-var cards = []; // 每个 card = { id, metric, branch, preset, customStart, customEnd, compareBranches:[], chart }
+var cards = [];
 var cardCounter = 0;
 
 function addCard(metricKey){
@@ -122,22 +174,19 @@ function renderCards(){
   
   var branchNames = getBranchesInRegion('全国');
   
-  // 顶部操作栏
-  var h = '<div style="background:var(--card);border-radius:8px;padding:12px 16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06);display:flex;align-items:center;justify-content:space-between">';
-  h += '<h3 style="font-size:15px;font-weight:700">📉 多期趋势分析</h3>';
-  h += '<div style="display:flex;gap:8px;align-items:center">';
-  // 新增指标选择器
-  h += '<select id="trend-new-metric" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;min-width:160px">';
+  var h = '<div class="trend-toolbar">';
+  h += '<h3>📉 多期趋势分析</h3>';
+  h += '<div class="tb-right">';
+  h += '<select id="trend-new-metric">';
   Object.keys(fieldGroups).forEach(function(g){
     h += '<optgroup label="'+g+'">';
     fieldGroups[g].forEach(function(f){ h += '<option value="'+f.k+'">'+f.l+'</option>'; });
     h += '</optgroup>';
   });
   h += '</select>';
-  h += '<button onclick="Trend.addCard(document.getElementById(\'trend-new-metric\').value)" style="padding:6px 16px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">+ 添加图表</button>';
+  h += '<button onclick="Trend.addCard(document.getElementById(\'trend-new-metric\').value)">+ 添加图表</button>';
   h += '</div></div>';
   
-  // 卡片列表
   h += '<div id="trend-cards">';
   cards.forEach(function(card){
     h += renderCardHTML(card, fieldGroups, branchNames, allMonths);
@@ -146,7 +195,6 @@ function renderCards(){
   
   ct.innerHTML = h;
   
-  // 渲染每个卡片的图表
   cards.forEach(function(card){
     renderCardChart(card);
   });
@@ -154,17 +202,14 @@ function renderCards(){
 
 function renderCardHTML(card, fieldGroups, branchNames, allMonths){
   var s = card;
-  var unit = metricUnit(s.metric);
-  var isPct = unit === '%';
   
-  var h = '<div style="background:var(--card);border-radius:8px;padding:16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)">';
+  var h = '<div class="trend-card">';
   
   // 卡片头
-  h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
-  h += '<div style="display:flex;align-items:center;gap:8px">';
-  h += '<span style="font-size:16px">📊</span>';
-  // 指标选择（可切换）
-  h += '<select onchange="Trend.updateCard(\''+s.id+'\',\'metric\',this.value)" style="padding:4px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;font-weight:600;min-width:160px">';
+  h += '<div class="trend-card-head">';
+  h += '<div class="ch-left">';
+  h += '<span class="ch-icon">📊</span>';
+  h += '<select class="trend-metric-sel" onchange="Trend.updateCard(\''+s.id+'\',\'metric\',this.value)">';
   Object.keys(fieldGroups).forEach(function(g){
     h += '<optgroup label="'+g+'">';
     fieldGroups[g].forEach(function(f){ h += '<option value="'+f.k+'"'+(s.metric===f.k?' selected':'')+'>'+f.l+'</option>'; });
@@ -172,15 +217,14 @@ function renderCardHTML(card, fieldGroups, branchNames, allMonths){
   });
   h += '</select>';
   h += '</div>';
-  h += '<button onclick="Trend.removeCard(\''+s.id+'\')" style="padding:4px 10px;border:1px solid #fecaca;border-radius:6px;background:#fff5f5;color:#dc2626;cursor:pointer;font-size:12px">✕ 关闭</button>';
+  h += '<button class="trend-close-btn" onclick="Trend.removeCard(\''+s.id+'\')">✕ 关闭</button>';
   h += '</div>';
   
-  // 筛选行：机构 + 时间范围
-  h += '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px">';
+  // 筛选行
+  h += '<div class="trend-filters">';
   
-  // 机构
-  h += '<div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:2px">机构</label>';
-  h += '<select onchange="Trend.updateCard(\''+s.id+'\',\'branch\',this.value)" style="padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;min-width:120px">';
+  h += '<div class="tf-group"><label>机构</label>';
+  h += '<select onchange="Trend.updateCard(\''+s.id+'\',\'branch\',this.value)">';
   h += '<option value="全国"'+(s.branch==='全国'?' selected':'')+'>全国汇总</option>';
   ['第一责任区','第二责任区','第三责任区','第四责任区'].forEach(function(r){
     h += '<option value="'+r+'"'+(s.branch===r?' selected':'')+'>'+r+'</option>';
@@ -190,9 +234,8 @@ function renderCardHTML(card, fieldGroups, branchNames, allMonths){
   });
   h += '</select></div>';
   
-  // 时间范围
-  h += '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:2px">时间范围</label>';
-  h += '<select id="'+s.id+'-preset" onchange="Trend.updateCard(\''+s.id+'\',\'preset\',this.value);var cw=document.getElementById(\''+s.id+'-custom\');cw.style.display=this.value===\'custom\'?\'flex\':\'none\'" style="padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px">';
+  h += '<div class="tf-group"><label>时间范围</label>';
+  h += '<select id="'+s.id+'-preset" onchange="Trend.updateCard(\''+s.id+'\',\'preset\',this.value);var cw=document.getElementById(\''+s.id+'-custom\');cw.style.display=this.value===\'custom\'?\'flex\':\'none\'">';
   h += '<option value="recent6"'+(s.preset==='recent6'?' selected':'')+'>近6个月</option>';
   h += '<option value="recent3"'+(s.preset==='recent3'?' selected':'')+'>近3个月</option>';
   h += '<option value="recent12"'+(s.preset==='recent12'?' selected':'')+'>近12个月</option>';
@@ -201,15 +244,13 @@ function renderCardHTML(card, fieldGroups, branchNames, allMonths){
   h += '<option value="custom"'+(s.preset==='custom'?' selected':'')+'>自定义</option>';
   h += '</select></div>';
   
-  // 自定义日期
-  h += '<div id="'+s.id+'-custom" style="display:'+(s.preset==='custom'?'flex':'none')+';gap:4px">';
-  h += '<input type="month" value="'+s.customStart+'" min="'+allMonths[0]+'" max="'+allMonths[allMonths.length-1]+'" onchange="Trend.updateCard(\''+s.id+'\',\'customStart\',this.value)" style="padding:4px 6px;border:1px solid #d1d5db;border-radius:6px;font-size:12px" title="起始月">';
-  h += '<input type="month" value="'+s.customEnd+'" min="'+allMonths[0]+'" max="'+allMonths[allMonths.length-1]+'" onchange="Trend.updateCard(\''+s.id+'\',\'customEnd\',this.value)" style="padding:4px 6px;border:1px solid #d1d5db;border-radius:6px;font-size:12px" title="结束月">';
+  h += '<div id="'+s.id+'-custom" class="tf-custom" style="display:'+(s.preset==='custom'?'flex':'none')+'">';
+  h += '<input type="month" value="'+s.customStart+'" min="'+allMonths[0]+'" max="'+allMonths[allMonths.length-1]+'" onchange="Trend.updateCard(\''+s.id+'\',\'customStart\',this.value)" title="起始月">';
+  h += '<input type="month" value="'+s.customEnd+'" min="'+allMonths[0]+'" max="'+allMonths[allMonths.length-1]+'" onchange="Trend.updateCard(\''+s.id+'\',\'customEnd\',this.value)" title="结束月">';
   h += '</div>';
   
-  // 对比机构添加
-  h += '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:2px">+ 对比机构</label>';
-  h += '<select onchange="if(this.value){Trend.addCompare(\''+s.id+'\',this.value);this.value=\'\'}" style="padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;min-width:120px">';
+  h += '<div class="tf-group"><label>+ 对比机构</label>';
+  h += '<select onchange="if(this.value){Trend.addCompare(\''+s.id+'\',this.value);this.value=\'\'}">';
   h += '<option value="">添加对比...</option>';
   ['全国','第一责任区','第二责任区','第三责任区','第四责任区'].forEach(function(r){
     if(r !== s.branch) h += '<option value="'+r+'">'+r+'</option>';
@@ -219,28 +260,29 @@ function renderCardHTML(card, fieldGroups, branchNames, allMonths){
   });
   h += '</select></div>';
   
-  h += '</div>'; // end 筛选行
+  h += '</div>';
   
-  // 对比机构标签
+  // 对比标签
   if(s.compareBranches.length > 0){
-    h += '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">';
+    h += '<div class="trend-compare-tags">';
     s.compareBranches.forEach(function(bn, i){
-      h += '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:11px;color:#fff;background:'+COLORS[(i+1)%COLORS.length]+'">'+bn+'<button onclick="Trend.removeCompare(\''+s.id+'\',\''+bn.replace(/'/g,'\\\'')+'\')" style="border:none;background:none;cursor:pointer;color:#fff;font-size:12px;padding:0">×</button></span>';
+      var c = COLORS[(i+1)%COLORS.length];
+      h += '<span class="ct-tag" style="background:'+c+'">'+bn+'<button onclick="Trend.removeCompare(\''+s.id+'\',\''+bn.replace(/'/g,'\\\'')+'\')">×</button></span>';
     });
     h += '</div>';
   }
   
-  // 图表 + 表格布局
-  h += '<div style="display:flex;gap:16px;align-items:stretch">';
-  h += '<div style="flex:1.5;min-width:0;position:relative;height:360px"><canvas id="'+s.id+'-chart"></canvas></div>';
-  h += '<div id="'+s.id+'-table" style="flex:1;max-height:360px;overflow-y:auto;min-width:0"></div>';
+  // 图表 + 表格
+  h += '<div class="trend-chart-table">';
+  h += '<div class="trend-chart-wrap"><canvas id="'+s.id+'-chart"></canvas></div>';
+  h += '<div id="'+s.id+'-table" class="trend-table-wrap"></div>';
   h += '</div>';
   
   h += '</div>';
   return h;
 }
 
-// ── 计算分公司在特定月份的排名 ──
+// ── 排名函数 ──
 function getBranchRank(branchName, month, metricKey, direction){
   var merged = (App.ALL_DATA && App.ALL_DATA._merged) || {};
   var mdata = merged[month];
@@ -251,14 +293,12 @@ function getBranchRank(branchName, month, metricKey, direction){
     if(v != null && !isNaN(v)) allVals.push({name: b.n, value: v});
   });
   if(!allVals.length) return null;
-  // direction: desc = 越大越好（排名靠前）, asc = 越小越好
   allVals.sort(function(a,b){ return direction==='asc' ? a.value - b.value : b.value - a.value; });
   var target = allVals.find(function(x){ return x.name === branchName; });
   if(!target) return null;
   return allVals.indexOf(target) + 1;
 }
 
-// ── 计算责任区在特定月份的排名（4个区之间） ──
 function getRegionRank(regionName, month, metricKey, direction){
   var merged = (App.ALL_DATA && App.ALL_DATA._merged) || {};
   var mdata = merged[month];
@@ -278,7 +318,6 @@ function getRegionRank(regionName, month, metricKey, direction){
   return allVals.indexOf(target) + 1;
 }
 
-// ── 统一排名函数 ──
 function getOrgRank(orgName, month, metricKey, direction){
   if(orgName === '全国' || orgName === '整体') return null;
   var branchNames = getBranchesInRegion('全国');
@@ -288,7 +327,7 @@ function getOrgRank(orgName, month, metricKey, direction){
   return null;
 }
 
-// ── 渲染单个卡片图表 ──
+// ── 渲染图表 ──
 function renderCardChart(card){
   if(card.chart){ try{ card.chart.destroy(); }catch(e){} }
   var canvas = document.getElementById(card.id + '-chart');
@@ -298,27 +337,23 @@ function renderCardChart(card){
   var unit = metricUnit(card.metric);
   var isPct = unit === '%';
   var f = (App.FIELDS || []).find(function(x){ return x.k === card.metric; }) || {};
-  var direction = f.rd || 'desc'; // desc=越大越好, asc=越小越好
+  var direction = f.rd || 'desc';
   
-  // 格式化数值
   function fmtVal(v){
     if(v == null) return '无数据';
     return isPct ? (v*100).toFixed(2)+'%' : v.toFixed(2);
   }
   
-  // 构建所有机构列表（主机构+对比机构）
   var allOrgs = [{name: card.branch, isMain: true}];
   card.compareBranches.forEach(function(bn){ allOrgs.push({name: bn, isMain: false}); });
   
   var datasets = allOrgs.map(function(org, i){
     var data = months.map(function(m){ return getMetricValue(m, org.name, card.metric); });
-    // 排名信息（仅分公司有排名）
     var ranks = months.map(function(m){ return getOrgRank(org.name, m, card.metric, direction); });
-    
     return {
       label: org.name,
       data: data,
-      _ranks: ranks, // 自定义字段存排名
+      _ranks: ranks,
       _hasRank: org.name !== '全国' && org.name !== '整体',
       borderColor: COLORS[i % COLORS.length],
       backgroundColor: org.isMain ? COLORS[i % COLORS.length] + '15' : 'transparent',
@@ -349,10 +384,12 @@ function renderCardChart(card){
             label: function(ctx){
               var v = ctx.parsed.y;
               var label = ctx.dataset.label + ': ' + fmtVal(v);
-              // 分公司显示排名
               if(ctx.dataset._hasRank && v != null){
                 var rank = ctx.dataset._ranks[ctx.dataIndex];
-                if(rank) label += '  (第' + rank + '/31名)';
+                if(rank){
+                  var total = getBranchesInRegion('全国').length;
+                  label += '  (第' + rank + '/' + total + '名)';
+                }
               }
               return label;
             }
@@ -360,19 +397,15 @@ function renderCardChart(card){
         }
       },
       scales: {
-        y: {
-          ticks: { callback: function(v){ return isPct ? (v*100).toFixed(0)+'%' : v.toFixed(0); } }
-        }
+        y: { ticks: { callback: function(v){ return isPct ? (v*100).toFixed(0)+'%' : v.toFixed(0); } } }
       }
-    },
-    // 自定义插件已移除
+    }
   });
   
-  // 渲染数据表格
   renderDataTable(card, months);
 }
 
-// ── 渲染数据表格 ──
+// ── 渲染表格 ──
 function renderDataTable(card, months){
   var el = document.getElementById(card.id + '-table');
   if(!el) return;
@@ -390,23 +423,21 @@ function renderDataTable(card, months){
     card.compareBranches.map(function(bn){ return {name: bn, isMain: false}; })
   );
   
-  var h = '<table style="width:100%;border-collapse:collapse;font-size:11px">';
-  h += '<thead><tr style="background:#f8f9fa">';
-  h += '<th style="padding:5px 8px;text-align:left;border-bottom:2px solid #e5e7eb;white-space:nowrap">机构</th>';
-  months.forEach(function(m){ h += '<th style="padding:5px 8px;text-align:right;border-bottom:2px solid #e5e7eb;white-space:nowrap">'+fmtMonth(m)+'</th>'; });
+  var h = '<table><thead><tr>';
+  h += '<th>机构</th>';
+  months.forEach(function(m){ h += '<th class="num">'+fmtMonth(m)+'</th>'; });
   h += '</tr></thead><tbody>';
   
   allOrgs.forEach(function(org, i){
     var isBranch = org.name !== '全国' && org.name !== '整体';
-    var bg = org.isMain ? '#f0f7ff' : '';
-    h += '<tr style="background:'+bg+'">';
-    h += '<td style="padding:4px 8px;border-bottom:1px solid #f0f0f0;font-weight:'+(org.isMain?'600':'400')+';color:'+COLORS[i%COLORS.length]+';white-space:nowrap">'+org.name+'</td>';
+    var bg = org.isMain ? ' style="background:#f0f7ff"' : '';
+    h += '<tr'+bg+'>';
+    h += '<td style="font-weight:'+(org.isMain?'600':'400')+';color:'+COLORS[i%COLORS.length]+'">'+org.name+'</td>';
     months.forEach(function(m){
       var v = getMetricValue(m, org.name, card.metric);
       var rank = isBranch ? getOrgRank(org.name, m, card.metric, direction) : null;
-      h += '<td style="padding:4px 8px;text-align:right;border-bottom:1px solid #f0f0f0;white-space:nowrap">';
-      h += fv(v);
-      if(rank) h += '<span style="color:#9ca3af;font-size:11px"> #'+rank+'</span>';
+      h += '<td class="num">' + fv(v);
+      if(rank) h += ' <span class="rank-tag">#'+rank+'</span>';
       h += '</td>';
     });
     h += '</tr>';
@@ -419,22 +450,16 @@ function renderDataTable(card, months){
 // ══════════ 操作 API ══════════
 
 window.Trend = {
-  state: {}, // 兼容
   render: function(){
     if(cards.length === 0) addCard();
     else renderCards();
   },
-  addCard: function(metricKey){
-    addCard(metricKey);
-  },
-  removeCard: function(id){
-    removeCard(id);
-  },
+  addCard: function(metricKey){ addCard(metricKey); },
+  removeCard: function(id){ removeCard(id); },
   updateCard: function(id, field, value){
     var card = cards.find(function(c){ return c.id === id; });
     if(!card) return;
     card[field] = value;
-    // 切换指标时保留对比机构和时间范围（用户明确要求不重置）
     renderCards();
   },
   addCompare: function(id, branchName){
