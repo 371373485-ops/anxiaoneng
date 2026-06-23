@@ -474,9 +474,17 @@ function generateAnalysis(card, months){
   );
   var analyses = [];
   
-  allOrgs.forEach(function(org){
+  // 预计算所有机构数据用于对比
+  var allData = allOrgs.map(function(org){
     var vals = months.map(function(m){ return getMetricValue(m, org.name, card.metric); });
-    var validVals = vals.filter(function(v){ return v != null && !isNaN(v); });
+    var valid = vals.filter(function(v){ return v != null && !isNaN(v); });
+    return { org: org, vals: vals, valid: valid };
+  });
+  
+  allData.forEach(function(d){
+    var org = d.org;
+    var vals = d.vals;
+    var validVals = d.valid;
     if(validVals.length < 2){
       analyses.push(org.name + '：数据不足，无法分析趋势。');
       return;
@@ -490,29 +498,92 @@ function generateAnalysis(card, months){
     var avgVal = validVals.reduce(function(a,b){ return a+b; }, 0) / validVals.length;
     var range = maxVal - minVal;
     var isImproving = direction === 'desc' ? change > 0 : change < 0;
+    var absChangePct = Math.abs(changePct);
+    
+    // 趋势方向（客观描述）
     var trendDir;
-    if (Math.abs(changePct) < 2) trendDir = '基本持平';
-    else if (isImproving) trendDir = '呈改善趋势';
-    else trendDir = '呈恶化趋势';
+    if (absChangePct < 2) trendDir = '基本持平，无明显变化';
+    else if (absChangePct < 5) trendDir = isImproving ? '略有改善' : '略有下降';
+    else if (absChangePct < 15) trendDir = isImproving ? '有所改善' : '有所下降';
+    else trendDir = isImproving ? '明显改善' : '明显下降';
+    
+    // 波动描述（客观）
     var volatility = avgVal !== 0 ? (range / Math.abs(avgVal) * 100) : 0;
-    var volatilityDesc = volatility < 5 ? '波动较小，走势平稳' : volatility < 15 ? '有一定波动' : '波动较大';
+    var volatilityDesc;
+    if (volatility < 3) volatilityDesc = '走势平稳，波动很小';
+    else if (volatility < 8) volatilityDesc = '有一定波动';
+    else if (volatility < 20) volatilityDesc = '波动较为明显';
+    else volatilityDesc = '波动较大';
+    
+    // 月度环比变化（找最大环比涨跌）
+    var maxMomUp = 0, maxMomDown = 0, maxMomUpMonth = '', maxMomDownMonth = '';
+    for (var i = 1; i < vals.length; i++) {
+      if (vals[i] != null && vals[i-1] != null) {
+        var mom = vals[i] - vals[i-1];
+        var momPct = vals[i-1] !== 0 ? mom / Math.abs(vals[i-1]) * 100 : 0;
+        if (momPct > Math.abs(maxMomUp)) { maxMomUp = momPct; maxMomUpMonth = fmtMonth(months[i]); }
+        if (momPct < -Math.abs(maxMomDown)) { maxMomDown = momPct; maxMomDownMonth = fmtMonth(months[i]); }
+      }
+    }
+    
+    // 排名变化
     var rankText = '';
     var isBranch = org.name !== '全国' && org.name !== '整体';
+    var total = getBranchesInRegion('全国').length;
     if(isBranch){
       var firstRank = getOrgRank(org.name, months[0], card.metric, direction);
       var lastRank = getOrgRank(org.name, months[months.length-1], card.metric, direction);
       if(firstRank && lastRank){
-        var total = getBranchesInRegion('全国').length;
         if(firstRank === lastRank) rankText = '排名稳定在第' + firstRank + '/' + total + '名';
-        else if(lastRank < firstRank) rankText = '排名从第' + firstRank + '上升至第' + lastRank + '/' + total + '名';
-        else rankText = '排名从第' + firstRank + '下滑至第' + lastRank + '/' + total + '名';
+        else if(lastRank < firstRank) rankText = '排名从第' + firstRank + '升至第' + lastRank + '/' + total + '名（上升' + (firstRank-lastRank) + '位）';
+        else rankText = '排名从第' + firstRank + '降至第' + lastRank + '/' + total + '名（下降' + (lastRank-firstRank) + '位）';
       }
     }
+    
+    // 与其他机构对比
+    var compareText = '';
+    if (allData.length > 1) {
+      var myAvg = avgVal;
+      var others = allData.filter(function(x){ return x.org.name !== org.name && x.valid.length >= 2; });
+      if (others.length > 0) {
+        var otherAvgs = others.map(function(x){ return x.valid.reduce(function(a,b){return a+b},0)/x.valid.length; });
+        var groupAvg = otherAvgs.reduce(function(a,b){return a+b},0) / otherAvgs.length;
+        var diff = myAvg - groupAvg;
+        var diffPct = groupAvg !== 0 ? diff / Math.abs(groupAvg) * 100 : 0;
+        var betterThan = direction === 'desc' ? diff > 0 : diff < 0;
+        if (Math.abs(diffPct) < 2) {
+          compareText = '与对比机构平均水平基本一致';
+        } else {
+          compareText = betterThan ? '高于对比机构平均水平' + Math.abs(diffPct).toFixed(1) + '%' : '低于对比机构平均水平' + Math.abs(diffPct).toFixed(1) + '%';
+        }
+        // 找差距最大的机构
+        var maxGapOrg = null, maxGap = 0;
+        others.forEach(function(x){
+          var oAvg = x.valid.reduce(function(a,b){return a+b},0)/x.valid.length;
+          var gap = Math.abs(myAvg - oAvg);
+          if (gap > maxGap) { maxGap = gap; maxGapOrg = x.org.name; }
+        });
+        if (maxGapOrg) {
+          var oAvgVal = others.find(function(x){return x.org.name===maxGapOrg}).valid.reduce(function(a,b){return a+b},0)/others.find(function(x){return x.org.name===maxGapOrg}).valid.length;
+          var gapPct = oAvgVal !== 0 ? (myAvg - oAvgVal)/Math.abs(oAvgVal)*100 : 0;
+          if (Math.abs(gapPct) >= 5) {
+            compareText += '，与' + maxGapOrg + '差距' + Math.abs(gapPct).toFixed(1) + '%';
+          }
+        }
+      }
+    }
+    
+    // 组织文字
     var text = org.name + '：' + metricName + '从' + fv(first) + '变为' + fv(last);
-    if(Math.abs(changePct) >= 0.1) text += '（变化' + (changePct > 0 ? '+' : '') + changePct.toFixed(1) + '%）';
+    if (absChangePct >= 0.1) text += '（变化' + (changePct > 0 ? '+' : '') + changePct.toFixed(1) + '%）';
     text += '，' + trendDir + '。';
     text += '期间最高' + fv(maxVal) + '，最低' + fv(minVal) + '，平均' + fv(avgVal) + '，' + volatilityDesc + '。';
-    if(rankText) text += rankText + '。';
+    // 月度最大波动
+    if (maxMomUp > 3) text += maxMomUpMonth + '环比增幅较大（+' + maxMomUp.toFixed(1) + '%），';
+    if (maxMomDown < -3) text += maxMomDownMonth + '环比降幅较大（' + maxMomDown.toFixed(1) + '%），';
+    if (maxMomUp > 3 || maxMomDown < -3) text = text.replace(/，$/, '。');
+    if (rankText) text += rankText + '。';
+    if (compareText) text += compareText + '。';
     analyses.push(text);
   });
   return analyses;
