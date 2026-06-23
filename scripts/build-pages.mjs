@@ -48,6 +48,17 @@ function removeElementByMarker(html,marker){
 }
 function sharePage(source,basePath){
   let html=source;
+  // Strip sensitive scripts and references from share pages
+  const SENSITIVE_PATTERNS=[
+    /<script[^>]*src="(?:dashboard-publish|dashboard-ai|dashboard-agent|dashboard-diagnosis|dashboard-remediation|dashboard-export)\.js[^>]*><\/script>/g,
+    /<script[^>]*src="xlsx\.full\.min\.js[^>]*><\/script>/g,
+    /<link[^>]*href="dashboard-publish\.css[^>]*"\s*\/?>/g,
+    /href="[^"]*\.xlsx"/g,
+  ];
+  for(const p of SENSITIVE_PATTERNS)html=html.replace(p,'');
+  // Strip data-share-restricted elements
+  html=html.replace(/<[^>]+data-share-restricted[^>]*>[\s\S]*?<\/[^>]+>/gi,'');
+  html=html.replace(/<input[^>]+data-share-restricted[^>]*\/?\s*>/gi,'');
   html=html.replace(/<base\s+href="[^"]*"\s*\/?>/i,`<base href="${basePath}">`);
   if(!html.includes(`<base href="${basePath}">`))html=html.replace(/<head>/i,`<head><base href="${basePath}">`);
   html=html.replace(/<meta name="viewport"/i,'<meta name="robots" content="noindex,nofollow"><meta name="viewport"');

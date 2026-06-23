@@ -1,4 +1,4 @@
-var App={};App.charts={};
+﻿var App={};App.charts={};
 
 var INDICATOR_DESC=[
   {g:"保费", items:[
@@ -198,7 +198,7 @@ function initData(){
       }
     }
     if(removed.length > 0){
-      console.log('[Data Cleanup] Removed stale months from _merged:', removed.join(', '));
+      if(App&&App.debug)console.log('[Data Cleanup] Removed stale months from _merged:', removed.join(', '));
       saveAllData();
     }
   }
