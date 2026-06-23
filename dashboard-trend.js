@@ -342,18 +342,28 @@ function renderCardChart(card){
   if(!canvas) return;
   
   var months = getMonths(card.preset, card.customStart, card.customEnd);
+
+  // 过滤掉所有机构都无数据的空月份
   var unit = metricUnit(card.metric);
-  var isPct = unit === '%';
   var f = (App.FIELDS || []).find(function(x){ return x.k === card.metric; }) || {};
   var direction = f.rd || 'desc';
+  var allOrgs = [{name: card.branch, isMain: true}].concat(
+    card.compareBranches.map(function(bn){ return {name: bn, isMain: false}; })
+  );
+  var activeMonths = months.filter(function(m){
+    return allOrgs.some(function(org){
+      var v = getMetricValue(m, org.name, card.metric);
+      return v != null && !isNaN(v);
+    });
+  });
+  if(activeMonths.length === 0) activeMonths = months; // 全空时保留原列表（显示无数据提示）
+  months = activeMonths;
+  var isPct = unit === '%';
   
   function fmtVal(v){
     if(v == null) return '无数据';
     return isPct ? (v*100).toFixed(2)+'%' : v.toFixed(2);
   }
-  
-  var allOrgs = [{name: card.branch, isMain: true}];
-  card.compareBranches.forEach(function(bn){ allOrgs.push({name: bn, isMain: false}); });
   
   var datasets = allOrgs.map(function(org, i){
     var data = months.map(function(m){ return getMetricValue(m, org.name, card.metric); });
