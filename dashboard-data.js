@@ -186,6 +186,22 @@ function initData(){
     }catch(e2){}
   }
   App.currentYear=App.currentMonth.split('-')[0];
+  // 清理 _merged 中不在 actuals 里的过期月份（防止 localStorage 残留）
+  if(App.ALL_DATA._merged && App.ALL_DATA.actuals){
+    var actualMonths = Object.keys(App.ALL_DATA.actuals);
+    var mergedMonths = Object.keys(App.ALL_DATA._merged);
+    var removed = [];
+    for(var mi=0; mi<mergedMonths.length; mi++){
+      if(actualMonths.indexOf(mergedMonths[mi]) < 0){
+        delete App.ALL_DATA._merged[mergedMonths[mi]];
+        removed.push(mergedMonths[mi]);
+      }
+    }
+    if(removed.length > 0){
+      console.log('[Data Cleanup] Removed stale months from _merged:', removed.join(', '));
+      saveAllData();
+    }
+  }
   saveAllData();
   updateYearUI();
   updateMonthUI();
