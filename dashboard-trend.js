@@ -179,7 +179,7 @@ function renderCardHTML(card, fieldGroups, branchNames, allMonths){
   h += '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px">';
   
   // 机构
-  h += '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:2px">机构</label>';
+  h += '<div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:2px">机构</label>';
   h += '<select onchange="Trend.updateCard(\''+s.id+'\',\'branch\',this.value)" style="padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;min-width:120px">';
   h += '<option value="全国"'+(s.branch==='全国'?' selected':'')+'>全国汇总</option>';
   ['第一责任区','第二责任区','第三责任区','第四责任区'].forEach(function(r){
@@ -231,9 +231,9 @@ function renderCardHTML(card, fieldGroups, branchNames, allMonths){
   }
   
   // 图表 + 表格布局
-  h += '<div style="display:flex;gap:16px;align-items:flex-start">';
-  h += '<div style="flex:1;min-width:0;position:relative;height:320px"><canvas id="'+s.id+'-chart"></canvas></div>';
-  h += '<div id="'+s.id+'-table" style="flex:0 0 320px;max-height:340px;overflow-y:auto"></div>';
+  h += '<div style="display:flex;gap:16px;align-items:stretch">';
+  h += '<div style="flex:1.5;min-width:0;position:relative;height:360px"><canvas id="'+s.id+'-chart"></canvas></div>';
+  h += '<div id="'+s.id+'-table" style="flex:1;max-height:360px;overflow-y:auto;min-width:0"></div>';
   h += '</div>';
   
   h += '</div>';
@@ -337,7 +337,7 @@ function renderCardChart(card){
     options: {
       responsive: true,
       maintainAspectRatio: true,
-      aspectRatio: 2.5,
+      aspectRatio: 2,
       plugins: {
         legend: {
           display: card.compareBranches.length > 0,
@@ -392,21 +392,21 @@ function renderDataTable(card, months){
   
   var h = '<table style="width:100%;border-collapse:collapse;font-size:11px">';
   h += '<thead><tr style="background:#f8f9fa">';
-  h += '<th style="padding:4px 6px;text-align:left;border-bottom:2px solid #e5e7eb;white-space:nowrap">机构</th>';
-  months.forEach(function(m){ h += '<th style="padding:4px 6px;text-align:right;border-bottom:2px solid #e5e7eb;white-space:nowrap">'+fmtMonth(m)+'</th>'; });
+  h += '<th style="padding:5px 8px;text-align:left;border-bottom:2px solid #e5e7eb;white-space:nowrap">机构</th>';
+  months.forEach(function(m){ h += '<th style="padding:5px 8px;text-align:right;border-bottom:2px solid #e5e7eb;white-space:nowrap">'+fmtMonth(m)+'</th>'; });
   h += '</tr></thead><tbody>';
   
   allOrgs.forEach(function(org, i){
     var isBranch = org.name !== '全国' && org.name !== '整体';
     var bg = org.isMain ? '#f0f7ff' : '';
     h += '<tr style="background:'+bg+'">';
-    h += '<td style="padding:3px 6px;border-bottom:1px solid #f0f0f0;font-weight:'+(org.isMain?'600':'400')+';color:'+COLORS[i%COLORS.length]+';white-space:nowrap">'+org.name+'</td>';
+    h += '<td style="padding:4px 8px;border-bottom:1px solid #f0f0f0;font-weight:'+(org.isMain?'600':'400')+';color:'+COLORS[i%COLORS.length]+';white-space:nowrap">'+org.name+'</td>';
     months.forEach(function(m){
       var v = getMetricValue(m, org.name, card.metric);
       var rank = isBranch ? getOrgRank(org.name, m, card.metric, direction) : null;
-      h += '<td style="padding:3px 6px;text-align:right;border-bottom:1px solid #f0f0f0;white-space:nowrap">';
+      h += '<td style="padding:4px 8px;text-align:right;border-bottom:1px solid #f0f0f0;white-space:nowrap">';
       h += fv(v);
-      if(rank) h += '<span style="color:#9ca3af;font-size:10px"> #'+rank+'</span>';
+      if(rank) h += '<span style="color:#9ca3af;font-size:11px"> #'+rank+'</span>';
       h += '</td>';
     });
     h += '</tr>';
