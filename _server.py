@@ -1,4 +1,4 @@
-import http.server, socketserver, os, sys, json, urllib.request, urllib.error, ssl, threading, time, hashlib
+﻿import http.server, socketserver, os, sys, json, urllib.request, urllib.error, ssl, threading, time, hashlib
 
 # 导入 AI Agent 引擎
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -383,6 +383,13 @@ class H(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self):
         if self.path == '/save-backup':
+            client_addr = self.client_address[0]
+            if client_addr not in ('127.0.0.1', '::1', 'localhost'):
+                self.send_response(403)
+                self._send_cors()
+                self.end_headers()
+                self.wfile.write(json.dumps({'error': 'forbidden: localhost only'}).encode())
+                return
             try:
                 length = int(self.headers.get('Content-Length', 0))
                 data = self.rfile.read(length)
@@ -437,18 +444,22 @@ class H(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(json.dumps({'ok': ok, 'aiEnabled': ok, 'model': ZHIPU_MODEL, 'hasKey': ok}).encode())
 
     # ══════════ JSON 文件持久化辅助 ══════════
+    _file_lock = threading.Lock()
+
     def _load_json(self, filename):
         path = os.path.join(DIR, filename)
-        try:
-            with open(path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            return {}
+        with self._file_lock:
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except (FileNotFoundError, json.JSONDecodeError):
+                return {}
 
     def _save_json(self, filename, data):
         path = os.path.join(DIR, filename)
-        with open(path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+        with self._file_lock:
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
 
     def _send_json(self, obj, code=200):
         self.send_response(code)
