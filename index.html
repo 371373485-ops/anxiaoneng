@@ -328,6 +328,12 @@ td.cmp-delta{transition:background .2s}
 
   /* ── Trend section ── */
   #trend-chart-wrap{height:220px}
+  #tab-trend > div[style*="display:flex;gap:16px"]{flex-direction:column !important}
+  #tab-trend > div[style*="display:flex;gap:16px"] > div{flex:1 !important;width:100% !important;max-height:none !important}
+  #tab-trend canvas{height:260px !important}
+  #tab-trend > div:first-child{flex-wrap:wrap}
+  #tab-trend > div:first-child select{font-size:11px}
+  #tab-trend > div:first-child button{font-size:11px;padding:4px 10px}
 
   /* ── Data management ── */
   .data-year h3{font-size:13px}
