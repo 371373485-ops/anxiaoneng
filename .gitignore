@@ -82,3 +82,8 @@ _diagnoses.json
 _payload_debug.json
 _remediation_tasks.json
 *.xlsx
+
+_check_enc2.mjs
+_dispatch.json
+_scan_leak.mjs
+index_restored.html
