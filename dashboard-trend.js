@@ -734,7 +734,7 @@ function generateAnalysis(card, months){
     
     // 组织文字
     var text = org.name + '：' + metricName + '从' + fv(first) + '变为' + fv(last);
-    if (Math.abs(changeAbs) >= 0.01) text += '（' + (changeAbs >= 0 ? '增加' : '减少') + Math.abs(changeDisplay).replace(/[+-]/g,'').trim() + '）';
+    if (Math.abs(changeAbs) >= 0.01) text += '（' + (changeAbs >= 0 ? '增加' : '减少') + (isPct ? Math.abs(changeAbs).toFixed(2) + '个百分点' : Math.abs(changePct).toFixed(1) + '%') + '）';
     text += '，' + trendDir + '。';
     text += '期间最高' + fv(maxVal) + '，最低' + fv(minVal) + '，平均' + fv(avgVal) + '，' + volatilityDesc + '。';
     // 月度最大波动
