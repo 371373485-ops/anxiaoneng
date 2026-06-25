@@ -407,9 +407,9 @@ function renderCardChart(card){
         backgroundColor: COLORS[i % COLORS.length] + (org.isMain ? 'cc' : '60'),
         borderColor: COLORS[i % COLORS.length],
         borderWidth: org.isMain ? 2 : 1,
-        borderRadius: 0,
-        barPercentage: 0.6,
-        categoryPercentage: 0.7
+        borderRadius: 4,
+        barPercentage: 0.8,
+        categoryPercentage: 0.8
       };
     });
     
