@@ -660,7 +660,7 @@ function generateAnalysis(card, months){
     if (changeMeasure <= 0) trendDir = '基本持平，无明显变化';
     else if (changeMeasure < (isPct ? 2 : 3)) trendDir = isImproving ? '略有增加/改善' : '略有减少/下降';
     else if (changeMeasure < (isPct ? 6 : 10)) trendDir = isImproving ? '有所改善' : '有所下降';
-    else trendDir = isImproving ? '明显' + (isPpt?'增加':'改善') : '明显' + (isPpt?'减少':'下降');
+    else trendDir = isImproving ? '明显' + (isPct?'增加':'改善') : '明显' + (isPct?'减少':'下降');
     
     // 波动描述（客观）
     var volatility = avgVal !== 0 ? (range / Math.abs(avgVal) * 100) : 0;
