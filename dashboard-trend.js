@@ -391,9 +391,9 @@ function renderCardChart(card){
         backgroundColor: COLORS[i % COLORS.length] + (org.isMain ? 'cc' : '60'),
         borderColor: COLORS[i % COLORS.length],
         borderWidth: org.isMain ? 2 : 1,
-        borderRadius: 4,
-        barPercentage: 0.7,
-        categoryPercentage: 0.8
+        borderRadius: 0,
+        barPercentage: 0.9,
+        categoryPercentage: 1.0
       };
     }
     return {
@@ -423,6 +423,7 @@ function renderCardChart(card){
       aspectRatio: 2.4,
       interaction: { mode: 'index', intersect: false },
       plugins: {
+        barVals: false,
         legend: {
           display: card.compareBranches.length > 0,
           position: 'bottom',
