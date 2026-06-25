@@ -36,6 +36,7 @@ if(!document.getElementById('trend-css')){
     '',
     '.trend-chart-table{display:flex;gap:16px;align-items:stretch}',
     '.trend-chart-wrap{flex:1.5;min-width:0;position:relative;height:360px}',
+    '.trend-chart-wrap canvas,.trend-chart-wrap div{width:100%!important;height:100%!important}',
     '.trend-table-wrap{flex:1;max-height:360px;overflow-y:auto;min-width:0}',
     '.trend-table-wrap table{width:100%;border-collapse:collapse;font-size:12px}',
     '.trend-table-wrap th{padding:5px 8px;text-align:left;border-bottom:2px solid #e5e7eb;white-space:nowrap;background:#f8f9fa}',
@@ -60,7 +61,7 @@ if(!document.getElementById('trend-css')){
     '  .trend-filters{gap:6px}',
     '  .trend-filters select,.trend-filters input{min-width:0;font-size:11px;padding:4px 6px}',
     '  .trend-chart-table{flex-direction:column;gap:12px}',
-    '  .trend-chart-wrap{height:240px;flex:none;width:100%}',
+    '  .trend-chart-wrap{height:260px;flex:none;width:100%}',
     '  .trend-table-wrap{max-height:none;overflow-x:auto;flex:none;width:100%}',
     '  .trend-table-wrap table{font-size:10px}',
     '  .trend-table-wrap th,.trend-table-wrap td{padding:3px 4px}',
@@ -336,10 +337,11 @@ function getOrgRank(orgName, month, metricKey, direction){
 }
 
 // ── 渲染图表 ──
+// ── 渲染图表（ECharts） ──
 function renderCardChart(card){
-  if(card.chart){ try{ card.chart.destroy(); }catch(e){} }
-  var canvas = document.getElementById(card.id + '-chart');
-  if(!canvas) return;
+  if(card.chart){ try{ card.chart.dispose(); }catch(e){} }
+  var dom = document.getElementById(card.id + '-chart');
+  if(!dom) return;
   
   var months = getMonths(card.preset, card.customStart, card.customEnd);
 
@@ -347,6 +349,7 @@ function renderCardChart(card){
   var unit = metricUnit(card.metric);
   var f = (App.FIELDS || []).find(function(x){ return x.k === card.metric; }) || {};
   var direction = f.rd || 'desc';
+  var metricName = f.l || card.metric;
   var allOrgs = [{name: card.branch, isMain: true}].concat(
     card.compareBranches.map(function(bn){ return {name: bn, isMain: false}; })
   );
@@ -356,7 +359,7 @@ function renderCardChart(card){
       return v != null && !isNaN(v);
     });
   });
-  if(activeMonths.length === 0) activeMonths = months; // 全空时保留原列表（显示无数据提示）
+  if(activeMonths.length === 0) activeMonths = months;
   months = activeMonths;
   var isPct = unit === '%';
   
@@ -364,59 +367,118 @@ function renderCardChart(card){
     if(v == null) return '无数据';
     return isPct ? (v*100).toFixed(2)+'%' : v.toFixed(2);
   }
+  function fmtAxisVal(v){
+    return isPct ? (v*100).toFixed(0)+'%' : v.toFixed(0);
+  }
   
-  var datasets = allOrgs.map(function(org, i){
+  // 构建系列数据
+  var totalBranches = getBranchesInRegion('全国').length;
+  var series = allOrgs.map(function(org, i){
     var data = months.map(function(m){ return getMetricValue(m, org.name, card.metric); });
     var ranks = months.map(function(m){ return getOrgRank(org.name, m, card.metric, direction); });
+    var hasRank = org.name !== '全国' && org.name !== '整体';
+    
     return {
-      label: org.name,
+      name: org.name,
+      type: 'line',
       data: data,
+      smooth: true,
+      symbol: 'circle',
+      symbolSize: org.isMain ? 7 : 5,
+      lineStyle: { width: org.isMain ? 2.5 : 1.5, color: COLORS[i % COLORS.length] },
+      itemStyle: { color: COLORS[i % COLORS.length] },
+      areaStyle: (org.isMain && card.compareBranches.length === 0) ? {
+        color: {
+          type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [
+            { offset: 0, color: COLORS[i%COLORS.length]+'30' },
+            { offset: 1, color: COLORS[i%COLORS.length]+'05' }
+          ]
+        }
+      } : undefined,
+      emphasis: { focus: 'series', scale: true, scaleSize: 6 },
       _ranks: ranks,
-      _hasRank: org.name !== '全国' && org.name !== '整体',
-      borderColor: COLORS[i % COLORS.length],
-      backgroundColor: org.isMain ? COLORS[i % COLORS.length] + '15' : 'transparent',
-      fill: org.isMain && card.compareBranches.length === 0,
-      tension: 0.3,
-      pointRadius: 4,
-      pointHoverRadius: 7,
-      spanGaps: true,
-      borderWidth: org.isMain ? 2.5 : 1.5
+      _hasRank: hasRank
     };
   });
   
-  card.chart = new Chart(canvas, {
-    type: 'line',
-    data: { labels: months.map(fmtMonth), datasets: datasets },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      aspectRatio: 2,
-      plugins: {
-        legend: {
-          display: card.compareBranches.length > 0,
-          position: 'bottom',
-          labels: { font: { size: 11 }, boxWidth: 12 }
-        },
-        tooltip: {
-          callbacks: {
-            label: function(ctx){
-              var v = ctx.parsed.y;
-              var label = ctx.dataset.label + ': ' + fmtVal(v);
-              if(ctx.dataset._hasRank && v != null){
-                var rank = ctx.dataset._ranks[ctx.dataIndex];
-                if(rank){
-                  var total = getBranchesInRegion('全国').length;
-                  label += '  (第' + rank + '/' + total + '名)';
-                }
-              }
-              return label;
+  var showLegend = card.compareBranches.length > 0;
+  
+  var option = {
+    backgroundColor: 'transparent',
+    grid: {
+      top: showLegend ? 45 : 20,
+      right: 15,
+      bottom: 30,
+      left: isPct ? 55 : 50,
+      containLabel: false
+    },
+    tooltip: {
+      trigger: 'axis',
+      confine: true,
+      backgroundColor: 'rgba(255,255,255,0.96)',
+      borderColor: '#e5e7eb',
+      borderWidth: 1,
+      textStyle: { fontSize: 12, color: '#374151' },
+      extraCssText: 'box-shadow: 0 4px 12px rgba(0,0,0,0.1);border-radius:8px;',
+      axisPointer: { type: 'cross', crossStyle: { color: '#9ca3af40' } },
+      formatter: function(params){
+        if(!params || !params.length) return '';
+        var monthLabel = params[0].axisValue;
+        var h = '<div style="font-weight:600;margin-bottom:6px;color:#1e3a5f">' + monthLabel + '</div>';
+        params.forEach(function(p){
+          var val = p.data != null ? fmtVal(p.data) : '无数据';
+          h += '<div style="display:flex;justify-content:space-between;gap:16px;margin:2px 0">';
+          h += '<span style="color:' + p.color + '"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + p.color + ';margin-right:6px"></span>' + p.seriesName + '</span>';
+          h += '<span style="font-weight:600">' + val + '</span>';
+          if(p.seriesData && p.seriesData._hasRank && p.dataIndex !== undefined){
+            var rankInfo = p.seriesData._ranks[p.dataIndex];
+            if(rankInfo){
+              h += '<span style="color:#9ca3af;font-size:11px">第' + rankInfo + '/' + totalBranches + '名</span>';
             }
           }
-        }
-      },
-      scales: {
-        y: { ticks: { callback: function(v){ return isPct ? (v*100).toFixed(0)+'%' : v.toFixed(0); } } }
+          h += '</div>';
+        });
+        return h;
       }
+    },
+    legend: showLegend ? {
+      top: 5,
+      textStyle: { fontSize: 11, color: '#6b7280' },
+      itemWidth: 14, itemHeight: 10,
+      icon: 'roundRect'
+    } : undefined,
+    xAxis: {
+      type: 'category',
+      data: months.map(fmtMonth),
+      boundaryGap: false,
+      axisLine: { lineStyle: { color: '#e5e7eb' } },
+      axisTick: { show: false },
+      axisLabel: { fontSize: 11, color: '#6b7280', margin: 10 }
+    },
+    yAxis: {
+      type: 'value',
+      splitLine: { lineStyle: { color: '#f0f0f0', type: 'dashed' } },
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: {
+        fontSize: 11, color: '#6b7280',
+        formatter: function(v){ return fmtAxisVal(v); }
+      }
+    },
+    dataZoom: months.length > 8 ? [{
+      type: 'inside', start: 100 - Math.round(800/months.length), end: 100
+    }] : [],
+    series: series
+  };
+  
+  card.chart = echarts.init(dom, null, { renderer: 'canvas' });
+  card.chart.setOption(option);
+  
+  // 响应式 resize
+  window.addEventListener('resize', function(){
+    if(card.chart && !card.chart.isDisposed()){
+      try{ card.chart.resize(); }catch(e){}
     }
   });
   
