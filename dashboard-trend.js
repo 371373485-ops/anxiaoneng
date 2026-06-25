@@ -22,11 +22,11 @@ if(!document.getElementById('trend-css')){
     '.tf-group select:focus,.tf-group input:focus{border-color:#3b82f6;outline:none}',
     '.tf-hint{font-size:11px;color:#9ca3af;margin-top:3px}',
     '.tf-group select[multiple]{min-height:140px;resize:vertical;overflow-y:auto}',
-    '.tag-select{border:1px solid #d1d5db;border-radius:6px;padding:6px;max-height:160px;overflow-y:auto;background:#fff;display:flex;flex-wrap:wrap;gap:4px;align-content:flex-start}',
-'.tag-item{display:inline-block;padding:3px 10px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;cursor:pointer;user-select:none;transition:.12s;background:#f8fafc;color:#475569;line-height:1.4}',
-'.tag-item:hover{border-color:#3b82f6;background:#eff6ff}',
-'.tag-item.selected{background:#0f3460;color:#fff;border-color:#0f3460}',
-'.tag-group-title{width:100%;font-size:11px;font-weight:600;color:#94a3b8;padding:4px 0 2px;border-bottom:1px solid #f1f5f9;margin-top:2px}',
+    '.tag-select{border:1px solid #e2e8f0;border-radius:7px;padding:8px;max-height:200px;overflow-y:auto;background:#fff;display:flex;flex-wrap:wrap;gap:5px;align-content:flex-start}',
+'.tag-item{display:inline-flex;align-items:center;padding:4px 10px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px;cursor:pointer;user-select:none;transition:.15s;background:#fff;color:#475569;line-height:1.3;white-space:nowrap}',
+'.tag-item:hover{border-color:#93c5fd;background:#eff6ff;transform:translateY(-1px)}',
+'.tag-item.selected{background:linear-gradient(135deg,#0f3460,#1a1a2e);color:#fff;border-color:#0f3460;box-shadow:0 2px 4px rgba(15,52,96,.25)}',
+'.tag-group-title{width:100%;font-size:11px;font-weight:600;color:#64748b;padding:6px 0 4px;border-bottom:1px solid #f1f5f9;margin-top:4px;letter-spacing:.3px;text-transform:uppercase}',
 '.trend-gen-btn{margin-top:4px;padding:8px 28px;background:#0f3460;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;transition:.2s}',
     '.trend-gen-btn:hover{background:#1a1a2e}',
     '.trend-card{background:var(--card);border-radius:8px;padding:16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)}',
@@ -46,7 +46,7 @@ if(!document.getElementById('trend-css')){
     '.trend-compare-tags .ct-tag{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:11px;color:#fff}',
     '.trend-compare-tags .ct-tag button{border:none;background:none;cursor:pointer;color:#fff;font-size:13px;padding:0;line-height:1}',
     '.trend-chart-table{display:flex;gap:16px;align-items:stretch}',
-    '.trend-chart-wrap{flex:1.5;min-width:0;position:relative;height:380px}',
+    '.trend-chart-wrap{flex:1.5;min-width:0;position:relative;height:420px}',
     '.trend-chart-wrap canvas,.trend-chart-wrap div{width:100%!important;height:100%!important}',
     '.trend-table-wrap{flex:1;max-height:360px;overflow-y:auto;min-width:0}',
     '.trend-table-wrap table{width:100%;border-collapse:collapse;font-size:12px}',
@@ -439,16 +439,18 @@ function renderCardChart(card){
       type: 'bar',
       data: { labels: months.map(fmtMonth), datasets: barDatasets },
       options: {
+        devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+        devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
         responsive: true,
         maintainAspectRatio: true,
-        aspectRatio: 1.8,
+        aspectRatio: 1.6,
         interaction: { mode: 'index', intersect: false },
         plugins: {
           barVals: false,
           legend: {
             display: card.compareBranches.length > 0,
             position: 'bottom',
-            labels: { font: { size: 11 }, boxWidth: 12, padding: 12 }
+            labels: { font: { size: 11 }, boxWidth: 14, padding: 20, usePointStyle: true }
           },
           tooltip: {
             backgroundColor: 'rgba(255,255,255,0.96)',
