@@ -191,7 +191,7 @@ function renderCards(){
   var fieldGroups = {};
   fields.forEach(function(f){ if(!fieldGroups[f.g]) fieldGroups[f.g] = []; fieldGroups[f.g].push(f); });
   var branchNames = getBranchesInRegion('全国');
-  var regionNames = ['第一责任区','第二责任区','第三责任区','第四责任区'];
+  var regionNames = App.REGIONS;
   var allOrgs = ['全国'].concat(regionNames, branchNames);
   
   var h = '<div class="trend-toolbar">';
@@ -202,7 +202,7 @@ function renderCards(){
   h += '<div class="trend-batch-row" style="align-items:stretch">';
   
   // 分析机构 — 按类别分组
-  var regionNames = ['第一责任区','第二责任区','第三责任区','第四责任区'];
+  var regionNames = App.REGIONS;
   h += '<div class="tf-group"><div class="tf-collapse-head" onclick="this.classList.toggle(\'open\');this.nextElementSibling.style.display=this.classList.contains(\'open\')?\'block\':\'none\'">分析机构 <span class="tf-count" id="branch-count">0</span></div>';
   h += '<div class="tag-select" id="batch-branch-box" data-name="branch" style="display:none">';
   // 全国
@@ -293,7 +293,7 @@ function renderCardHTML(card, fieldGroups, branchNames, allMonths){
   h += '<div class="tf-group"><label>机构</label>';
   h += '<select onchange="Trend.updateCard(\''+s.id+'\',\'branch\',this.value)">';
   h += '<option value="全国"'+(s.branch==='全国'?' selected':'')+'>全国汇总</option>';
-  ['第一责任区','第二责任区','第三责任区','第四责任区'].forEach(function(r){
+  App.REGIONS.forEach(function(r){
     h += '<option value="'+r+'"'+(s.branch===r?' selected':'')+'>'+r+'</option>';
   });
   branchNames.forEach(function(bn){
@@ -319,7 +319,7 @@ function renderCardHTML(card, fieldGroups, branchNames, allMonths){
   h += '<div class="tf-group"><label>+ 对比机构</label>';
   h += '<select onchange="if(this.value){Trend.addCompare(\''+s.id+'\',this.value);this.value=\'\'}">';
   h += '<option value="">添加对比...</option>';
-  ['全国','第一责任区','第二责任区','第三责任区','第四责任区'].forEach(function(r){
+  ['全国'].concat(App.REGIONS).forEach(function(r){
     if(r !== s.branch) h += '<option value="'+r+'">'+r+'</option>';
   });
   branchNames.forEach(function(bn){
@@ -373,7 +373,7 @@ function getRegionRank(regionName, month, metricKey, direction){
   var merged = (App.ALL_DATA && App.ALL_DATA._merged) || {};
   var mdata = merged[month];
   if(!mdata) return null;
-  var regions = ['第一责任区','第二责任区','第三责任区','第四责任区'];
+  var regions = App.REGIONS;
   var allVals = [];
   regions.forEach(function(rn){
     var rd = mdata.regions && mdata.regions[rn];
@@ -392,7 +392,7 @@ function getOrgRank(orgName, month, metricKey, direction){
   if(orgName === '全国' || orgName === '整体') return null;
   var branchNames = getBranchesInRegion('全国');
   if(branchNames.indexOf(orgName) >= 0) return getBranchRank(orgName, month, metricKey, direction);
-  var regionNames = ['第一责任区','第二责任区','第三责任区','第四责任区'];
+  var regionNames = App.REGIONS;
   if(regionNames.indexOf(orgName) >= 0) return getRegionRank(orgName, month, metricKey, direction);
   return null;
 }
@@ -440,7 +440,7 @@ function renderCardChart(card){
   }
   
   var totalBranches = getBranchesInRegion('全国').length;
-  var regionNames = ['第一责任区','第二责任区','第三责任区','第四责任区'];
+  var regionNames = App.REGIONS;
   
   if(chartType === 'bar'){
     // ── Chart.js 柱状图（与折线图同配色） ──
@@ -466,12 +466,10 @@ function renderCardChart(card){
       data: { labels: months.map(fmtMonth), datasets: barDatasets },
       options: {
         devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
-        devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
         responsive: true,
         maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
         plugins: {
-          barVals: false,
           legend: {
             display: card.compareBranches.length > 0,
             position: 'bottom',
@@ -539,7 +537,6 @@ function renderCardChart(card){
         maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
         plugins: {
-          barVals: false,
           legend: {
             display: card.compareBranches.length > 0,
             position: 'bottom',
@@ -705,7 +702,7 @@ function generateAnalysis(card, months){
     // 排名变化
     var rankText = '';
     var isBranch = org.name !== '全国' && org.name !== '整体';
-    var isRegion = ['第一责任区','第二责任区','第三责任区','第四责任区'].indexOf(org.name) >= 0;
+    var isRegion = App.REGIONS.indexOf(org.name) >= 0;
     var total = isRegion ? 4 : getBranchesInRegion('全国').length;
     if(isBranch){
       var firstRank = getOrgRank(org.name, months[0], card.metric, direction);
