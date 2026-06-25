@@ -28,6 +28,10 @@ if(!document.getElementById('trend-css')){
 '.trend-org-grid label:hover{color:#2563eb}',
 '.trend-gen-btn{padding:8px 24px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap;align-self:flex-start}',
 '.trend-gen-btn:hover{background:#1d4ed8}',
+  '.trend-chart-table{display:flex;gap:16px;align-items:stretch}',
+  '.trend-chart-wrap{flex:1.5;min-width:0;position:relative;height:380px}',
+  '.trend-chart-wrap canvas,.trend-chart-wrap div{width:100%!important;height:100%!important}',
+  '.trend-table-wrap{flex:1;max-height:360px;overflow-y:auto;min-width:0}',
 
   '.trend-analysis-box{margin-top:12px;padding:12px 14px;background:#f8f9fa;border-radius:8px;border-left:3px solid #2563eb}',
   '.trend-analysis-title{font-size:13px;font-weight:600;margin-bottom:8px;color:#1e3a5f}',
@@ -418,7 +422,7 @@ function renderCardChart(card){
       options: {
         responsive: true,
         maintainAspectRatio: true,
-        aspectRatio: 2.4,
+        aspectRatio: 1.8,
         interaction: { mode: 'index', intersect: false },
         plugins: {
           barVals: false,
@@ -487,7 +491,7 @@ function renderCardChart(card){
       options: {
         responsive: true,
         maintainAspectRatio: true,
-        aspectRatio: 2.4,
+        aspectRatio: 1.8,
         interaction: { mode: 'index', intersect: false },
         plugins: {
           barVals: false,
