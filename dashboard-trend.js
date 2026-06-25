@@ -35,7 +35,7 @@ if(!document.getElementById('trend-css')){
     '.trend-compare-tags .ct-tag button{border:none;background:none;cursor:pointer;color:#fff;font-size:12px;padding:0}',
     '',
     '.trend-chart-table{display:flex;gap:16px;align-items:stretch}',
-    '.trend-chart-wrap{flex:1.5;min-width:0;position:relative;height:360px}',
+    '.trend-chart-wrap{flex:1.5;min-width:0;position:relative;height:380px}',
     '.trend-chart-wrap canvas,.trend-chart-wrap div{width:100%!important;height:100%!important}',
     '.trend-table-wrap{flex:1;max-height:360px;overflow-y:auto;min-width:0}',
     '.trend-table-wrap table{width:100%;border-collapse:collapse;font-size:12px}',
@@ -415,35 +415,42 @@ function renderCardChart(card){
   
   var option = {
     backgroundColor: 'transparent',
+    color: COLORS,
     grid: {
-      top: showLegend ? 45 : 20,
-      right: 15,
-      bottom: 30,
-      left: isPct ? 55 : 50,
+      top: showLegend ? 48 : 18,
+      right: 20,
+      bottom: 28,
+      left: isPct ? 58 : 52,
       containLabel: false
     },
     tooltip: {
       trigger: 'axis',
       confine: true,
-      backgroundColor: 'rgba(255,255,255,0.96)',
-      borderColor: '#e5e7eb',
+      backgroundColor: '#fff',
+      borderColor: '#e2e8f0',
       borderWidth: 1,
+      borderRadius: 8,
+      padding: [12, 16],
       textStyle: { fontSize: 12, color: '#374151' },
-      extraCssText: 'box-shadow: 0 4px 12px rgba(0,0,0,0.1);border-radius:8px;',
-      axisPointer: { type: 'cross', crossStyle: { color: '#9ca3af40' } },
+      extraCssText: 'box-shadow: 0 4px 20px rgba(0,0,0,0.08);',
+      axisPointer: {
+        type: 'cross',
+        lineStyle: { color: '#94a3b8', width: 1, type: 'dashed' },
+        crossStyle: { color: '#94a3b8', width: 1, type: 'dashed' }
+      },
       formatter: function(params){
         if(!params || !params.length) return '';
         var monthLabel = params[0].axisValue;
-        var h = '<div style="font-weight:600;margin-bottom:6px;color:#1e3a5f">' + monthLabel + '</div>';
+        var h = '<div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#1e293b;padding-bottom:6px;border-bottom:1px solid #e5e7eb">' + monthLabel + '</div>';
         params.forEach(function(p){
           var val = p.data != null ? fmtVal(p.data) : '无数据';
-          h += '<div style="display:flex;justify-content:space-between;gap:16px;margin:2px 0">';
-          h += '<span style="color:' + p.color + '"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + p.color + ';margin-right:6px"></span>' + p.seriesName + '</span>';
-          h += '<span style="font-weight:600">' + val + '</span>';
+          h += '<div style="display:flex;justify-content:space-between;align-items:center;gap:24px;margin:4px 0">';
+          h += '<span style="color:' + p.color + ';font-weight:500"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + p.color + ';margin-right:8px"></span>' + p.seriesName + '</span>';
+          h += '<span style="font-weight:700;font-size:13px">' + val + '</span>';
           if(p.seriesData && p.seriesData._hasRank && p.dataIndex !== undefined){
             var rankInfo = p.seriesData._ranks[p.dataIndex];
             if(rankInfo){
-              h += '<span style="color:#9ca3af;font-size:11px">第' + rankInfo + '/' + totalBranches + '名</span>';
+              h += '<span style="color:#9ca3af;font-size:11px;background:#f3f4f6;padding:1px 6px;border-radius:4px">第' + rankInfo + '/' + totalBranches + '名</span>';
             }
           }
           h += '</div>';
@@ -452,38 +459,41 @@ function renderCardChart(card){
       }
     },
     legend: showLegend ? {
-      top: 5,
-      textStyle: { fontSize: 11, color: '#6b7280' },
-      itemWidth: 14, itemHeight: 10,
-      icon: 'roundRect'
+      top: 4,
+      textStyle: { fontSize: 11, color: '#64748b' },
+      itemWidth: 14, itemHeight: 3,
+      icon: 'roundRect',
+      itemGap: 16
     } : undefined,
     xAxis: {
       type: 'category',
       data: months.map(fmtMonth),
       boundaryGap: false,
-      axisLine: { lineStyle: { color: '#e5e7eb' } },
+      axisLine: { lineStyle: { color: '#e2e8f0', width: 1.5 } },
       axisTick: { show: false },
-      axisLabel: { fontSize: 11, color: '#6b7280', margin: 10 }
+      axisLabel: { fontSize: 12, color: '#64748b', margin: 12, fontFamily: '-apple-system,sans-serif' }
     },
     yAxis: {
       type: 'value',
       min: yMin,
       max: yMax,
-      splitLine: { lineStyle: { color: '#f0f0f0', type: 'dashed' } },
+      splitNumber: 5,
+      splitLine: { lineStyle: { color: '#f1f5f9', width: 1 } },
       axisLine: { show: false },
       axisTick: { show: false },
       axisLabel: {
-        fontSize: 11, color: '#6b7280',
+        fontSize: 12, color: '#64748b', fontFamily: '-apple-system,sans-serif',
         formatter: function(v){ return fmtAxisVal(v); }
       }
     },
     dataZoom: months.length > 8 ? [{
-      type: 'inside', start: 100 - Math.round(800/months.length), end: 100
+      type: 'inside', start: 100 - Math.round(800/months.length), end: 100,
+      zoomOnMouseWheel: true, moveOnMouseMove: true
     }] : [],
     series: series
-  };
+  };;
   
-  card.chart = echarts.init(dom, null, { renderer: 'canvas' });
+  card.chart = echarts.init(dom, null, { renderer: 'canvas', devicePixelRatio: Math.min(window.devicePixelRatio || 2, 3) });
   card.chart.setOption(option);
   
   // 响应式 resize
