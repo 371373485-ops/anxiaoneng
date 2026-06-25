@@ -32,7 +32,7 @@ if(!document.getElementById('trend-css')){
 '.tag-item{display:inline-flex;align-items:center;justify-content:center;padding:5px 8px;border:1px solid #d9dfe8;border-radius:6px;font-size:13px;cursor:pointer;user-select:none;transition:.15s;background:#fff;color:#475569;line-height:1.4;text-align:center}',
 '.tag-item:hover{border-color:#93c5fd;background:#f0f7ff;box-shadow:0 1px 3px rgba(59,130,246,.15)}',
 '.tag-item.selected{background:linear-gradient(135deg,#0f3460,#1a1a2e);color:#fff;border-color:#0f3460;box-shadow:0 2px 6px rgba(15,52,96,.35)}',
-'.tag-group-title{grid-column:1/-1;font-size:11px;font-weight:600;color:#64748b;padding:6px 0 4px;border-bottom:1px solid #eef2f7;margin-top:4px;letter-spacing:.5px;text-transform:uppercase}',
+'.tag-group-title{grid-column:1/-1;font-size:12px;font-weight:700;color:#0f3460;padding:8px 4px 3px;border-bottom:2px solid #e2e8f0;margin-top:6px;letter-spacing:.5px;text-transform:none;background:#f8fafc;border-radius:4px}',
 '.trend-gen-btn{margin-top:4px;padding:8px 28px;background:#0f3460;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;transition:.2s}',
     '.trend-gen-btn:hover{background:#1a1a2e}',
     '.trend-card{background:var(--card);border-radius:8px;padding:16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)}',
@@ -201,16 +201,30 @@ function renderCards(){
   // 行1：三列并排 — 分析机构 | 对比机构 | 分析指标
   h += '<div class="trend-batch-row" style="align-items:stretch">';
   
-  // 分析机构
+  // 分析机构 — 按类别分组
+  var regionNames = ['第一责任区','第二责任区','第三责任区','第四责任区'];
   h += '<div class="tf-group"><div class="tf-collapse-head" onclick="this.classList.toggle(\'open\');this.nextElementSibling.style.display=this.classList.contains(\'open\')?\'block\':\'none\'">分析机构 <span class="tf-count" id="branch-count">0</span></div>';
   h += '<div class="tag-select" id="batch-branch-box" data-name="branch" style="display:none">';
-  allOrgs.forEach(function(o){ h += '<span class="tag-item" data-val="'+o+'" onclick="Trend.toggleTag(this)">'+o+'</span>'; });
+  // 全国
+  h += '<div class="tag-group-title">全国</div>';
+  h += '<span class="tag-item" data-val="全国" onclick="Trend.toggleTag(this)">全国</span>';
+  // 责任区
+  h += '<div class="tag-group-title">责任区</div>';
+  regionNames.forEach(function(r){ h += '<span class="tag-item" data-val="'+r+'" onclick="Trend.toggleTag(this)">'+r+'</span>'; });
+  // 分公司
+  h += '<div class="tag-group-title">分公司</div>';
+  branchNames.forEach(function(b){ if(b!=='全国' && regionNames.indexOf(b)<0) h += '<span class="tag-item" data-val="'+b+'" onclick="Trend.toggleTag(this)">'+b+'</span>'; });
   h += '</div></div>';
   
-  // 对比机构
+  // 对比机构 — 按类别分组
   h += '<div class="tf-group"><div class="tf-collapse-head" onclick="this.classList.toggle(\'open\');this.nextElementSibling.style.display=this.classList.contains(\'open\')?\'block\':\'none\'">对比机构 <span class="tf-count" id="compare-count">0</span></div>';
   h += '<div class="tag-select" id="batch-compare-box" data-name="compare" style="display:none">';
-  allOrgs.forEach(function(o){ h += '<span class="tag-item" data-val="'+o+'" onclick="Trend.toggleTag(this)">'+o+'</span>'; });
+  h += '<div class="tag-group-title">全国</div>';
+  h += '<span class="tag-item" data-val="全国" onclick="Trend.toggleTag(this)">全国</span>';
+  h += '<div class="tag-group-title">责任区</div>';
+  regionNames.forEach(function(r){ h += '<span class="tag-item" data-val="'+r+'" onclick="Trend.toggleTag(this)">'+r+'</span>'; });
+  h += '<div class="tag-group-title">分公司</div>';
+  branchNames.forEach(function(b){ if(b!=='全国' && regionNames.indexOf(b)<0) h += '<span class="tag-item" data-val="'+b+'" onclick="Trend.toggleTag(this)">'+b+'</span>'; });
   h += '</div></div>';
   
   // 分析指标
