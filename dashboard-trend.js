@@ -239,6 +239,9 @@ function renderCards(){
   h += '</div>'; // end row1
   
   // 行2：时间范围 + 生成按钮
+  var availMonths = getAvailableMonths();
+  var dataMin = availMonths.length ? availMonths[0] : '';
+  var dataMax = availMonths.length ? availMonths[availMonths.length-1] : '';
   h += '<div class="trend-batch-row" style="align-items:center;margin-top:4px">';
   h += '<div class="tf-group" style="flex:0 0 auto;min-width:160px"><label>时间范围</label><select id="batch-preset" onchange="document.getElementById(\'batch-custom-wrap\').style.display=this.value===\'custom\'?\'flex\':\'none\'">';
   h += '<option value="recent3">近3月</option>';
@@ -248,7 +251,7 @@ function renderCards(){
   h += '<option value="yoy">年度同比</option>';
   h += '<option value="custom">自定义</option>';
   h += '</select></div>';
-  h += '<div id="batch-custom-wrap" class="tf-group" style="display:none;flex:0 0 auto;flex-direction:row;gap:4px;align-items:center"><input type="month" id="batch-start"><span style="font-size:11px">至</span><input type="month" id="batch-end"></div>';
+  h += '<div id="batch-custom-wrap" class="tf-group" style="display:none;flex:0 0 auto;flex-direction:row;gap:4px;align-items:center"><input type="month" id="batch-start" min="'+dataMin+'" max="'+dataMax+'"><span style="font-size:11px">至</span><input type="month" id="batch-end" min="'+dataMin+'" max="'+dataMax+'"></div>';
   h += '<button class="trend-gen-btn" onclick="Trend.generate()">⚙️ 生成趋势分析</button>';
   h += '</div>';
   
