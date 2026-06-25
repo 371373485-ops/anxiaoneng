@@ -159,16 +159,18 @@ function addCard(metricKey){
     customStart: '',
     customEnd: '',
     compareBranches: [],
+    chartType: 'line',
     chart: null
   };
   cards.push(card);
+  saveCardsState();
   renderCards();
 }
 
 function removeCard(id){
   cards = cards.filter(function(c){ return c.id !== id; });
   if(cards.length === 0) addCard();
-  else renderCards();
+  else { saveCardsState(); renderCards(); }
 }
 
 // ── 渲染所有卡片 ──
@@ -724,16 +726,50 @@ function renderAnalysis(card, months){
 
 // ══════════ 操作 API ══════════
 
+// ── 持久化卡片状态 ──
+var TREND_STORAGE_KEY = 'trend_cards_state';
+
+function saveCardsState(){
+  try{
+    var state = cards.map(function(c){
+      return {
+        id: c.id, metric: c.metric, branch: c.branch,
+        preset: c.preset, customStart: c.customStart, customEnd: c.customEnd,
+        compareBranches: c.compareBranches, chartType: c.chartType || 'line'
+      };
+    });
+    localStorage.setItem(TREND_STORAGE_KEY, JSON.stringify(state));
+  }catch(e){}
+}
+
+function loadCardsState(){
+  try{
+    var s = localStorage.getItem(TREND_STORAGE_KEY);
+    if(!s) return false;
+    var state = JSON.parse(s);
+    if(!state || !state.length) return false;
+    cards = state.map(function(c){
+      c.chart = null; // chart 实例不持久化
+      return c;
+    });
+    cardCounter = cards.length;
+    return true;
+  }catch(e){ return false; }
+}
+
 window.Trend = {
   render: function(){
-    if(cards.length === 0) addCard();
-    else renderCards();
+    if(cards.length === 0){
+      if(!loadCardsState()) addCard();
+      else renderCards();
+    } else renderCards();
   },
   addCard: function(metricKey){ addCard(metricKey); },
   setChartType: function(id, type){
     var card = cards.find(function(c){ return c.id === id; });
     if(!card) return;
     card.chartType = type;
+    saveCardsState();
     renderCards();
   },
   removeCard: function(id){ removeCard(id); },
@@ -741,6 +777,7 @@ window.Trend = {
     var card = cards.find(function(c){ return c.id === id; });
     if(!card) return;
     card[field] = value;
+    saveCardsState();
     renderCards();
   },
   addCompare: function(id, branchName){
@@ -749,6 +786,7 @@ window.Trend = {
     if(card.compareBranches.length >= 9) return;
     if(card.compareBranches.indexOf(branchName) < 0 && branchName !== card.branch){
       card.compareBranches.push(branchName);
+      saveCardsState();
       renderCards();
     }
   },
@@ -756,6 +794,7 @@ window.Trend = {
     var card = cards.find(function(c){ return c.id === id; });
     if(!card) return;
     card.compareBranches = card.compareBranches.filter(function(b){ return b !== branchName; });
+    saveCardsState();
     renderCards();
   }
 };
