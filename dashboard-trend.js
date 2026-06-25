@@ -22,17 +22,17 @@ if(!document.getElementById('trend-css')){
     '.tf-group select:focus,.tf-group input:focus{border-color:#3b82f6;outline:none}',
     '.tf-hint{font-size:11px;color:#9ca3af;margin-top:3px}',
     '.tf-group select[multiple]{min-height:140px;resize:vertical;overflow-y:auto}',
-    '.tf-collapse-head{font-size:12px;font-weight:600;color:#374151;padding:8px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;transition:.15s}',
-'.tf-collapse-head:hover{background:#f1f5f9;border-color:#cbd5e1}',
+    '.tf-collapse-head{font-size:13px;font-weight:600;color:#334155;padding:10px 14px;background:#fafbfc;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;transition:.15s;margin-bottom:4px}',
+'.tf-collapse-head:hover{background:#f1f5f9;border-color:#b8c9d9}',
 '.tf-collapse-head::after{content:\'▶\';font-size:9px;color:#94a3b8;transition:.15s}',
 '.tf-collapse-head.open::after{transform:rotate(90deg)}',
 '.tf-count{font-size:11px;color:#0f3460;font-weight:700;margin-left:4px}',
 
-'.tag-select{border:1px solid #e2e8f0;border-radius:7px;padding:8px;max-height:200px;overflow-y:auto;background:#fff;display:flex;flex-wrap:wrap;gap:5px;align-content:flex-start}',
-'.tag-item{display:inline-flex;align-items:center;padding:4px 10px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px;cursor:pointer;user-select:none;transition:.15s;background:#fff;color:#475569;line-height:1.3;white-space:nowrap}',
-'.tag-item:hover{border-color:#93c5fd;background:#eff6ff;transform:translateY(-1px)}',
-'.tag-item.selected{background:linear-gradient(135deg,#0f3460,#1a1a2e);color:#fff;border-color:#0f3460;box-shadow:0 2px 4px rgba(15,52,96,.25)}',
-'.tag-group-title{width:100%;font-size:11px;font-weight:600;color:#64748b;padding:6px 0 4px;border-bottom:1px solid #f1f5f9;margin-top:4px;letter-spacing:.3px;text-transform:uppercase}',
+'.tag-select{border:1px solid #e2e8f0;border-radius:7px;padding:10px 12px;max-height:240px;overflow-y:auto;background:#fff;display:flex;flex-wrap:wrap;gap:6px 10px;align-content:flex-start}',
+'.tag-item{display:inline-flex;align-items:center;padding:5px 14px;border:1px solid #d9dfe8;border-radius:6px;font-size:13px;cursor:pointer;user-select:none;transition:.15s;background:#fff;color:#475569;line-height:1.4;white-space:nowrap}',
+'.tag-item:hover{border-color:#93c5fd;background:#f0f7ff;box-shadow:0 1px 3px rgba(59,130,246,.15)}',
+'.tag-item.selected{background:linear-gradient(135deg,#0f3460,#1a1a2e);color:#fff;border-color:#0f3460;box-shadow:0 2px 6px rgba(15,52,96,.35)}',
+'.tag-group-title{width:100%;font-size:12px;font-weight:600;color:#64748b;padding:8px 0 5px;border-bottom:1px solid #eef2f7;margin-top:6px;letter-spacing:.5px;text-transform:uppercase}',
 '.trend-gen-btn{margin-top:4px;padding:8px 28px;background:#0f3460;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;transition:.2s}',
     '.trend-gen-btn:hover{background:#1a1a2e}',
     '.trend-card{background:var(--card);border-radius:8px;padding:16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)}',
@@ -657,10 +657,10 @@ function generateAnalysis(card, months){
     
     // 趋势方向（客观描述）
     var trendDir;
-    if (changeMeasure < (isPct ? 1 : 2)) trendDir = '基本持平，无明显变化';
-    else if (changeMeasure < (isPct ? 3 : 5)) trendDir = isImproving ? '略有改善' : '略有下降';
-    else if (changeMeasure < (isPct ? 8 : 15)) trendDir = isImproving ? '有所改善' : '有所下降';
-    else trendDir = isImproving ? '明显改善' : '明显下降';
+    if (changeMeasure <= 0) trendDir = '基本持平，无明显变化';
+    else if (changeMeasure < (isPct ? 2 : 3)) trendDir = isImproving ? '略有增加/改善' : '略有减少/下降';
+    else if (changeMeasure < (isPct ? 6 : 10)) trendDir = isImproving ? '有所改善' : '有所下降';
+    else trendDir = isImproving ? '明显' + (isPpt?'增加':'改善') : '明显' + (isPpt?'减少':'下降');
     
     // 波动描述（客观）
     var volatility = avgVal !== 0 ? (range / Math.abs(avgVal) * 100) : 0;
@@ -734,7 +734,7 @@ function generateAnalysis(card, months){
     
     // 组织文字
     var text = org.name + '：' + metricName + '从' + fv(first) + '变为' + fv(last);
-    if (Math.abs(isPct ? changeAbs : changePct) >= 0.1) text += '（' + (changeDisplay.startsWith('+') ? '增加' : '减少') + changeDisplay.replace(/^[+-]/, '') + '）';
+    if (Math.abs(changeAbs) >= 0.01) text += '（' + (changeAbs >= 0 ? '增加' : '减少') + Math.abs(changeDisplay).replace(/[+-]/g,'').trim() + '）';
     text += '，' + trendDir + '。';
     text += '期间最高' + fv(maxVal) + '，最低' + fv(minVal) + '，平均' + fv(avgVal) + '，' + volatilityDesc + '。';
     // 月度最大波动
