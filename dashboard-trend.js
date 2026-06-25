@@ -22,7 +22,13 @@ if(!document.getElementById('trend-css')){
     '.tf-group select:focus,.tf-group input:focus{border-color:#3b82f6;outline:none}',
     '.tf-hint{font-size:11px;color:#9ca3af;margin-top:3px}',
     '.tf-group select[multiple]{min-height:140px;resize:vertical;overflow-y:auto}',
-    '.tag-select{border:1px solid #e2e8f0;border-radius:7px;padding:8px;max-height:200px;overflow-y:auto;background:#fff;display:flex;flex-wrap:wrap;gap:5px;align-content:flex-start}',
+    '.tf-collapse-head{font-size:12px;font-weight:600;color:#374151;padding:8px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;transition:.15s}',
+'.tf-collapse-head:hover{background:#f1f5f9;border-color:#cbd5e1}',
+'.tf-collapse-head::after{content:\'▶\';font-size:9px;color:#94a3b8;transition:.15s}',
+'.tf-collapse-head.open::after{transform:rotate(90deg)}',
+'.tf-count{font-size:11px;color:#0f3460;font-weight:700;margin-left:4px}',
+
+'.tag-select{border:1px solid #e2e8f0;border-radius:7px;padding:8px;max-height:200px;overflow-y:auto;background:#fff;display:flex;flex-wrap:wrap;gap:5px;align-content:flex-start}',
 '.tag-item{display:inline-flex;align-items:center;padding:4px 10px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px;cursor:pointer;user-select:none;transition:.15s;background:#fff;color:#475569;line-height:1.3;white-space:nowrap}',
 '.tag-item:hover{border-color:#93c5fd;background:#eff6ff;transform:translateY(-1px)}',
 '.tag-item.selected{background:linear-gradient(135deg,#0f3460,#1a1a2e);color:#fff;border-color:#0f3460;box-shadow:0 2px 4px rgba(15,52,96,.25)}',
@@ -196,17 +202,20 @@ function renderCards(){
   h += '<div class="trend-batch-row" style="align-items:stretch">';
   
   // 分析机构
-  h += '<div class="tf-group"><label>分析机构</label><div class="tag-select" id="batch-branch-box" data-name="branch">';
+  h += '<div class="tf-group"><div class="tf-collapse-head" onclick="this.classList.toggle(\'open\');this.nextElementSibling.style.display=this.classList.contains(\'open\')?\'block\':\'none\'">分析机构 <span class="tf-count" id="branch-count">0</span></div>';
+  h += '<div class="tag-select" id="batch-branch-box" data-name="branch" style="display:none">';
   allOrgs.forEach(function(o){ h += '<span class="tag-item" data-val="'+o+'" onclick="Trend.toggleTag(this)">'+o+'</span>'; });
   h += '</div></div>';
   
   // 对比机构
-  h += '<div class="tf-group"><label>对比机构</label><div class="tag-select" id="batch-compare-box" data-name="compare">';
+  h += '<div class="tf-group"><div class="tf-collapse-head" onclick="this.classList.toggle(\'open\');this.nextElementSibling.style.display=this.classList.contains(\'open\')?\'block\':\'none\'">对比机构 <span class="tf-count" id="compare-count">0</span></div>';
+  h += '<div class="tag-select" id="batch-compare-box" data-name="compare" style="display:none">';
   allOrgs.forEach(function(o){ h += '<span class="tag-item" data-val="'+o+'" onclick="Trend.toggleTag(this)">'+o+'</span>'; });
   h += '</div></div>';
   
   // 分析指标
-  h += '<div class="tf-group" style="flex:2"><label>分析指标</label><div class="tag-select" id="batch-metrics-box" data-name="metric">';
+  h += '<div class="tf-group" style="flex:2"><div class="tf-collapse-head" onclick="this.classList.toggle(\'open\');this.nextElementSibling.style.display=this.classList.contains(\'open\')?\'block\':\'none\'">分析指标 <span class="tf-count" id="metric-count">0</span></div>';
+  h += '<div class="tag-select" id="batch-metrics-box" data-name="metric" style="display:none">';
   Object.keys(fieldGroups).forEach(function(g){
     h += '<div class="tag-group-title">'+g+'</div>';
     fieldGroups[g].forEach(function(f){ h += '<span class="tag-item" data-val="'+f.k+'" onclick="Trend.toggleTag(this)">'+f.l+'</span>'; });
@@ -635,18 +644,22 @@ function generateAnalysis(card, months){
     var last = validVals[validVals.length - 1];
     var change = last - first;
     var changePct = first !== 0 ? (change / Math.abs(first) * 100) : 0;
+    var changeAbs = last - first; // absolute change (for % metrics, this is percentage points)
     var maxVal = Math.max.apply(null, validVals);
     var minVal = Math.min.apply(null, validVals);
     var avgVal = validVals.reduce(function(a,b){ return a+b; }, 0) / validVals.length;
     var range = maxVal - minVal;
     var isImproving = direction === 'desc' ? change > 0 : change < 0;
     var absChangePct = Math.abs(changePct);
+    // For % metrics, use absolute change (pp) for grading; for others, use relative %
+    var changeMeasure = isPct ? Math.abs(changeAbs) : absChangePct;
+    var changeDisplay = isPct ? (changeAbs > 0 ? '+' : '') + changeAbs.toFixed(2) + '个百分点' : (changePct > 0 ? '+' : '') + changePct.toFixed(1) + '%';
     
     // 趋势方向（客观描述）
     var trendDir;
-    if (absChangePct < 2) trendDir = '基本持平，无明显变化';
-    else if (absChangePct < 5) trendDir = isImproving ? '略有改善' : '略有下降';
-    else if (absChangePct < 15) trendDir = isImproving ? '有所改善' : '有所下降';
+    if (changeMeasure < (isPct ? 1 : 2)) trendDir = '基本持平，无明显变化';
+    else if (changeMeasure < (isPct ? 3 : 5)) trendDir = isImproving ? '略有改善' : '略有下降';
+    else if (changeMeasure < (isPct ? 8 : 15)) trendDir = isImproving ? '有所改善' : '有所下降';
     else trendDir = isImproving ? '明显改善' : '明显下降';
     
     // 波动描述（客观）
@@ -663,8 +676,9 @@ function generateAnalysis(card, months){
       if (vals[i] != null && vals[i-1] != null) {
         var mom = vals[i] - vals[i-1];
         var momPct = vals[i-1] !== 0 ? mom / Math.abs(vals[i-1]) * 100 : 0;
-        if (momPct > Math.abs(maxMomUp)) { maxMomUp = momPct; maxMomUpMonth = fmtMonth(months[i]); }
-        if (momPct < -Math.abs(maxMomDown)) { maxMomDown = momPct; maxMomDownMonth = fmtMonth(months[i]); }
+        var momDisp = isPct ? mom : momPct; // pp for % metrics, % for others
+        if (momDisp > Math.abs(maxMomUp)) { maxMomUp = momDisp; maxMomUpMonth = fmtMonth(months[i]); }
+        if (momDisp < -Math.abs(maxMomDown)) { maxMomDown = momDisp; maxMomDownMonth = fmtMonth(months[i]); }
       }
     }
     
@@ -693,11 +707,12 @@ function generateAnalysis(card, months){
         var groupAvg = otherAvgs.reduce(function(a,b){return a+b},0) / otherAvgs.length;
         var diff = myAvg - groupAvg;
         var diffPct = groupAvg !== 0 ? diff / Math.abs(groupAvg) * 100 : 0;
+        var diffDisp = isPct ? Math.abs(diff).toFixed(2) + '个百分点' : Math.abs(diffPct).toFixed(1) + '%';
         var betterThan = direction === 'desc' ? diff > 0 : diff < 0;
         if (Math.abs(diffPct) < 2) {
           compareText = '与对比机构平均水平基本一致';
         } else {
-          compareText = betterThan ? '高于对比机构平均水平' + Math.abs(diffPct).toFixed(1) + '%' : '低于对比机构平均水平' + Math.abs(diffPct).toFixed(1) + '%';
+          compareText = betterThan ? '高于对比机构平均水平' + diffDisp : '低于对比机构平均水平' + diffDisp
         }
         // 找差距最大的机构
         var maxGapOrg = null, maxGap = 0;
@@ -709,8 +724,9 @@ function generateAnalysis(card, months){
         if (maxGapOrg) {
           var oAvgVal = others.find(function(x){return x.org.name===maxGapOrg}).valid.reduce(function(a,b){return a+b},0)/others.find(function(x){return x.org.name===maxGapOrg}).valid.length;
           var gapPct = oAvgVal !== 0 ? (myAvg - oAvgVal)/Math.abs(oAvgVal)*100 : 0;
-          if (Math.abs(gapPct) >= 5) {
-            compareText += '，与' + maxGapOrg + '差距' + Math.abs(gapPct).toFixed(1) + '%';
+          var gapDisp = isPct ? Math.abs(myAvg - oAvgVal).toFixed(2) + '个百分点' : Math.abs(gapPct).toFixed(1) + '%';
+          if ((isPct ? Math.abs(myAvg - oAvgVal) : Math.abs(gapPct)) >= (isPct ? 2 : 5)) {
+            compareText += '，与' + maxGapOrg + '差距' + gapDisp;
           }
         }
       }
@@ -718,12 +734,13 @@ function generateAnalysis(card, months){
     
     // 组织文字
     var text = org.name + '：' + metricName + '从' + fv(first) + '变为' + fv(last);
-    if (absChangePct >= 0.1) text += '（变化' + (changePct > 0 ? '+' : '') + changePct.toFixed(1) + '%）';
+    if (Math.abs(isPct ? changeAbs : changePct) >= 0.1) text += '（' + (changeDisplay.startsWith('+') ? '增加' : '减少') + changeDisplay.replace(/^[+-]/, '') + '）';
     text += '，' + trendDir + '。';
     text += '期间最高' + fv(maxVal) + '，最低' + fv(minVal) + '，平均' + fv(avgVal) + '，' + volatilityDesc + '。';
     // 月度最大波动
-    if (maxMomUp > 3) text += maxMomUpMonth + '环比增幅较大（+' + maxMomUp.toFixed(1) + '%），';
-    if (maxMomDown < -3) text += maxMomDownMonth + '环比降幅较大（' + maxMomDown.toFixed(1) + '%），';
+    var momUnit = isPct ? '个百分点' : '%';
+    if (maxMomUp > (isPct ? 2 : 3)) text += maxMomUpMonth + '环比增加' + maxMomUp.toFixed(isPct ? 2 : 1) + momUnit + '，';
+    if (maxMomDown < -(isPct ? 2 : 3)) text += maxMomDownMonth + '环比减少' + Math.abs(maxMomDown).toFixed(isPct ? 2 : 1) + momUnit + '，';
     if (maxMomUp > 3 || maxMomDown < -3) text = text.replace(/，$/, '。');
     if (rankText) text += rankText + '。';
     if (compareText) text += compareText + '。';
@@ -796,6 +813,9 @@ window.Trend = {
   },
   toggleTag: function(el){
     el.classList.toggle('selected');
+    // update count
+    var box = el.closest('.tag-select');
+    if(box){ var n = box.querySelectorAll('.tag-item.selected').length; var cEl = box.previousElementSibling; if(cEl){ var cSpan = cEl.querySelector('.tf-count'); if(cSpan) cSpan.textContent = n > 0 ? '('+n+')' : ''; } }
   },
   generate: function(){
     var branchBox = document.getElementById("batch-branch-box");
