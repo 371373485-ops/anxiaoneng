@@ -458,6 +458,19 @@ function renderCardChart(card){
     },
     yAxis: {
       type: 'value',
+      min: function(value){
+        // 自动缩放：数据范围 + 上下各留 10% 边距
+        var diff = value.max - value.min;
+        if(diff === 0) return value.min - 1;
+        var pad = Math.max(diff * 0.15, Math.abs(value.min * 0.02));
+        return value.min - pad;
+      },
+      max: function(value){
+        var diff = value.max - value.min;
+        if(diff === 0) return value.max + 1;
+        var pad = Math.max(diff * 0.15, Math.abs(value.max * 0.02));
+        return value.max + pad;
+      },
       splitLine: { lineStyle: { color: '#f0f0f0', type: 'dashed' } },
       axisLine: { show: false },
       axisTick: { show: false },
