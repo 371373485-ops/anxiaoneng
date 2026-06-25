@@ -46,8 +46,8 @@ if(!document.getElementById('trend-css')){
     '.trend-compare-tags .ct-tag{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:11px;color:#fff}',
     '.trend-compare-tags .ct-tag button{border:none;background:none;cursor:pointer;color:#fff;font-size:13px;padding:0;line-height:1}',
     '.trend-chart-table{display:flex;gap:16px;align-items:stretch}',
-    '.trend-chart-wrap{flex:1.5;min-width:0;position:relative;height:420px}',
-    '.trend-chart-wrap canvas,.trend-chart-wrap div{width:100%!important;height:100%!important}',
+    '.trend-chart-wrap{flex:1.5;min-width:0;position:relative;height:400px}',
+    '.trend-chart-wrap canvas{position:absolute;top:0;left:0;width:100%!important;height:100%!important}',
     '.trend-table-wrap{flex:1;max-height:360px;overflow-y:auto;min-width:0}',
     '.trend-table-wrap table{width:100%;border-collapse:collapse;font-size:12px}',
     '.trend-table-wrap th{padding:5px 8px;text-align:left;border-bottom:2px solid #e5e7eb;white-space:nowrap;background:#f8f9fa}',
@@ -442,20 +442,19 @@ function renderCardChart(card){
         devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
         devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
         responsive: true,
-        maintainAspectRatio: true,
-        aspectRatio: 1.6,
+        maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
         plugins: {
           barVals: false,
           legend: {
             display: card.compareBranches.length > 0,
             position: 'bottom',
-            labels: { font: { size: 11 }, boxWidth: 14, padding: 20, usePointStyle: true }
+            labels: { font: { size: 11 }, boxWidth: 12, padding: 16 }
           },
           tooltip: {
-            backgroundColor: 'rgba(255,255,255,0.96)',
-            titleColor: '#1e293b', bodyColor: '#374151',
-            borderColor: '#e2e8f0', borderWidth: 1, cornerRadius: 8, padding: 10,
+            backgroundColor: 'rgba(30,41,59,0.92)',
+            titleColor: '#f1f5f9', bodyColor: '#e2e8f0',
+            borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1, cornerRadius: 8, padding: 12, titleFont: { size: 13, weight: 'bold' }, bodyFont: { size: 12 },
             callbacks: {
               label: function(ctx){
                 var v = ctx.parsed.y;
@@ -511,8 +510,7 @@ function renderCardChart(card){
       data: { labels: months.map(fmtMonth), datasets: datasets },
       options: {
         responsive: true,
-        maintainAspectRatio: true,
-        aspectRatio: 1.8,
+        maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
         plugins: {
           barVals: false,
