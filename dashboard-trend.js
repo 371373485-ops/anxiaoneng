@@ -402,6 +402,15 @@ function renderCardChart(card){
     };
   });
   
+  // 计算 Y 轴范围（自动缩放）
+  var allDataVals = [];
+  series.forEach(function(s){ (s.data||[]).forEach(function(v){ if(v!=null&&!isNaN(v)) allDataVals.push(v); }); });
+  var yMin = Math.min.apply(null, allDataVals);
+  var yMax = Math.max.apply(null, allDataVals);
+  var yDiff = yMax - yMin;
+  if(yDiff === 0) { yMin -= 1; yMax += 1; }
+  else { var pad = Math.max(yDiff * 0.2, Math.abs((yMax+yMin)/2 * 0.02)); yMin -= pad; yMax += pad; }
+
   var showLegend = card.compareBranches.length > 0;
   
   var option = {
@@ -458,19 +467,8 @@ function renderCardChart(card){
     },
     yAxis: {
       type: 'value',
-      min: function(value){
-        // 自动缩放：数据范围 + 上下各留 10% 边距
-        var diff = value.max - value.min;
-        if(diff === 0) return value.min - 1;
-        var pad = Math.max(diff * 0.15, Math.abs(value.min * 0.02));
-        return value.min - pad;
-      },
-      max: function(value){
-        var diff = value.max - value.min;
-        if(diff === 0) return value.max + 1;
-        var pad = Math.max(diff * 0.15, Math.abs(value.max * 0.02));
-        return value.max + pad;
-      },
+      min: yMin,
+      max: yMax,
       splitLine: { lineStyle: { color: '#f0f0f0', type: 'dashed' } },
       axisLine: { show: false },
       axisTick: { show: false },
