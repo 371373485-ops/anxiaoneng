@@ -24,6 +24,9 @@ if(!document.getElementById('trend-css')){
     '.trend-card-head .ch-icon{font-size:16px}',
     '.trend-card-head select.trend-metric-sel{padding:4px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;font-weight:600;min-width:160px}',
     '.trend-card-head .trend-close-btn{padding:4px 10px;border:1px solid #fecaca;border-radius:6px;background:#fff5f5;color:#dc2626;cursor:pointer;font-size:12px}',
+    '.trend-card-head .trend-type-btns{display:flex;gap:2px;background:#f1f5f9;border-radius:6px;padding:2px}',
+    '.trend-card-head .trend-type-btn{padding:3px 10px;border:none;border-radius:4px;cursor:pointer;font-size:11px;background:transparent;color:#64748b}',
+    '.trend-card-head .trend-type-btn.active{background:#fff;color:#2563eb;font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.08)}',
     '',
     '.trend-filters{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px}',
     '.trend-filters .tf-group label{font-size:11px;color:var(--muted);display:block;margin-bottom:2px}',
@@ -223,7 +226,15 @@ function renderCardHTML(card, fieldGroups, branchNames, allMonths){
   });
   h += '</select>';
   h += '</div>';
+  // 图表类型切换
+  var chartType = s.chartType || 'line';
+  h += '<div style="display:flex;align-items:center;gap:8px">';
+  h += '<div class="trend-type-btns">';
+  h += '<button class="trend-type-btn'+(chartType==='line'?' active':'')+'" onclick="Trend.setChartType(\''+s.id+'\',\'line\')">折线图</button>';
+  h += '<button class="trend-type-btn'+(chartType==='bar'?' active':'')+'" onclick="Trend.setChartType(\''+s.id+'\',\'bar\')">柱状图</button>';
+  h += '</div>';
   h += '<button class="trend-close-btn" onclick="Trend.removeCard(\''+s.id+'\')">✕ 关闭</button>';
+  h += '</div>';
   h += '</div>';
   
   // 筛选行
@@ -361,6 +372,7 @@ function renderCardChart(card){
   if(activeMonths.length === 0) activeMonths = months;
   months = activeMonths;
   var isPct = unit === '%';
+  var chartType = card.chartType || 'line';
   
   function fmtVal(v){
     if(v == null) return '无数据';
@@ -370,6 +382,20 @@ function renderCardChart(card){
   var datasets = allOrgs.map(function(org, i){
     var data = months.map(function(m){ return getMetricValue(m, org.name, card.metric); });
     var ranks = months.map(function(m){ return getOrgRank(org.name, m, card.metric, direction); });
+    if(chartType === 'bar'){
+      return {
+        label: org.name,
+        data: data,
+        _ranks: ranks,
+        _hasRank: org.name !== '全国' && org.name !== '整体',
+        backgroundColor: COLORS[i % COLORS.length] + (org.isMain ? 'cc' : '60'),
+        borderColor: COLORS[i % COLORS.length],
+        borderWidth: org.isMain ? 2 : 1,
+        borderRadius: 4,
+        barPercentage: 0.7,
+        categoryPercentage: 0.8
+      };
+    }
     return {
       label: org.name,
       data: data,
@@ -389,7 +415,7 @@ function renderCardChart(card){
   });
   
   card.chart = new Chart(canvas, {
-    type: 'line',
+    type: chartType,
     data: { labels: months.map(fmtMonth), datasets: datasets },
     options: {
       responsive: true,
@@ -644,6 +670,12 @@ window.Trend = {
     else renderCards();
   },
   addCard: function(metricKey){ addCard(metricKey); },
+  setChartType: function(id, type){
+    var card = cards.find(function(c){ return c.id === id; });
+    if(!card) return;
+    card.chartType = type;
+    renderCards();
+  },
   removeCard: function(id){ removeCard(id); },
   updateCard: function(id, field, value){
     var card = cards.find(function(c){ return c.id === id; });
