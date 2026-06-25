@@ -470,6 +470,7 @@ function renderCardChart(card){
         maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
         plugins: {
+          barVals: false,
           legend: {
             display: card.compareBranches.length > 0,
             position: 'bottom',
