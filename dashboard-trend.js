@@ -22,7 +22,12 @@ if(!document.getElementById('trend-css')){
     '.tf-group select:focus,.tf-group input:focus{border-color:#3b82f6;outline:none}',
     '.tf-hint{font-size:11px;color:#9ca3af;margin-top:3px}',
     '.tf-group select[multiple]{min-height:140px;resize:vertical;overflow-y:auto}',
-    '.trend-gen-btn{margin-top:4px;padding:8px 28px;background:#0f3460;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;transition:.2s}',
+    '.tag-select{border:1px solid #d1d5db;border-radius:6px;padding:6px;max-height:160px;overflow-y:auto;background:#fff;display:flex;flex-wrap:wrap;gap:4px;align-content:flex-start}',
+'.tag-item{display:inline-block;padding:3px 10px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;cursor:pointer;user-select:none;transition:.12s;background:#f8fafc;color:#475569;line-height:1.4}',
+'.tag-item:hover{border-color:#3b82f6;background:#eff6ff}',
+'.tag-item.selected{background:#0f3460;color:#fff;border-color:#0f3460}',
+'.tag-group-title{width:100%;font-size:11px;font-weight:600;color:#94a3b8;padding:4px 0 2px;border-bottom:1px solid #f1f5f9;margin-top:2px}',
+'.trend-gen-btn{margin-top:4px;padding:8px 28px;background:#0f3460;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;transition:.2s}',
     '.trend-gen-btn:hover{background:#1a1a2e}',
     '.trend-card{background:var(--card);border-radius:8px;padding:16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)}',
     '.trend-card-head{display:flex;align-items:center;gap:8px;padding-bottom:10px;border-bottom:1px solid #eef2f7;margin-bottom:10px}',
@@ -187,25 +192,31 @@ function renderCards(){
   h += '<h3>📉 多期趋势分析</h3>';
   h += '<div class="trend-batch-panel">';
   
-  // 行1：分析机构（多选） + 对比机构（多选） + 分析指标（多选），三列并排
-  h += '<div class="trend-batch-row" style="align-items:flex-start">';
-  h += '<div class="tf-group"><label>分析机构</label><select id="batch-branch" multiple size="6">';
-  allOrgs.forEach(function(o){ h += '<option value="'+o+'">'+o+'</option>'; });
-  h += '</select><div class="tf-hint">按住 Ctrl 多选</div></div>';
-  h += '<div class="tf-group"><label>对比机构</label><select id="batch-compare" multiple size="6">';
-  allOrgs.forEach(function(o){ h += '<option value="'+o+'">'+o+'</option>'; });
-  h += '</select><div class="tf-hint">按住 Ctrl 多选</div></div>';
-  h += '<div class="tf-group" style="flex:2"><label>分析指标</label><select id="batch-metrics" multiple size="6">';
+  // 行1：三列并排 — 分析机构 | 对比机构 | 分析指标
+  h += '<div class="trend-batch-row" style="align-items:stretch">';
+  
+  // 分析机构
+  h += '<div class="tf-group"><label>分析机构</label><div class="tag-select" id="batch-branch-box" data-name="branch">';
+  allOrgs.forEach(function(o){ h += '<span class="tag-item" data-val="'+o+'" onclick="Trend.toggleTag(this)">'+o+'</span>'; });
+  h += '</div></div>';
+  
+  // 对比机构
+  h += '<div class="tf-group"><label>对比机构</label><div class="tag-select" id="batch-compare-box" data-name="compare">';
+  allOrgs.forEach(function(o){ h += '<span class="tag-item" data-val="'+o+'" onclick="Trend.toggleTag(this)">'+o+'</span>'; });
+  h += '</div></div>';
+  
+  // 分析指标
+  h += '<div class="tf-group" style="flex:2"><label>分析指标</label><div class="tag-select" id="batch-metrics-box" data-name="metric">';
   Object.keys(fieldGroups).forEach(function(g){
-    h += '<optgroup label="'+g+'">';
-    fieldGroups[g].forEach(function(f){ h += '<option value="'+f.k+'">'+f.l+'</option>'; });
-    h += '</optgroup>';
+    h += '<div class="tag-group-title">'+g+'</div>';
+    fieldGroups[g].forEach(function(f){ h += '<span class="tag-item" data-val="'+f.k+'" onclick="Trend.toggleTag(this)">'+f.l+'</span>'; });
   });
-  h += '</select><div class="tf-hint">按住 Ctrl 多选，每个指标生成一张图表</div></div>';
-  h += '</div>';
+  h += '</div></div>';
+  
+  h += '</div>'; // end row1
   
   // 行2：时间范围 + 生成按钮
-  h += '<div class="trend-batch-row" style="align-items:center">';
+  h += '<div class="trend-batch-row" style="align-items:center;margin-top:4px">';
   h += '<div class="tf-group" style="flex:0 0 auto;min-width:160px"><label>时间范围</label><select id="batch-preset" onchange="document.getElementById(\'batch-custom-wrap\').style.display=this.value===\'custom\'?\'flex\':\'none\'">';
   h += '<option value="recent3">近3月</option>';
   h += '<option value="recent6" selected>近6月</option>';
@@ -218,7 +229,7 @@ function renderCards(){
   h += '<button class="trend-gen-btn" onclick="Trend.generate()">⚙️ 生成趋势分析</button>';
   h += '</div>';
   
-  h += '</div></div>';
+  h += '</div></div>'; // end panel + toolbar
   
   h += '<div id="trend-cards">';
   cards.forEach(function(card){ h += renderCardHTML(card, fieldGroups, branchNames, allMonths); });
@@ -771,9 +782,9 @@ function loadCardsState(){
 window.Trend = {
   render: function(){
     if(cards.length === 0){
-      if(!loadCardsState()) addCard();
-      else renderCards();
-    } else renderCards();
+      if(!loadCardsState()) { renderCards(); return; }
+    }
+    renderCards();
   },
   addCard: function(metricKey){ addCard(metricKey); },
   setChartType: function(id, type){
@@ -783,15 +794,21 @@ window.Trend = {
     saveCardsState();
     renderCards();
   },
+  toggleTag: function(el){
+    el.classList.toggle('selected');
+  },
   generate: function(){
-    var branchSel = document.getElementById("batch-branch");
-    var compareSel = document.getElementById("batch-compare");
-    var metricSel = document.getElementById("batch-metrics");
+    var branchBox = document.getElementById("batch-branch-box");
+    var compareBox = document.getElementById("batch-compare-box");
+    var metricBox = document.getElementById("batch-metrics-box");
     var presetSel = document.getElementById("batch-preset");
-    if(!branchSel || !metricSel) return;
-    var branches = [];
-    for(var b=0;b<branchSel.options.length;b++){ if(branchSel.options[b].selected) branches.push(branchSel.options[b].value); }
+    if(!branchBox || !metricBox) return;
+    function getSelected(box){ var s=[]; if(box){ box.querySelectorAll(".tag-item.selected").forEach(function(t){ s.push(t.getAttribute("data-val")); }); } return s; }
+    var branches = getSelected(branchBox);
+    var compareBranches = getSelected(compareBox);
+    var metrics = getSelected(metricBox);
     if(branches.length === 0){ alert("请至少选择一个分析机构"); return; }
+    if(metrics.length === 0){ alert("请至少选择一个分析指标"); return; }
     var preset = presetSel ? presetSel.value : "recent6";
     var customStart = "", customEnd = "";
     if(preset === "custom"){
@@ -801,11 +818,6 @@ window.Trend = {
       customEnd = es ? es.value : "";
       if(!customStart || !customEnd){ alert("请选择自定义时间范围"); return; }
     }
-    var compareBranches = [];
-    if(compareSel){ for(var i=0;i<compareSel.options.length;i++){ if(compareSel.options[i].selected) compareBranches.push(compareSel.options[i].value); } }
-    var metrics = [];
-    if(metricSel){ for(var j=0;j<metricSel.options.length;j++){ if(metricSel.options[j].selected) metrics.push(metricSel.options[j].value); } }
-    if(metrics.length === 0){ alert("请至少选择一个分析指标"); return; }
     cards.forEach(function(card){ if(card.chart){ try{ card.chart.destroy(); }catch(e){} } });
     cards = []; cardCounter = 0;
     metrics.forEach(function(mk){
