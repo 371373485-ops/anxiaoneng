@@ -28,11 +28,11 @@ if(!document.getElementById('trend-css')){
 '.tf-collapse-head.open::after{transform:rotate(90deg)}',
 '.tf-count{font-size:11px;color:#0f3460;font-weight:700;margin-left:4px}',
 
-'.tag-select{border:1px solid #e2e8f0;border-radius:7px;padding:10px 12px;max-height:240px;overflow-y:auto;background:#fff;display:flex;flex-wrap:wrap;gap:6px 10px;align-content:flex-start}',
-'.tag-item{display:inline-flex;align-items:center;padding:5px 14px;border:1px solid #d9dfe8;border-radius:6px;font-size:13px;cursor:pointer;user-select:none;transition:.15s;background:#fff;color:#475569;line-height:1.4;white-space:nowrap}',
+'.tag-select{border:1px solid #e2e8f0;border-radius:8px;padding:12px;max-height:260px;overflow-y:auto;background:#fff;display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px}',
+'.tag-item{display:inline-flex;align-items:center;justify-content:center;padding:5px 8px;border:1px solid #d9dfe8;border-radius:6px;font-size:13px;cursor:pointer;user-select:none;transition:.15s;background:#fff;color:#475569;line-height:1.4;text-align:center}',
 '.tag-item:hover{border-color:#93c5fd;background:#f0f7ff;box-shadow:0 1px 3px rgba(59,130,246,.15)}',
 '.tag-item.selected{background:linear-gradient(135deg,#0f3460,#1a1a2e);color:#fff;border-color:#0f3460;box-shadow:0 2px 6px rgba(15,52,96,.35)}',
-'.tag-group-title{width:100%;font-size:12px;font-weight:600;color:#64748b;padding:8px 0 5px;border-bottom:1px solid #eef2f7;margin-top:6px;letter-spacing:.5px;text-transform:uppercase}',
+'.tag-group-title{grid-column:1/-1;font-size:11px;font-weight:600;color:#64748b;padding:6px 0 4px;border-bottom:1px solid #eef2f7;margin-top:4px;letter-spacing:.5px;text-transform:uppercase}',
 '.trend-gen-btn{margin-top:4px;padding:8px 28px;background:#0f3460;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;transition:.2s}',
     '.trend-gen-btn:hover{background:#1a1a2e}',
     '.trend-card{background:var(--card);border-radius:8px;padding:16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)}',
@@ -651,16 +651,15 @@ function generateAnalysis(card, months){
     var range = maxVal - minVal;
     var isImproving = direction === 'desc' ? change > 0 : change < 0;
     var absChangePct = Math.abs(changePct);
-    // For % metrics, use absolute change (pp) for grading; for others, use relative %
-    var changeMeasure = isPct ? Math.abs(changeAbs) : absChangePct;
-    var changeDisplay = isPct ? (changeAbs > 0 ? '+' : '') + changeAbs.toFixed(2) + '个百分点' : (changePct > 0 ? '+' : '') + changePct.toFixed(1) + '%';
+    var changeMeasure = absChangePct;
+    var changeDisplay = (changePct > 0 ? '+' : '') + changePct.toFixed(2) + '%';
     
     // 趋势方向（客观描述）
     var trendDir;
     if (changeMeasure <= 0) trendDir = '基本持平，无明显变化';
-    else if (changeMeasure < (isPct ? 2 : 3)) trendDir = isImproving ? '略有增加/改善' : '略有减少/下降';
-    else if (changeMeasure < (isPct ? 6 : 10)) trendDir = isImproving ? '有所改善' : '有所下降';
-    else trendDir = isImproving ? '明显' + (isPct?'增加':'改善') : '明显' + (isPct?'减少':'下降');
+    else if (changeMeasure < 3) trendDir = isImproving ? '略有改善' : '略有下降';
+    else if (changeMeasure < 10) trendDir = isImproving ? '有所改善' : '有所下降';
+    else trendDir = isImproving ? '明显改善' : '明显下降';
     
     // 波动描述（客观）
     var volatility = avgVal !== 0 ? (range / Math.abs(avgVal) * 100) : 0;
@@ -676,7 +675,7 @@ function generateAnalysis(card, months){
       if (vals[i] != null && vals[i-1] != null) {
         var mom = vals[i] - vals[i-1];
         var momPct = vals[i-1] !== 0 ? mom / Math.abs(vals[i-1]) * 100 : 0;
-        var momDisp = isPct ? mom : momPct; // pp for % metrics, % for others
+        var momDisp = momPct
         if (momDisp > Math.abs(maxMomUp)) { maxMomUp = momDisp; maxMomUpMonth = fmtMonth(months[i]); }
         if (momDisp < -Math.abs(maxMomDown)) { maxMomDown = momDisp; maxMomDownMonth = fmtMonth(months[i]); }
       }
@@ -707,7 +706,7 @@ function generateAnalysis(card, months){
         var groupAvg = otherAvgs.reduce(function(a,b){return a+b},0) / otherAvgs.length;
         var diff = myAvg - groupAvg;
         var diffPct = groupAvg !== 0 ? diff / Math.abs(groupAvg) * 100 : 0;
-        var diffDisp = isPct ? Math.abs(diff).toFixed(2) + '个百分点' : Math.abs(diffPct).toFixed(1) + '%';
+        var diffDisp = Math.abs(diffPct).toFixed(2) + '%';
         var betterThan = direction === 'desc' ? diff > 0 : diff < 0;
         if (Math.abs(diffPct) < 2) {
           compareText = '与对比机构平均水平基本一致';
@@ -724,8 +723,8 @@ function generateAnalysis(card, months){
         if (maxGapOrg) {
           var oAvgVal = others.find(function(x){return x.org.name===maxGapOrg}).valid.reduce(function(a,b){return a+b},0)/others.find(function(x){return x.org.name===maxGapOrg}).valid.length;
           var gapPct = oAvgVal !== 0 ? (myAvg - oAvgVal)/Math.abs(oAvgVal)*100 : 0;
-          var gapDisp = isPct ? Math.abs(myAvg - oAvgVal).toFixed(2) + '个百分点' : Math.abs(gapPct).toFixed(1) + '%';
-          if ((isPct ? Math.abs(myAvg - oAvgVal) : Math.abs(gapPct)) >= (isPct ? 2 : 5)) {
+          var gapDisp = Math.abs(gapPct).toFixed(2) + '%';
+          if (Math.abs(gapPct) >= 5) {
             compareText += '，与' + maxGapOrg + '差距' + gapDisp;
           }
         }
@@ -734,11 +733,11 @@ function generateAnalysis(card, months){
     
     // 组织文字
     var text = org.name + '：' + metricName + '从' + fv(first) + '变为' + fv(last);
-    if (Math.abs(changeAbs) >= 0.01) text += '（' + (changeAbs >= 0 ? '增加' : '减少') + (isPct ? Math.abs(changeAbs).toFixed(2) + '个百分点' : Math.abs(changePct).toFixed(1) + '%') + '）';
+    if (Math.abs(changePct) >= 0.01) text += '（' + (changePct >= 0 ? '增加' : '减少') + Math.abs(changePct).toFixed(2) + '%）';
     text += '，' + trendDir + '。';
     text += '期间最高' + fv(maxVal) + '，最低' + fv(minVal) + '，平均' + fv(avgVal) + '，' + volatilityDesc + '。';
     // 月度最大波动
-    var momUnit = isPct ? '个百分点' : '%';
+    var momUnit = '%';
     if (maxMomUp > (isPct ? 2 : 3)) text += maxMomUpMonth + '环比增加' + maxMomUp.toFixed(isPct ? 2 : 1) + momUnit + '，';
     if (maxMomDown < -(isPct ? 2 : 3)) text += maxMomDownMonth + '环比减少' + Math.abs(maxMomDown).toFixed(isPct ? 2 : 1) + momUnit + '，';
     if (maxMomUp > 3 || maxMomDown < -3) text = text.replace(/，$/, '。');
