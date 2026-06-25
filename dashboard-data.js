@@ -171,7 +171,7 @@ function initData(){
   catch(e){}
   // 🔁 Fallback: restore from disk backup if localStorage is empty
   var isGithubPages=typeof location!=='undefined'&&/\.github\.io$/i.test(location.hostname||'');
-  if((!loaded||!App.ALL_DATA||Object.keys(App.ALL_DATA.actuals||{}).length===0)&&!isGithubPages){
+  if(!loaded||!App.ALL_DATA||Object.keys(App.ALL_DATA.actuals||{}).length===0){
     try{
       var xhr=new XMLHttpRequest();
     xhr.open('GET','_data_backup.json?t='+Date.now(),false);
