@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>安效能数据看板 — PC UI Demo</title>
+<link rel="icon" href="data:,">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --bg-0:#0a0e17; --bg-1:#111726; --bg-2:#1a2138; --bg-3:#232d4a;
+  --surface:rgba(26,33,56,.55); --surface-hover:rgba(35,45,74,.8); --surface-raised:rgba(22,28,46,.95);
+  --border:rgba(99,119,182,.12); --border-strong:rgba(99,119,182,.25);
+  --glass:rgba(255,255,255,.025); --glass-strong:rgba(255,255,255,.05);
+  --text-0:#f0f4ff; --text-1:#c4cce0; --text-2:#7a85a3; --text-3:#4a5375;
+  --blue:#4c8bf5; --blue-soft:rgba(76,139,245,.1); --blue-glow:rgba(76,139,245,.35);
+  --green:#22c55e; --green-soft:rgba(34,197,94,.1);
+  --red:#ef4444; --red-soft:rgba(239,68,68,.1);
+  --amber:#f59e0b; --amber-soft:rgba(245,158,11,.1);
+  --purple:#a78bfa; --purple-soft:rgba(167,139,250,.1);
+  --cyan:#06b6d4; --cyan-soft:rgba(6,182,212,.1);
+  --font-display:'Fraunces',Georgia,serif;
+  --font-body:'DM Sans',-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;
+  --font-mono:'JetBrains Mono','SF Mono',Consolas,monospace;
+  --r-sm:6px; --r-md:10px; --r-lg:14px; --r-xl:20px;
+  --shadow-sm:0 1px 3px rgba(0,0,0,.3); --shadow-md:0 4px 16px rgba(0,0,0,.4); --shadow-lg:0 8px 32px rgba(0,0,0,.5);
+  --t-fast:.15s cubic-bezier(.4,0,.2,1); --t-med:.3s cubic-bezier(.4,0,.2,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:14px;-webkit-font-smoothing:antialiased}
+body{font-family:var(--font-body);background:var(--bg-0);color:var(--text-1);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 1200px 800px at 10% -10%,rgba(76,139,245,.05),transparent),radial-gradient(ellipse 800px 500px at 90% 110%,rgba(167,139,250,.03),transparent),linear-gradient(180deg,var(--bg-0),var(--bg-1));pointer-events:none;z-index:-1}
+
+/* ══ LAYOUT: Sidebar + Main ══ */
+.app{display:flex;min-height:100vh}
+.sidebar{
+  width:220px;flex-shrink:0;background:var(--bg-1);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;position:fixed;top:0;bottom:0;left:0;z-index:50;
+  padding:var(--lg) 0;
+}
+.sidebar__brand{padding:0 var(--lg) var(--lg);border-bottom:1px solid var(--border);margin-bottom:var(--md)}
+.sidebar__logo{display:flex;align-items:center;gap:var(--sm)}
+.sidebar__logo-icon{width:36px;height:36px;border-radius:var(--r-sm);background:linear-gradient(135deg,var(--blue),var(--purple));display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;color:#fff;font-size:18px;box-shadow:0 2px 12px var(--blue-glow)}
+.sidebar__logo-text{font-family:var(--font-display);font-size:1rem;font-weight:600;color:var(--text-0);line-height:1.3}
+.sidebar__logo-sub{font-size:.65rem;color:var(--text-2);font-family:var(--font-mono);margin-top:1px}
+.sidebar__nav{flex:1;padding:0 var(--sm)}
+.sidebar__section-label{font-size:.62rem;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;font-family:var(--font-mono);padding:var(--md) var(--md) var(--xs)}
+.sidebar__item{
+  display:flex;align-items:center;gap:var(--sm);padding:var(--sm) var(--md);border-radius:var(--r-sm);
+  color:var(--text-2);font-size:.82rem;cursor:pointer;transition:var(--t-fast);margin-bottom:1px;border:1px solid transparent;
+}
+.sidebar__item:hover{background:var(--glass);color:var(--text-1)}
+.sidebar__item.active{background:var(--blue-soft);color:var(--blue);border-color:rgba(76,139,245,.15);font-weight:600}
+.sidebar__item-icon{width:18px;text-align:center;font-size:.9rem;flex-shrink:0}
+.sidebar__item-badge{margin-left:auto;background:var(--red);color:#fff;border-radius:10px;padding:1px 6px;font-size:.6rem;font-weight:700;font-family:var(--font-mono)}
+.sidebar__footer{padding:var(--md) var(--lg);border-top:1px solid var(--border)}
+.sidebar__status{display:flex;align-items:center;gap:var(--xs);font-size:.7rem;color:var(--text-2);font-family:var(--font-mono)}
+.sidebar__dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green)}
+
+/* ══ MAIN ══ */
+.main-area{flex:1;margin-left:220px;display:flex;flex-direction:column;min-height:100vh}
+
+/* ── Top Bar ── */
+.topbar{
+  background:rgba(17,23,38,.8);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);
+  padding:var(--sm) var(--xl);display:flex;align-items:center;gap:var(--md);position:sticky;top:0;z-index:40;
+}
+.topbar__title{font-family:var(--font-display);font-size:1.1rem;font-weight:600;color:var(--text-0);letter-spacing:-.02em}
+.topbar__sub{font-size:.7rem;color:var(--text-2);font-family:var(--font-mono)}
+.topbar__spacer{flex:1}
+.topbar__group{display:inline-flex;align-items:center;gap:var(--xs);padding:3px;background:var(--glass);border:1px solid var(--border);border-radius:var(--r-md)}
+.tb-lbl{font-size:.65rem;color:var(--text-3);padding:0 4px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.05em}
+.tb-sel{
+  height:28px;padding:0 24px 0 10px;border:1px solid var(--border);border-radius:var(--r-sm);
+  background:var(--glass-strong);color:var(--text-1);font-size:.75rem;cursor:pointer;appearance:none;-webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'%3E%3Cpath fill='%237a85a3' d='M0 0l4 5 4-5z'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 8px center;
+}
+.tb-sel option{color:var(--text-0);background:var(--bg-2)}
+.tb-btn{
+  height:28px;padding:0 12px;border:1px solid var(--border);border-radius:var(--r-sm);
+  background:var(--glass-strong);color:var(--text-1);font-size:.75rem;cursor:pointer;transition:var(--t-fast);
+  display:inline-flex;align-items:center;gap:4px;white-space:nowrap;
+}
+.tb-btn:hover{background:var(--surface-hover);border-color:var(--border-strong);color:var(--text-0)}
+.tb-btn--accent{background:var(--blue-soft);border-color:rgba(76,139,245,.2);color:var(--blue);font-weight:600}
+.tb-btn--accent:hover{background:rgba(76,139,245,.18);border-color:var(--blue)}
+.tb-sep{width:1px;height:16px;background:var(--border-strong)}
+
+/* ── Content ── */
+.content{padding:var(--lg) var(--xl);flex:1;max-width:1600px;width:100%}
+.tab{display:none}
+.tab.active{display:block;animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* ══ ALERT BANNER ══ */
+.alert-bar{
+  display:flex;align-items:center;gap:var(--md);padding:var(--sm) var(--lg);margin-bottom:var(--lg);
+  background:linear-gradient(90deg,var(--red-soft),transparent 70%);
+  border:1px solid rgba(239,68,68,.15);border-radius:var(--r-md);font-size:.8rem;
+}
+.alert-bar__dot{width:18px;height:18px;border-radius:50%;background:var(--red-soft);display:flex;align-items:center;justify-content:center;color:var(--red);font-size:.65rem;font-weight:700;flex-shrink:0}
+.alert-bar__num{font-family:var(--font-mono);font-weight:600;color:var(--red)}
+.alert-bar__link{color:var(--blue);text-decoration:none;cursor:pointer}
+.alert-bar__link:hover{text-decoration:underline}
+
+/* ══ KPI GRID — PC宽屏 ══ */
+.kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:var(--md);margin-bottom:var(--lg)}
+.kpi-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:var(--md);
+  position:relative;overflow:hidden;transition:var(--t-med);
+}
+.kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent,var(--blue));opacity:.5}
+.kpi-card:hover{border-color:var(--border-strong);transform:translateY(-1px);box-shadow:var(--shadow-md)}
+.kpi-card__label{font-size:.68rem;color:var(--text-2);text-transform:uppercase;letter-spacing:.04em;font-family:var(--font-mono);margin-bottom:var(--xs)}
+.kpi-card__value{font-family:var(--font-display);font-size:1.5rem;font-weight:600;color:var(--text-0);line-height:1.1}
+.kpi-card__unit{font-size:.7rem;color:var(--text-2);font-family:var(--font-mono);margin-left:2px}
+.kpi-card__change{display:inline-flex;align-items:center;gap:2px;font-size:.68rem;font-family:var(--font-mono);margin-top:var(--xs);padding:1px 5px;border-radius:var(--r-sm)}
+.kpi-card__change--up{background:var(--green-soft);color:var(--green)}
+.kpi-card__change--down{background:var(--red-soft);color:var(--red)}
+.kpi-card__alert-dot{position:absolute;top:var(--sm);right:var(--sm);width:7px;height:7px;border-radius:50%;background:var(--red);box-shadow:0 0 6px var(--red)}
+
+/* ══ SECTION CARD ══ */
+.card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  margin-bottom:var(--lg);overflow:hidden;
+}
+.card__header{display:flex;align-items:center;justify-content:space-between;padding:var(--md) var(--lg);border-bottom:1px solid var(--border)}
+.card__title{font-family:var(--font-display);font-size:.95rem;font-weight:600;color:var(--text-0);letter-spacing:-.01em}
+.card__meta{font-size:.7rem;color:var(--text-2);font-family:var(--font-mono)}
+.card__body{padding:var(--lg)}
+
+/* ══ TWO COLUMN ══ */
+.dual-col{display:grid;grid-template-columns:1.4fr 1fr;gap:var(--lg);margin-bottom:var(--lg)}
+.dual-col--equal{grid-template-columns:1fr 1fr}
+
+/* ══ CHART AREA ══ */
+.chart-area{
+  height:320px;border-radius:var(--r-md);background:var(--glass);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;color:var(--text-3);font-size:.82rem;font-family:var(--font-mono);
+  position:relative;
+}
+.chart-area--tall{height:400px}
+.chart-area::after{content:'📊 Chart Area (Chart.js)'}
+
+/* ══ TABLE ══ */
+.tbl-scroll{overflow-x:auto;border-radius:var(--r-md);border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:.8rem}
+thead{background:var(--glass-strong)}
+th{padding:var(--sm) var(--md);text-align:left;font-weight:600;color:var(--text-2);font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;font-family:var(--font-mono);border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;top:0}
+td{padding:var(--sm) var(--md);border-bottom:1px solid var(--border);color:var(--text-1);font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+tbody tr{transition:var(--t-fast)}
+tbody tr:hover{background:var(--glass)}
+tbody tr:last-child td{border-bottom:none}
+.td-name{font-family:var(--font-body);font-weight:500;color:var(--text-0)}
+.td-good{color:var(--green)}
+.td-bad{color:var(--red)}
+.td-warn{color:var(--amber)}
+.td-region{color:var(--text-2);font-size:.75rem}
+
+/* ══ AI PANEL ══ */
+.ai-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
+.ai-panel__head{padding:var(--md) var(--lg);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:var(--sm);background:var(--glass-strong)}
+.ai-panel__icon{width:28px;height:28px;border-radius:var(--r-sm);background:linear-gradient(135deg,var(--purple),var(--blue));display:flex;align-items:center;justify-content:center;font-size:.8rem}
+.ai-panel__title{font-family:var(--font-display);font-size:.95rem;font-weight:600;color:var(--text-0)}
+.ai-panel__tag{margin-left:auto;font-size:.65rem;padding:2px 8px;border-radius:var(--r-sm);background:var(--purple-soft);color:var(--purple);font-family:var(--font-mono)}
+.ai-chat{padding:var(--lg);min-height:240px;max-height:400px;overflow-y:auto}
+.ai-msg{margin-bottom:var(--md);max-width:80%}
+.ai-msg--user{margin-left:auto;text-align:right}
+.ai-msg__bubble{display:inline-block;padding:var(--sm) var(--md);border-radius:var(--r-lg);font-size:.82rem;line-height:1.7}
+.ai-msg--user .ai-msg__bubble{background:var(--blue);color:#fff;border-bottom-right-radius:4px}
+.ai-msg--ai .ai-msg__bubble{background:var(--glass-strong);border:1px solid var(--border);color:var(--text-1);border-bottom-left-radius:4px}
+.ai-input-row{display:flex;gap:var(--sm);padding:var(--md) var(--lg);border-top:1px solid var(--border)}
+.ai-input{flex:1;height:36px;padding:0 var(--md);background:var(--glass-strong);border:1px solid var(--border);border-radius:var(--r-md);color:var(--text-0);font-size:.82rem;font-family:var(--font-body);outline:none;transition:var(--t-fast)}
+.ai-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-soft)}
+.ai-input::placeholder{color:var(--text-3)}
+.ai-send{height:36px;padding:0 var(--lg);background:var(--blue);border:none;border-radius:var(--r-md);color:#fff;font-size:.82rem;font-weight:600;cursor:pointer;transition:var(--t-fast)}
+.ai-send:hover{background:#3b7de0}
+
+/* ══ TREND FILTERS ══ */
+.filter-row{display:flex;align-items:flex-end;gap:var(--md);flex-wrap:wrap;margin-bottom:var(--lg)}
+.filter-item{display:flex;flex-direction:column;gap:3px}
+.filter-label{font-size:.62rem;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;font-family:var(--font-mono)}
+.filter-sel{
+  height:32px;padding:0 28px 0 10px;background:var(--glass-strong);border:1px solid var(--border);border-radius:var(--r-sm);
+  color:var(--text-0);font-size:.8rem;cursor:pointer;appearance:none;-webkit-appearance:none;min-width:140px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'%3E%3Cpath fill='%237a85a3' d='M0 0l4 5 4-5z'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 8px center;
+}
+
+/* ══ DATA MGMT ══ */
+.data-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--lg)}
+.data-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:var(--lg)}
+.data-box__title{font-family:var(--font-display);font-size:.92rem;font-weight:600;color:var(--text-0);margin-bottom:var(--sm)}
+.data-box__desc{font-size:.78rem;color:var(--text-2);line-height:1.6;margin-bottom:var(--md)}
+.btn-act{display:inline-flex;align-items:center;gap:4px;height:34px;padding:0 var(--md);border:1px solid var(--border-strong);border-radius:var(--r-sm);background:var(--glass-strong);color:var(--text-0);font-size:.78rem;cursor:pointer;transition:var(--t-fast);margin-bottom:var(--xs)}
+.btn-act:hover{background:var(--surface-hover);border-color:var(--blue)}
+
+/* ══ RESPONSIVE ══ */
+@media(max-width:1200px){.kpi-row{grid-template-columns:repeat(3,1fr)}.dual-col{grid-template-columns:1fr}.data-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:768px){.sidebar{display:none}.main-area{margin-left:0}.kpi-row{grid-template-columns:repeat(2,1fr)}.data-grid{grid-template-columns:1fr}.content{padding:var(--md)}}
+</style>
+</head>
+<body>
+<div class="app">
+<!-- ══ SIDEBAR ══ -->
+<aside class="sidebar">
+  <div class="sidebar__brand">
+    <div class="sidebar__logo">
+      <div class="sidebar__logo-icon">华</div>
+      <div>
+        <div class="sidebar__logo-text">华安保险</div>
+        <div class="sidebar__logo-sub">经营效能看板</div>
+      </div>
+    </div>
+  </div>
+  <nav class="sidebar__nav">
+    <div class="sidebar__section-label">分析</div>
+    <div class="sidebar__item active" onclick="switchTab('overview')"><span class="sidebar__item-icon">📊</span> 总览</div>
+    <div class="sidebar__item" onclick="switchTab('regions')"><span class="sidebar__item-icon">📈</span> 责任区对比<span class="sidebar__item-badge">3</span></div>
+    <div class="sidebar__item" onclick="switchTab('branches')"><span class="sidebar__item-icon">📋</span> 分公司明细<span class="sidebar__item-badge">8</span></div>
+    <div class="sidebar__item" onclick="switchTab('trend')"><span class="sidebar__item-icon">📉</span> 多期趋势</div>
+    <div class="sidebar__section-label">智能</div>
+    <div class="sidebar__item" onclick="switchTab('ai')"><span class="sidebar__item-icon">🤖</span> AI 智能分析<span class="sidebar__item-badge">8</span></div>
+    <div class="sidebar__section-label">管理</div>
+    <div class="sidebar__item" onclick="switchTab('data')"><span class="sidebar__item-icon">📦</span> 数据管理</div>
+    <div class="sidebar__item" onclick="switchTab('guide')"><span class="sidebar__item-icon">📖</span> 指标说明</div>
+  </nav>
+  <div class="sidebar__footer">
+    <div class="sidebar__status"><div class="sidebar__dot"></div> 服务正常 · 2026-04</div>
+  </div>
+</aside>
+
+<!-- ══ MAIN AREA ══ -->
+<div class="main-area">
+  <!-- Top Bar -->
+  <header class="topbar">
+    <div>
+      <div class="topbar__title">总览</div>
+      <div class="topbar__sub">2026年4月 · 计划: 自动</div>
+    </div>
+    <div class="topbar__spacer"></div>
+    <div class="topbar__group">
+      <span class="tb-lbl">年</span>
+      <select class="tb-sel"><option>2026</option></select>
+      <span class="tb-lbl">月</span>
+      <select class="tb-sel"><option>4月</option><option>5月</option></select>
+    </div>
+    <div class="tb-sep"></div>
+    <select class="tb-sel"><option>计划: 自动</option></select>
+    <div class="tb-sep"></div>
+    <button class="tb-btn tb-btn--accent">🔍 对比模式</button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn">📥 导入实际</button>
+    <button class="tb-btn">📅 导入计划</button>
+    <button class="tb-btn">💾 导出</button>
+    <button class="tb-btn">📂 恢复</button>
+  </header>
+
+  <div class="content">
+    <!-- ══ OVERVIEW ══ -->
+    <div id="tab-overview" class="tab active">
+      <div class="alert-bar">
+        <div class="alert-bar__dot">!</div>
+        <span>触发 <span class="alert-bar__num">8</span> 条预警 · 涉及 <span class="alert-bar__num">5</span> 家分公司 · <span class="alert-bar__link">查看详情 →</span></span>
+      </div>
+      <div class="kpi-row">
+        <div class="kpi-card" style="--accent:var(--blue)">
+          <div class="kpi-card__label">保费实际</div>
+          <div class="kpi-card__value">35,431<span class="kpi-card__unit">万</span></div>
+          <div class="kpi-card__change kpi-card__change--up">▲ 3.8%</div>
+        </div>
+        <div class="kpi-card" style="--accent:var(--green)">
+          <div class="kpi-card__label">经营利润</div>
+          <div class="kpi-card__value">2,847<span class="kpi-card__unit">万</span></div>
+          <div class="kpi-card__change kpi-card__change--up">▲ 12.3%</div>
+        </div>
+        <div class="kpi-card" style="--accent:var(--amber)">
+          <div class="kpi-card__label">综合成本率</div>
+          <div class="kpi-card__value">96.85<span class="kpi-card__unit">%</span></div>
+          <div class="kpi-card__change kpi-card__change--down">▼ 1.2pp</div>
+          <div class="kpi-card__alert-dot"></div>
+        </div>
+        <div class="kpi-card" style="--accent:var(--purple)">
+          <div class="kpi-card__label">人均产能</div>
+          <div class="kpi-card__value">144.06<span class="kpi-card__unit">万/人</span></div>
+          <div class="kpi-card__change kpi-card__change--down">▼ 0.4%</div>
+        </div>
+        <div class="kpi-card" style="--accent:var(--cyan)">
+          <div class="kpi-card__label">人均利润</div>
+          <div class="kpi-card__value">9.71<span class="kpi-card__unit">万/人</span></div>
+          <div class="kpi-card__change kpi-card__change--up">▲ 5.2%</div>
+        </div>
+        <div class="kpi-card" style="--accent:var(--red)">
+          <div class="kpi-card__label">已赚赔付率</div>
+          <div class="kpi-card__value">62.34<span class="kpi-card__unit">%</span></div>
+          <div class="kpi-card__change kpi-card__change--down">▼ 0.8pp</div>
+        </div>
+      </div>
+      <div class="dual-col">
+        <div class="card">
+          <div class="card__header"><div class="card__title">保费结构分析</div><div class="card__meta">万元</div></div>
+          <div class="card__body"><div class="chart-area chart-area--tall"></div></div>
+        </div>
+        <div class="card">
+          <div class="card__header"><div class="card__title">效益指标</div><div class="card__meta">近6月</div></div>
+          <div class="card__body"><div class="chart-area chart-area--tall"></div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card__header"><div class="card__title">全国分公司排行</div><div class="card__meta">31家 · 按保费降序</div></div>
+        <div class="card__body">
+          <div class="tbl-scroll">
+            <table>
+              <thead><tr><th>分公司</th><th>责任区</th><th>保费(万)</th><th>利润(万)</th><th>COR</th><th>产能(万/人)</th><th>预警</th></tr></thead>
+              <tbody>
+                <tr><td class="td-name">北京分公司</td><td class="td-region">第一</td><td>3,245.80</td><td class="td-good">412.30</td><td class="td-good">94.20%</td><td>152.30</td><td>—</td></tr>
+                <tr><td class="td-name">上海分公司</td><td class="td-region">第一</td><td>2,890.50</td><td class="td-good">356.80</td><td class="td-good">95.10%</td><td>148.60</td><td>—</td></tr>
+                <tr><td class="td-name">广州分公司</td><td class="td-region">第二</td><td>2,456.20</td><td class="td-bad">-45.30</td><td class="td-bad">101.80%</td><td>135.40</td><td><span style="color:var(--red)">●</span> 亏损</td></tr>
+                <tr><td class="td-name">深圳分公司</td><td class="td-region">第二</td><td>2,103.70</td><td class="td-good">234.50</td><td class="td-warn">97.50%</td><td>143.20</td><td><span style="color:var(--amber)">●</span> COR偏高</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ REGIONS ══ -->
+    <div id="tab-regions" class="tab">
+      <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+        <div class="kpi-card" style="--accent:var(--blue)"><div class="kpi-card__label">第一责任区</div><div class="kpi-card__value">12,450<span class="kpi-card__unit">万</span></div></div>
+        <div class="kpi-card" style="--accent:var(--green)"><div class="kpi-card__label">第二责任区</div><div class="kpi-card__value">8,920<span class="kpi-card__unit">万</span></div></div>
+        <div class="kpi-card" style="--accent:var(--amber)"><div class="kpi-card__label">第三责任区</div><div class="kpi-card__value">7,830<span class="kpi-card__unit">万</span></div></div>
+        <div class="kpi-card" style="--accent:var(--purple)"><div class="kpi-card__label">第四责任区</div><div class="kpi-card__value">6,230<span class="kpi-card__unit">万</span></div></div>
+      </div>
+      <div class="dual-col">
+        <div class="card"><div class="card__header"><div class="card__title">保费对比</div><div class="card__meta">4区</div></div><div class="card__body"><div class="chart-area chart-area--tall"></div></div></div>
+        <div class="card"><div class="card__header"><div class="card__title">效益对比</div><div class="card__meta">COR / 赔付率</div></div><div class="card__body"><div class="chart-area chart-area--tall"></div></div></div>
+      </div>
+    </div>
+
+    <!-- ══ BRANCHES ══ -->
+    <div id="tab-branches" class="tab">
+      <div class="card">
+        <div class="card__header"><div class="card__title">分公司明细</div><div class="card__meta">31家 · 2026-04</div></div>
+        <div class="card__body">
+          <div class="tbl-scroll" style="max-height:600px;overflow-y:auto">
+            <table>
+              <thead><tr><th>分公司</th><th>责任区</th><th>保费(万)</th><th>利润(万)</th><th>COR</th><th>产能(万/人)</th><th>利润(万/人)</th><th>赔付率</th><th>预警</th></tr></thead>
+              <tbody>
+                <tr><td class="td-name">北京分公司</td><td class="td-region">第一</td><td>3,245.80</td><td class="td-good">412.30</td><td class="td-good">94.20%</td><td>152.30</td><td>14.20</td><td class="td-good">58.30%</td><td>—</td></tr>
+                <tr><td class="td-name">上海分公司</td><td class="td-region">第一</td><td>2,890.50</td><td class="td-good">356.80</td><td class="td-good">95.10%</td><td>148.60</td><td>12.80</td><td class="td-good">60.10%</td><td>—</td></tr>
+                <tr><td class="td-name">广州分公司</td><td class="td-region">第二</td><td>2,456.20</td><td class="td-bad">-45.30</td><td class="td-bad">101.80%</td><td>135.40</td><td class="td-bad">-2.50</td><td class="td-bad">68.50%</td><td><span style="color:var(--red)">●</span> 亏损</td></tr>
+                <tr><td class="td-name">深圳分公司</td><td class="td-region">第二</td><td>2,103.70</td><td class="td-good">234.50</td><td class="td-warn">97.50%</td><td>143.20</td><td>10.60</td><td class="td-warn">64.20%</td><td><span style="color:var(--amber)">●</span> COR偏高</td></tr>
+                <tr><td class="td-name">杭州分公司</td><td class="td-region">第三</td><td>1,856.40</td><td class="td-good">198.70</td><td class="td-good">93.80%</td><td>156.80</td><td>15.40</td><td class="td-good">57.50%</td><td>—</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ AI ══ -->
+    <div id="tab-ai" class="tab">
+      <div class="alert-bar"><div class="alert-bar__dot">!</div><span>规则引擎检出 <span class="alert-bar__num">8</span> 条预警 · AI 深度解读已就绪</span></div>
+      <div class="dual-col" style="grid-template-columns:1fr 1.2fr">
+        <div class="card">
+          <div class="card__header"><div class="card__title">规则预警汇总</div><div class="card__meta">8条</div></div>
+          <div class="card__body">
+            <div class="tbl-scroll">
+              <table>
+                <thead><tr><th>分公司</th><th>指标</th><th>值</th><th>阈值</th><th>级别</th></tr></thead>
+                <tbody>
+                  <tr><td class="td-name">广州</td><td>COR</td><td class="td-bad">101.80%</td><td>≥95%</td><td><span style="color:var(--red)">●红</span></td></tr>
+                  <tr><td class="td-name">广州</td><td>利润</td><td class="td-bad">-45.30</td><td>>0</td><td><span style="color:var(--red)">●红</span></td></tr>
+                  <tr><td class="td-name">深圳</td><td>COR</td><td class="td-warn">97.50%</td><td>≥95%</td><td><span style="color:var(--amber)">●橙</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="ai-panel">
+          <div class="ai-panel__head"><div class="ai-panel__icon">🤖</div><div class="ai-panel__title">AI 深度对话</div><div class="ai-panel__tag">GLM-4-Plus</div></div>
+          <div class="ai-chat">
+            <div class="ai-msg ai-msg--ai"><div class="ai-msg__bubble"><strong>广州分公司 · 深度解读</strong><br><br>COR 101.80% 突破盈亏线，核心矛盾在已赚赔付率 68.50% 显著高于全国 62.34%。近6月从 60.20% 攀升至 68.50%，加速恶化。<br><br><strong>预判：</strong>6月COR将达104%+，建议核查车险大案。</div></div>
+            <div class="ai-msg ai-msg--user"><div class="ai-msg__bubble">广州赔付率恶化的主要原因？</div></div>
+            <div class="ai-msg ai-msg--ai"><div class="ai-msg__bubble">车险已赚赔付率从 58.30% 升至 71.20%（+12.9pp），远超均值。可能原因：<br>1. 大案集中赔付<br>2. 渠道结构变化<br>3. 核保标准放松<br><br>建议调取4月理赔明细核实。</div></div>
+          </div>
+          <div class="ai-input-row"><input class="ai-input" placeholder="输入问题…"><button class="ai-send">发送</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ TREND ══ -->
+    <div id="tab-trend" class="tab">
+      <div class="filter-row">
+        <div class="filter-item"><div class="filter-label">指标</div><select class="filter-sel"><option>整体人均产能(实际)</option></select></div>
+        <div class="filter-item"><div class="filter-label">责任区</div><select class="filter-sel"><option>全国汇总</option><option>第一责任区</option></select></div>
+        <div class="filter-item"><div class="filter-label">分公司</div><select class="filter-sel"><option>全部汇总</option></select></div>
+        <div class="filter-item"><div class="filter-label">时间范围</div><select class="filter-sel"><option>近6个月</option><option>全部</option></select></div>
+        <button class="tb-btn tb-btn--accent" style="height:32px;margin-bottom:0">🔍 显示</button>
+      </div>
+      <div class="card"><div class="card__header"><div class="card__title">整体人均产能 — 近6月趋势</div><div class="card__meta">万元/人</div></div><div class="card__body"><div class="chart-area chart-area--tall"></div></div></div>
+      <div class="dual-col">
+        <div class="card"><div class="card__header"><div class="card__title">多指标对比</div><div class="card__meta">2-6个</div></div><div class="card__body"><div class="chart-area"></div></div></div>
+        <div class="card"><div class="card__header"><div class="card__title">分公司对比</div><div class="card__meta">2-8家</div></div><div class="card__body"><div class="chart-area"></div></div></div>
+      </div>
+    </div>
+
+    <!-- ══ DATA ══ -->
+    <div id="tab-data" class="tab">
+      <div class="data-grid">
+        <div class="data-box">
+          <div class="data-box__title">📥 数据导入</div>
+          <div class="data-box__desc">支持 Excel (.xlsx) 格式，导入后自动合并到当前月份。</div>
+          <button class="btn-act">📥 导入实际</button><br>
+          <button class="btn-act">📅 导入计划</button><br>
+          <button class="btn-act">📋 实际模板</button><br>
+          <button class="btn-act">📋 计划模板</button>
+        </div>
+        <div class="data-box">
+          <div class="data-box__title">💾 备份恢复</div>
+          <div class="data-box__desc">导出全部数据为 JSON，可跨设备迁移。</div>
+          <button class="btn-act">💾 导出备份</button><br>
+          <button class="btn-act">📂 恢复备份</button>
+        </div>
+        <div class="data-box">
+          <div class="data-box__title">🔒 加密分享</div>
+          <div class="data-box__desc">一键加密，生成 GitHub Pages 分享链接。</div>
+          <button class="btn-act">🔒 加密分享</button><br>
+          <button class="btn-act">📤 导出分享数据</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ GUIDE ══ -->
+    <div id="tab-guide" class="tab">
+      <div class="card">
+        <div class="card__header"><div class="card__title">指标说明</div><div class="card__meta">77项指标</div></div>
+        <div class="card__body">
+          <div class="tbl-scroll">
+            <table>
+              <thead><tr><th>指标</th><th>分组</th><th>单位</th><th>方向</th><th>说明</th></tr></thead>
+              <tbody>
+                <tr><td class="td-name">保费实际合计</td><td>保费</td><td>万元</td><td class="td-good">↑</td><td>各险种保费实际收入合计</td></tr>
+                <tr><td class="td-name">经营利润</td><td>效益</td><td>万元</td><td class="td-good">↑</td><td>含投资收益</td></tr>
+                <tr><td class="td-name">综合成本率</td><td>效益</td><td>%</td><td class="td-bad">↓</td><td>低于100%为盈利</td></tr>
+                <tr><td class="td-name">整体人均产能</td><td>效能</td><td>万元/人</td><td class="td-good">↑</td><td>保费/平均人数</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<script>
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.sidebar__item').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  event.target.closest('.sidebar__item').classList.add('active');
+}
+</script>
+</body>
+</html>

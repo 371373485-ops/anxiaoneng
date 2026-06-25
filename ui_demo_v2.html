@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>安效能数据看板 — UI Demo</title>
+<link rel="icon" href="data:,">
+<style>
+/* ═══════════════════════════════════════════════════════
+   DESIGN SYSTEM — "Refined Industrial"
+   深色质感 + 精密仪表盘风格 + 暖色点缀
+   ═══════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* ── Color: Deep Slate Base ── */
+  --bg-0: #0a0e17;
+  --bg-1: #111726;
+  --bg-2: #1a2138;
+  --bg-3: #232d4a;
+  --surface: rgba(26, 33, 56, 0.6);
+  --surface-hover: rgba(35, 45, 74, 0.8);
+  --surface-raised: rgba(30, 38, 62, 0.95);
+  --border: rgba(99, 119, 182, 0.15);
+  --border-strong: rgba(99, 119, 182, 0.3);
+  --glass: rgba(255, 255, 255, 0.03);
+  --glass-strong: rgba(255, 255, 255, 0.06);
+
+  /* ── Text ── */
+  --text-0: #f0f4ff;
+  --text-1: #c4cce0;
+  --text-2: #7a85a3;
+  --text-3: #4a5375;
+
+  /* ── Accents ── */
+  --blue: #4c8bf5;
+  --blue-soft: rgba(76, 139, 245, 0.12);
+  --blue-glow: rgba(76, 139, 245, 0.4);
+  --green: #22c55e;
+  --green-soft: rgba(34, 197, 94, 0.12);
+  --red: #ef4444;
+  --red-soft: rgba(239, 68, 68, 0.12);
+  --amber: #f59e0b;
+  --amber-soft: rgba(245, 158, 11, 0.12);
+  --purple: #a78bfa;
+  --purple-soft: rgba(167, 139, 250, 0.12);
+  --cyan: #06b6d4;
+  --cyan-soft: rgba(6, 182, 212, 0.12);
+
+  /* ── Typography ── */
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'DM Sans', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+
+  /* ── Spacing ── */
+  --xs: 4px;
+  --sm: 8px;
+  --md: 16px;
+  --lg: 24px;
+  --xl: 32px;
+  --xxl: 48px;
+
+  /* ── Radius ── */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 16px;
+  --r-xl: 24px;
+
+  /* ── Shadows ── */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
+  --shadow-glow: 0 0 24px var(--blue-glow);
+
+  /* ── Transitions ── */
+  --t-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --t-med: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --t-slow: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Reset ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; -webkit-font-smoothing: antialiased; }
+body {
+  font-family: var(--font-body);
+  background: var(--bg-0);
+  color: var(--text-1);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 800px 600px at 15% -5%, rgba(76, 139, 245, 0.06), transparent),
+    radial-gradient(ellipse 600px 400px at 85% 100%, rgba(167, 139, 250, 0.04), transparent),
+    linear-gradient(180deg, var(--bg-0) 0%, var(--bg-1) 100%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* ═══════════════════════════════════════════════════════
+   HEADER
+   ═══════════════════════════════════════════════════════ */
+.header {
+  background: linear-gradient(135deg, rgba(17, 23, 38, 0.95), rgba(26, 33, 56, 0.95));
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  padding: var(--md) var(--xl);
+  display: flex;
+  align-items: center;
+  gap: var(--lg);
+  flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sm);
+}
+.header__logo {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-sm);
+  background: linear-gradient(135deg, var(--blue), var(--purple));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--text-0);
+  font-size: 16px;
+  box-shadow: 0 2px 8px var(--blue-glow);
+}
+.header__title {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-0);
+  letter-spacing: -0.02em;
+}
+.header__sub {
+  font-size: 0.7rem;
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  margin-top: 1px;
+}
+
+/* ── Toolbar ── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sm);
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+.toolbar__group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--xs);
+  padding: 3px;
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+.tb-label {
+  font-size: 0.7rem;
+  color: var(--text-2);
+  padding: 0 var(--xs);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.tb-select, .tb-btn, .tb-btn-file {
+  height: 30px;
+  padding: 0 var(--md);
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-1);
+  font-size: 0.78rem;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: var(--t-fast);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--xs);
+  white-space: nowrap;
+}
+.tb-select {
+  background: var(--glass-strong);
+  border-color: var(--border);
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 24px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%237a85a3' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+}
+.tb-select option { color: var(--text-0); background: var(--bg-2); }
+.tb-btn:hover, .tb-btn-file:hover {
+  background: var(--glass-strong);
+  border-color: var(--border-strong);
+  color: var(--text-0);
+}
+.tb-btn--accent {
+  background: var(--blue-soft);
+  border-color: rgba(76, 139, 245, 0.3);
+  color: var(--blue);
+  font-weight: 600;
+}
+.tb-btn--accent:hover {
+  background: rgba(76, 139, 245, 0.2);
+  border-color: var(--blue);
+}
+.toolbar__sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border-strong);
+}
+
+/* ═══════════════════════════════════════════════════════
+   NAV
+   ═══════════════════════════════════════════════════════ */
+.nav {
+  display: flex;
+  gap: 2px;
+  padding: 0 var(--xl);
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.nav::-webkit-scrollbar { display: none; }
+.nav__item {
+  padding: var(--sm) var(--md);
+  border: none;
+  background: none;
+  color: var(--text-2);
+  font-size: 0.82rem;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: var(--t-fast);
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: var(--xs);
+}
+.nav__item:hover { color: var(--text-1); }
+.nav__item.active {
+  color: var(--text-0);
+  border-bottom-color: var(--blue);
+  font-weight: 600;
+}
+.nav__badge {
+  background: var(--red);
+  color: var(--text-0);
+  border-radius: 10px;
+  padding: 1px 6px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+/* ═══════════════════════════════════════════════════════
+   MAIN
+   ═══════════════════════════════════════════════════════ */
+.main {
+  padding: var(--lg) var(--xl);
+  max-width: 1600px;
+  margin: 0 auto;
+}
+.tab { display: none; }
+.tab.active { display: block; animation: fadeIn 0.3s ease; }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ═══════════════════════════════════════════════════════
+   KPI CARDS
+   ═══════════════════════════════════════════════════════ */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--md);
+  margin-bottom: var(--lg);
+}
+.kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--md);
+  position: relative;
+  overflow: hidden;
+  transition: var(--t-med);
+}
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent, var(--blue));
+  opacity: 0.6;
+}
+.kpi-card:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+.kpi-card__label {
+  font-size: 0.72rem;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-family: var(--font-mono);
+  margin-bottom: var(--xs);
+}
+.kpi-card__value {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-weight: 600;
+  color: var(--text-0);
+  line-height: 1.2;
+}
+.kpi-card__unit {
+  font-size: 0.75rem;
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  margin-left: var(--xs);
+}
+.kpi-card__change {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  margin-top: var(--xs);
+  padding: 1px 6px;
+  border-radius: var(--r-sm);
+}
+.kpi-card__change--up { background: var(--green-soft); color: var(--green); }
+.kpi-card__change--down { background: var(--red-soft); color: var(--red); }
+.kpi-card__alert {
+  position: absolute;
+  top: var(--sm);
+  right: var(--sm);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--red);
+  box-shadow: 0 0 8px var(--red);
+}
+.kpi-card--amber::before { background: var(--amber); }
+.kpi-card--red::before { background: var(--red); }
+.kpi-card--green::before { background: var(--green); }
+.kpi-card--purple::before { background: var(--purple); }
+.kpi-card--cyan::before { background: var(--cyan); }
+
+/* ═══════════════════════════════════════════════════════
+   SECTION / CARD
+   ═══════════════════════════════════════════════════════ */
+.section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--lg);
+  margin-bottom: var(--lg);
+}
+.section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--md);
+}
+.section__title {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-0);
+  letter-spacing: -0.01em;
+}
+.section__meta {
+  font-size: 0.72rem;
+  color: var(--text-2);
+  font-family: var(--font-mono);
+}
+
+/* ═══════════════════════════════════════════════════════
+   TABLE
+   ═══════════════════════════════════════════════════════ */
+.tbl-wrap {
+  overflow-x: auto;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+thead { background: var(--glass-strong); }
+th {
+  padding: var(--sm) var(--md);
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-2);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-family: var(--font-mono);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+td {
+  padding: var(--sm) var(--md);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+tbody tr { transition: var(--t-fast); }
+tbody tr:hover { background: var(--glass); }
+tbody tr:last-child td { border-bottom: none; }
+.td-name { font-family: var(--font-body); font-weight: 500; color: var(--text-0); }
+.td-good { color: var(--green); }
+.td-bad { color: var(--red); }
+.td-warn { color: var(--amber); }
+
+/* ═══════════════════════════════════════════════════════
+   CHART PLACEHOLDER
+   ═══════════════════════════════════════════════════════ */
+.chart-box {
+  height: 280px;
+  border-radius: var(--r-md);
+  background: var(--glass);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-3);
+  font-size: 0.82rem;
+  font-family: var(--font-mono);
+  position: relative;
+}
+.chart-box::after {
+  content: 'Chart Area';
+}
+
+/* ═══════════════════════════════════════════════════════
+   ALERT BANNER
+   ═══════════════════════════════════════════════════════ */
+.alert-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--md);
+  padding: var(--sm) var(--lg);
+  background: linear-gradient(90deg, var(--red-soft), transparent);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--r-md);
+  margin-bottom: var(--md);
+  font-size: 0.8rem;
+}
+.alert-banner__icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--red-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--red);
+  font-size: 0.7rem;
+  flex-shrink: 0;
+}
+.alert-banner__count {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--red);
+}
+
+/* ═══════════════════════════════════════════════════════
+   AI SECTION
+   ═══════════════════════════════════════════════════════ */
+.ai-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+.ai-panel__header {
+  padding: var(--md) var(--lg);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: var(--sm);
+  background: var(--glass-strong);
+}
+.ai-panel__icon {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-sm);
+  background: linear-gradient(135deg, var(--purple), var(--blue));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+}
+.ai-panel__title {
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-0);
+}
+.ai-chat {
+  padding: var(--lg);
+  min-height: 200px;
+}
+.ai-msg {
+  margin-bottom: var(--md);
+  max-width: 85%;
+}
+.ai-msg--user {
+  margin-left: auto;
+  text-align: right;
+}
+.ai-msg__bubble {
+  display: inline-block;
+  padding: var(--sm) var(--md);
+  border-radius: var(--r-lg);
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+.ai-msg--user .ai-msg__bubble {
+  background: var(--blue);
+  color: var(--text-0);
+  border-bottom-right-radius: var(--r-sm);
+}
+.ai-msg--ai .ai-msg__bubble {
+  background: var(--glass-strong);
+  border: 1px solid var(--border);
+  color: var(--text-1);
+  border-bottom-left-radius: var(--r-sm);
+}
+.ai-input-row {
+  display: flex;
+  gap: var(--sm);
+  padding: var(--md) var(--lg);
+  border-top: 1px solid var(--border);
+}
+.ai-input {
+  flex: 1;
+  height: 36px;
+  padding: 0 var(--md);
+  background: var(--glass-strong);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  color: var(--text-0);
+  font-size: 0.82rem;
+  font-family: var(--font-body);
+  outline: none;
+  transition: var(--t-fast);
+}
+.ai-input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-soft); }
+.ai-input::placeholder { color: var(--text-3); }
+.ai-send {
+  height: 36px;
+  padding: 0 var(--lg);
+  background: var(--blue);
+  border: none;
+  border-radius: var(--r-md);
+  color: var(--text-0);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--t-fast);
+}
+.ai-send:hover { background: #3b7de0; }
+
+/* ═══════════════════════════════════════════════════════
+   TREND CONTROLS
+   ═══════════════════════════════════════════════════════ */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--md);
+  flex-wrap: wrap;
+  padding: var(--md);
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  margin-bottom: var(--lg);
+}
+.filter-bar__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.filter-bar__label {
+  font-size: 0.65rem;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-family: var(--font-mono);
+}
+.filter-bar__select {
+  height: 32px;
+  padding: 0 var(--md);
+  background: var(--glass-strong);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--text-0);
+  font-size: 0.8rem;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 24px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%237a85a3' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  min-width: 120px;
+}
+
+/* ═══════════════════════════════════════════════════════
+   DATA MANAGEMENT
+   ═══════════════════════════════════════════════════════ */
+.data-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--lg);
+}
+.data-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--lg);
+}
+.data-card__title {
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-0);
+  margin-bottom: var(--md);
+}
+.data-card__desc {
+  font-size: 0.78rem;
+  color: var(--text-2);
+  line-height: 1.6;
+  margin-bottom: var(--md);
+}
+.btn-action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--xs);
+  height: 34px;
+  padding: 0 var(--lg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  background: var(--glass-strong);
+  color: var(--text-0);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: var(--t-fast);
+}
+.btn-action:hover { background: var(--surface-hover); border-color: var(--blue); }
+
+/* ═══════════════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .header { padding: var(--sm) var(--md); }
+  .header__title { font-size: 0.92rem; }
+  .toolbar { width: 100%; }
+  .nav { padding: 0 var(--md); }
+  .main { padding: var(--md); }
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .data-panel { grid-template-columns: 1fr; }
+  .kpi-card__value { font-size: 1.3rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══ HEADER ══ -->
+<header class="header">
+  <div class="header__brand">
+    <div class="header__logo">华</div>
+    <div>
+      <div class="header__title">华安保险 · 经营效能数据看板</div>
+      <div class="header__sub">2026-04 · 计划: 自动</div>
+    </div>
+  </div>
+  <div class="toolbar">
+    <div class="toolbar__group">
+      <span class="tb-label">年度</span>
+      <select class="tb-select"><option>2026</option></select>
+      <span class="tb-label">月</span>
+      <select class="tb-select"><option>4月</option></select>
+    </div>
+    <div class="toolbar__sep"></div>
+    <select class="tb-select"><option>计划: 自动</option></select>
+    <div class="toolbar__sep"></div>
+    <button class="tb-btn tb-btn--accent">🔍 对比模式</button>
+    <div class="toolbar__sep"></div>
+    <button class="tb-btn">📥 导入实际</button>
+    <button class="tb-btn">📅 导入计划</button>
+    <button class="tb-btn">💾 导出备份</button>
+    <button class="tb-btn">📂 恢复备份</button>
+  </div>
+</header>
+
+<!-- ══ NAV ══ -->
+<nav class="nav">
+  <button class="nav__item active" onclick="switchTab('overview')">📊 总览</button>
+  <button class="nav__item" onclick="switchTab('regions')">📈 责任区对比 <span class="nav__badge">3</span></button>
+  <button class="nav__item" onclick="switchTab('branches')">📋 分公司明细 <span class="nav__badge">8</span></button>
+  <button class="nav__item" onclick="switchTab('ai')">🤖 AI 智能分析</button>
+  <button class="nav__item" onclick="switchTab('trend')">📈 多期趋势</button>
+  <button class="nav__item" onclick="switchTab('data')">📦 数据管理</button>
+  <button class="nav__item" onclick="switchTab('guide')">📖 指标说明</button>
+</nav>
+
+<!-- ══ MAIN ══ -->
+<main class="main">
+
+  <!-- ── Tab: Overview ── -->
+  <div id="tab-overview" class="tab active">
+    <div class="alert-banner">
+      <div class="alert-banner__icon">!</div>
+      <span>当前触发 <span class="alert-banner__count">8</span> 条预警 · 涉及 <span class="alert-banner__count">5</span> 家分公司 ·
+        <a href="#" style="color: var(--blue); text-decoration: none;">查看详情</a></span>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi-card" style="--accent: var(--blue)">
+        <div class="kpi-card__label">保费实际合计</div>
+        <div class="kpi-card__value">35,431.01<span class="kpi-card__unit">万元</span></div>
+        <div class="kpi-card__change kpi-card__change--up">▲ 3.8% vs 上月</div>
+      </div>
+      <div class="kpi-card kpi-card--green" style="--accent: var(--green)">
+        <div class="kpi-card__label">经营利润</div>
+        <div class="kpi-card__value">2,847.50<span class="kpi-card__unit">万元</span></div>
+        <div class="kpi-card__change kpi-card__change--up">▲ 12.3% vs 上月</div>
+      </div>
+      <div class="kpi-card kpi-card--amber" style="--accent: var(--amber)">
+        <div class="kpi-card__label">综合成本率</div>
+        <div class="kpi-card__value">96.85<span class="kpi-card__unit">%</span></div>
+        <div class="kpi-card__change kpi-card__change--down">▼ 1.2pp vs 上月</div>
+        <div class="kpi-card__alert"></div>
+      </div>
+      <div class="kpi-card kpi-card--purple" style="--accent: var(--purple)">
+        <div class="kpi-card__label">整体人均产能</div>
+        <div class="kpi-card__value">144.06<span class="kpi-card__unit">万元/人</span></div>
+        <div class="kpi-card__change kpi-card__change--down">▼ 0.4% vs 上月</div>
+      </div>
+      <div class="kpi-card kpi-card--cyan" style="--accent: var(--cyan)">
+        <div class="kpi-card__label">整体人均利润</div>
+        <div class="kpi-card__value">9.71<span class="kpi-card__unit">万元/人</span></div>
+        <div class="kpi-card__change kpi-card__change--up">▲ 5.2% vs 上月</div>
+      </div>
+      <div class="kpi-card kpi-card--red" style="--accent: var(--red)">
+        <div class="kpi-card__label">已赚赔付率</div>
+        <div class="kpi-card__value">62.34<span class="kpi-card__unit">%</span></div>
+        <div class="kpi-card__change kpi-card__change--down">▼ 0.8pp vs 上月</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section__header">
+        <div class="section__title">保费结构</div>
+        <div class="section__meta">单位: 万元</div>
+      </div>
+      <div class="chart-box"></div>
+    </div>
+
+    <div class="section">
+      <div class="section__header">
+        <div class="section__title">效益指标趋势</div>
+        <div class="section__meta">近 6 个月</div>
+      </div>
+      <div class="chart-box"></div>
+    </div>
+  </div>
+
+  <!-- ── Tab: Regions ── -->
+  <div id="tab-regions" class="tab">
+    <div class="kpi-grid">
+      <div class="kpi-card" style="--accent: var(--blue)">
+        <div class="kpi-card__label">第一责任区 · 保费</div>
+        <div class="kpi-card__value">12,450.30<span class="kpi-card__unit">万元</span></div>
+      </div>
+      <div class="kpi-card kpi-card--green" style="--accent: var(--green)">
+        <div class="kpi-card__label">第二责任区 · 保费</div>
+        <div class="kpi-card__value">8,920.15<span class="kpi-card__unit">万元</span></div>
+      </div>
+      <div class="kpi-card kpi-card--amber" style="--accent: var(--amber)">
+        <div class="kpi-card__label">第三责任区 · 保费</div>
+        <div class="kpi-card__value">7,830.56<span class="kpi-card__unit">万元</span></div>
+      </div>
+      <div class="kpi-card kpi-card--purple" style="--accent: var(--purple)">
+        <div class="kpi-card__label">第四责任区 · 保费</div>
+        <div class="kpi-card__value">6,230.00<span class="kpi-card__unit">万元</span></div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section__header">
+        <div class="section__title">责任区对比</div>
+        <div class="section__meta">4 个责任区</div>
+      </div>
+      <div class="chart-box"></div>
+    </div>
+  </div>
+
+  <!-- ── Tab: Branches ── -->
+  <div id="tab-branches" class="tab">
+    <div class="section">
+      <div class="section__header">
+        <div class="section__title">分公司明细</div>
+        <div class="section__meta">31 家分公司 · 2026-04</div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>分公司</th><th>责任区</th><th>保费实际(万元)</th>
+              <th>经营利润(万元)</th><th>综合成本率</th><th>人均产能(万元/人)</th><th>预警</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="td-name">北京分公司</td><td>第一责任区</td><td>3,245.80</td><td class="td-good">412.30</td><td class="td-good">94.20%</td><td>152.30</td><td>—</td></tr>
+            <tr><td class="td-name">上海分公司</td><td>第一责任区</td><td>2,890.50</td><td class="td-good">356.80</td><td class="td-good">95.10%</td><td>148.60</td><td>—</td></tr>
+            <tr><td class="td-name">广州分公司</td><td>第二责任区</td><td>2,456.20</td><td class="td-bad">-45.30</td><td class="td-bad">101.80%</td><td>135.40</td><td><span style="color:var(--red)">●</span> 利润亏损</td></tr>
+            <tr><td class="td-name">深圳分公司</td><td>第二责任区</td><td>2,103.70</td><td class="td-good">234.50</td><td class="td-warn">97.50%</td><td>143.20</td><td><span style="color:var(--amber)">●</span> COR偏高</td></tr>
+            <tr><td class="td-name">杭州分公司</td><td>第三责任区</td><td>1,856.40</td><td class="td-good">198.70</td><td class="td-good">93.80%</td><td>156.80</td><td>—</td></tr>
+            <tr><td class="td-name">成都分公司</td><td>第三责任区</td><td>1,734.20</td><td class="td-warn">52.10</td><td class="td-warn">98.40%</td><td>128.90</td><td><span style="color:var(--amber)">●</span> COR偏高</td></tr>
+            <tr><td class="td-name">武汉分公司</td><td>第四责任区</td><td>1,523.60</td><td class="td-good">167.40</td><td class="td-good">94.60%</td><td>141.50</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Tab: AI ── -->
+  <div id="tab-ai" class="tab">
+    <div class="alert-banner">
+      <div class="alert-banner__icon">!</div>
+      <span>规则引擎检出 <span class="alert-banner__count">8</span> 条预警 · AI 深度解读已就绪</span>
+    </div>
+    <div class="ai-panel">
+      <div class="ai-panel__header">
+        <div class="ai-panel__icon">🤖</div>
+        <div class="ai-panel__title">AI 智能经营分析</div>
+      </div>
+      <div class="ai-chat">
+        <div class="ai-msg ai-msg--ai">
+          <div class="ai-msg__bubble">
+            <strong>广州分公司 · 深度解读</strong><br><br>
+            综合成本率 101.80% 突破盈亏平衡线，核心矛盾在于已赚赔付率 68.50% 显著高于全国均值 62.34%。结合近 6 个月趋势，赔付率从 60.20% 持续攀升至 68.50%，呈加速恶化态势。<br><br>
+            <strong>风险预判：</strong>若趋势延续，6 月综合成本率将达 104%+，建议优先核查车险大案集中情况。
+          </div>
+        </div>
+        <div class="ai-msg ai-msg--user">
+          <div class="ai-msg__bubble">广州分公司赔付率恶化的主要原因是什么？</div>
+        </div>
+        <div class="ai-msg ai-msg--ai">
+          <div class="ai-msg__bubble">
+            从数据看，广州分公司近 3 个月车险已赚赔付率从 58.30% 升至 71.20%，增幅 12.9pp，远超其他分公司。可能原因：<br>
+            1. 大案集中赔付（需核查 4 月案均赔款）<br>
+            2. 渠道结构变化导致高风险业务占比上升<br>
+            3. 核保标准放松<br><br>
+            建议调取 4 月理赔明细核实大案影响。
+          </div>
+        </div>
+      </div>
+      <div class="ai-input-row">
+        <input class="ai-input" placeholder="输入问题，如：对比北京和上海的效益指标">
+        <button class="ai-send">发送</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Tab: Trend ── -->
+  <div id="tab-trend" class="tab">
+    <div class="filter-bar">
+      <div class="filter-bar__item">
+        <div class="filter-bar__label">指标</div>
+        <select class="filter-bar__select"><option>整体人均产能(实际)</option></select>
+      </div>
+      <div class="filter-bar__item">
+        <div class="filter-bar__label">责任区</div>
+        <select class="filter-bar__select"><option>全国汇总</option><option>第一责任区</option><option>第二责任区</option><option>第三责任区</option><option>第四责任区</option></select>
+      </div>
+      <div class="filter-bar__item">
+        <div class="filter-bar__label">分公司</div>
+        <select class="filter-bar__select"><option>全部汇总</option></select>
+      </div>
+      <div class="filter-bar__item">
+        <div class="filter-bar__label">时间范围</div>
+        <select class="filter-bar__select"><option>近 6 个月</option><option>近 3 个月</option><option>全部</option><option>自定义</option></select>
+      </div>
+      <button class="btn-action" style="margin-left: auto;">🔍 显示趋势</button>
+    </div>
+    <div class="section">
+      <div class="section__header">
+        <div class="section__title">整体人均产能(实际) — 近 6 个月</div>
+        <div class="section__meta">万元/人</div>
+      </div>
+      <div class="chart-box" style="height: 360px;"></div>
+    </div>
+    <div class="section">
+      <div class="section__header">
+        <div class="section__title">多指标对比</div>
+        <div class="section__meta">可同时选 2-6 个指标</div>
+      </div>
+      <div class="chart-box" style="height: 280px;"></div>
+    </div>
+  </div>
+
+  <!-- ── Tab: Data ── -->
+  <div id="tab-data" class="tab">
+    <div class="data-panel">
+      <div class="data-card">
+        <div class="data-card__title">📥 导入数据</div>
+        <div class="data-card__desc">支持 Excel (.xlsx) 格式。导入后数据自动合并到当前月份，可随时切换月份查看。</div>
+        <button class="btn-action">📥 导入实际数据</button>
+        <div style="height: 8px;"></div>
+        <button class="btn-action">📅 导入计划数据</button>
+        <div style="height: var(--md);"></div>
+        <div class="data-card__title" style="font-size: 0.82rem;">下载模板</div>
+        <button class="btn-action" style="font-size: 0.75rem;">实际数据模板</button>
+        <div style="height: 8px;"></div>
+        <button class="btn-action" style="font-size: 0.75rem;">计划数据模板</button>
+      </div>
+      <div class="data-card">
+        <div class="data-card__title">💾 备份与分享</div>
+        <div class="data-card__desc">导出当前所有数据为 JSON 文件，可用于备份恢复或跨设备迁移。</div>
+        <button class="btn-action">💾 导出备份</button>
+        <div style="height: 8px;"></div>
+        <button class="btn-action">📂 恢复备份</button>
+        <div style="height: var(--md);"></div>
+        <div class="data-card__title" style="font-size: 0.82rem;">加密分享</div>
+        <div class="data-card__desc">一键加密数据，生成带密码的分享链接，可部署到 GitHub Pages。</div>
+        <button class="btn-action">🔒 加密分享数据</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Tab: Guide ── -->
+  <div id="tab-guide" class="tab">
+    <div class="section">
+      <div class="section__header">
+        <div class="section__title">指标说明</div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr><th>指标</th><th>分组</th><th>单位</th><th>方向</th><th>说明</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="td-name">保费实际合计</td><td>保费</td><td>万元</td><td class="td-good">↑ 越高越好</td><td>当期各险种保费实际收入合计</td></tr>
+            <tr><td class="td-name">经营利润</td><td>效益</td><td>万元</td><td class="td-good">↑ 越高越好</td><td>当期经营利润，含投资收益</td></tr>
+            <tr><td class="td-name">综合成本率</td><td>效益</td><td>%</td><td class="td-bad">↓ 越低越好</td><td>赔付率+费用率，低于100%为盈利</td></tr>
+            <tr><td class="td-name">整体人均产能</td><td>效能</td><td>万元/人</td><td class="td-good">↑ 越高越好</td><td>保费收入/平均人数</td></tr>
+            <tr><td class="td-name">已赚赔付率</td><td>效益</td><td>%</td><td class="td-bad">↓ 越低越好</td><td>已决赔款/已赚保费</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.nav__item').forEach(t=>t.classList.remove('active'));
+  var tab=document.getElementById('tab-'+name);
+  if(tab)tab.classList.add('active');
+  event.target.closest('.nav__item').classList.add('active');
+}
+</script>
+</body>
+</html>
