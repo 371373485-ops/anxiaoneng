@@ -416,7 +416,10 @@ function renderCardChart(card){
               var label = ctx.dataset.label + ': ' + fmtVal(v);
               if(ctx.dataset._hasRank && v != null){
                 var rank = ctx.dataset._ranks[ctx.dataIndex];
-                if(rank) label += '  (第' + rank + '/' + getBranchesInRegion('全国').length + '名)';
+                if(rank){
+                  var rTotal = ['第一责任区','第二责任区','第三责任区','第四责任区'].indexOf(ctx.dataset.label) >= 0 ? 4 : getBranchesInRegion('全国').length;
+                  label += '  (第' + rank + '/' + rTotal + '名)';
+                }
               }
               return label;
             }
@@ -558,7 +561,8 @@ function generateAnalysis(card, months){
     // 排名变化
     var rankText = '';
     var isBranch = org.name !== '全国' && org.name !== '整体';
-    var total = getBranchesInRegion('全国').length;
+    var isRegion = ['第一责任区','第二责任区','第三责任区','第四责任区'].indexOf(org.name) >= 0;
+    var total = isRegion ? 4 : getBranchesInRegion('全国').length;
     if(isBranch){
       var firstRank = getOrgRank(org.name, months[0], card.metric, direction);
       var lastRank = getOrgRank(org.name, months[months.length-1], card.metric, direction);
