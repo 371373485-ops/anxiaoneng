@@ -643,20 +643,23 @@ function generateAnalysis(card, months){
     var first = validVals[0];
     var last = validVals[validVals.length - 1];
     var change = last - first;
-    var changePct = first !== 0 ? (change / Math.abs(first) * 100) : 0;
-    var changeAbs = last - first; // absolute change (for % metrics, this is percentage points)
+    var changePct = first !== 0 ? (change / Math.abs(first) * 100) : 0;  // 相对变化（增减幅），用于额度指标
+    var changeAbs = last - first; // 绝对差值，用于百分比指标
     var maxVal = Math.max.apply(null, validVals);
     var minVal = Math.min.apply(null, validVals);
     var avgVal = validVals.reduce(function(a,b){ return a+b; }, 0) / validVals.length;
     var range = maxVal - minVal;
     var isImproving = direction === 'desc' ? change > 0 : change < 0;
     var absChangePct = Math.abs(changePct);
-    var changeMeasure = absChangePct;
-    var changeDisplay = (changePct > 0 ? '+' : '') + changePct.toFixed(2) + '%';
+    // 百分比指标用绝对差值×100（加减法）；额度指标用相对变化（增减幅）
+    var changeDispVal = isPct ? Math.abs(changeAbs * 100) : Math.abs(changePct);
+    var changeMeasure = changeDispVal;
     
     // 趋势方向（客观描述）
     var trendDir;
-    if (changeMeasure <= 0) trendDir = '基本持平，无明显变化';
+    // 百分比指标>1%才描述，额度指标>2%
+    var flatThreshold = isPct ? 1 : 2;
+    if (changeMeasure < flatThreshold) trendDir = '基本持平，无明显变化';
     else if (changeMeasure < 3) trendDir = isImproving ? '略有改善' : '略有下降';
     else if (changeMeasure < 10) trendDir = isImproving ? '有所改善' : '有所下降';
     else trendDir = isImproving ? '明显改善' : '明显下降';
@@ -675,7 +678,8 @@ function generateAnalysis(card, months){
       if (vals[i] != null && vals[i-1] != null) {
         var mom = vals[i] - vals[i-1];
         var momPct = vals[i-1] !== 0 ? mom / Math.abs(vals[i-1]) * 100 : 0;
-        var momDisp = momPct
+        // 百分比指标用绝对差值×100（加减法）；额度指标用相对变化（增减幅）
+        var momDisp = isPct ? mom * 100 : momPct;
         if (momDisp > Math.abs(maxMomUp)) { maxMomUp = momDisp; maxMomUpMonth = fmtMonth(months[i]); }
         if (momDisp < -Math.abs(maxMomDown)) { maxMomDown = momDisp; maxMomDownMonth = fmtMonth(months[i]); }
       }
@@ -706,9 +710,11 @@ function generateAnalysis(card, months){
         var groupAvg = otherAvgs.reduce(function(a,b){return a+b},0) / otherAvgs.length;
         var diff = myAvg - groupAvg;
         var diffPct = groupAvg !== 0 ? diff / Math.abs(groupAvg) * 100 : 0;
-        var diffDisp = Math.abs(diffPct).toFixed(2) + '%';
+        // 百分比指标用绝对差值×100；额度指标用相对变化
+        var diffDispVal = isPct ? Math.abs(diff * 100) : Math.abs(diffPct);
+        var diffDisp = diffDispVal.toFixed(2) + '%';
         var betterThan = direction === 'desc' ? diff > 0 : diff < 0;
-        if (Math.abs(diffPct) < 2) {
+        if (diffDispVal < 2) {
           compareText = '与对比机构平均水平基本一致';
         } else {
           compareText = betterThan ? '高于对比机构平均水平' + diffDisp : '低于对比机构平均水平' + diffDisp
@@ -723,8 +729,10 @@ function generateAnalysis(card, months){
         if (maxGapOrg) {
           var oAvgVal = others.find(function(x){return x.org.name===maxGapOrg}).valid.reduce(function(a,b){return a+b},0)/others.find(function(x){return x.org.name===maxGapOrg}).valid.length;
           var gapPct = oAvgVal !== 0 ? (myAvg - oAvgVal)/Math.abs(oAvgVal)*100 : 0;
-          var gapDisp = Math.abs(gapPct).toFixed(2) + '%';
-          if (Math.abs(gapPct) >= 5) {
+          // 百分比指标用绝对差值×100；额度指标用相对变化
+          var gapDispVal = isPct ? Math.abs(myAvg - oAvgVal) * 100 : Math.abs(gapPct);
+          var gapDisp = gapDispVal.toFixed(2) + '%';
+          if (gapDispVal >= 5) {
             compareText += '，与' + maxGapOrg + '差距' + gapDisp;
           }
         }
@@ -733,14 +741,13 @@ function generateAnalysis(card, months){
     
     // 组织文字
     var text = org.name + '：' + metricName + '从' + fv(first) + '变为' + fv(last);
-    if (Math.abs(changePct) >= 0.01) text += '（' + (changePct >= 0 ? '增加' : '减少') + Math.abs(changePct).toFixed(2) + '%）';
+    if (changeMeasure >= 0.01) text += '（' + (change >= 0 ? '增加' : '减少') + changeDispVal.toFixed(2) + '%）';
     text += '，' + trendDir + '。';
     text += '期间最高' + fv(maxVal) + '，最低' + fv(minVal) + '，平均' + fv(avgVal) + '，' + volatilityDesc + '。';
     // 月度最大波动
-    var momUnit = '%';
-    if (maxMomUp > (isPct ? 2 : 3)) text += maxMomUpMonth + '环比增加' + maxMomUp.toFixed(isPct ? 2 : 1) + momUnit + '，';
-    if (maxMomDown < -(isPct ? 2 : 3)) text += maxMomDownMonth + '环比减少' + Math.abs(maxMomDown).toFixed(isPct ? 2 : 1) + momUnit + '，';
-    if (maxMomUp > 3 || maxMomDown < -3) text = text.replace(/，$/, '。');
+    if (maxMomUp > 1) text += maxMomUpMonth + '环比增加' + maxMomUp.toFixed(2) + '%，';
+    if (maxMomDown < -1) text += maxMomDownMonth + '环比减少' + Math.abs(maxMomDown).toFixed(2) + '%，';
+    if (maxMomUp > 1 || maxMomDown < -1) text = text.replace(/，$/, '。');
     if (rankText) text += rankText + '。';
     if (compareText) text += compareText + '。';
     analyses.push(text);
