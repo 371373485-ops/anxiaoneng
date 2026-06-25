@@ -12,42 +12,20 @@ if(!document.getElementById('trend-css')){
   var style = document.createElement('style');
   style.id = 'trend-css';
   style.textContent = [
-    '.trend-toolbar{background:var(--card);border-radius:8px;padding:12px 16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06);display:flex;align-items:center;justify-content:space-between}',
-    '.trend-toolbar h3{font-size:15px;font-weight:700}',
-    '.trend-toolbar .tb-right{display:flex;gap:8px;align-items:center}',
-    '.trend-toolbar select{padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;min-width:160px}',
-    '.trend-toolbar button{padding:6px 16px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600}',
-    '',
-    '.trend-card{background:var(--card);border-radius:8px;padding:16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)}',
-    '.trend-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}',
-    '.trend-card-head .ch-left{display:flex;align-items:center;gap:8px}',
-    '.trend-card-head .ch-icon{font-size:16px}',
-    '.trend-card-head select.trend-metric-sel{padding:4px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;font-weight:600;min-width:160px}',
-    '.trend-card-head .trend-close-btn{padding:4px 10px;border:1px solid #fecaca;border-radius:6px;background:#fff5f5;color:#dc2626;cursor:pointer;font-size:12px}',
-    '.trend-card-head .trend-type-btns{display:flex;gap:2px;background:#f1f5f9;border-radius:6px;padding:2px}',
-    '.trend-card-head .trend-type-btn{padding:3px 10px;border:none;border-radius:4px;cursor:pointer;font-size:11px;background:transparent;color:#64748b}',
-    '.trend-card-head .trend-type-btn.active{background:#fff;color:#2563eb;font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.08)}',
-    '',
-    '.trend-filters{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px}',
-    '.trend-filters .tf-group label{font-size:11px;color:var(--muted);display:block;margin-bottom:2px}',
-    '.trend-filters select,.trend-filters input{padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;min-width:120px}',
-    '.trend-filters .tf-custom{display:flex;gap:4px}',
-    '',
-    '.trend-compare-tags{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}',
-    '.trend-compare-tags .ct-tag{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:11px;color:#fff}',
-    '.trend-compare-tags .ct-tag button{border:none;background:none;cursor:pointer;color:#fff;font-size:12px;padding:0}',
-    '',
-    '.trend-chart-table{display:flex;gap:16px;align-items:stretch}',
-    '.trend-chart-wrap{flex:1.5;min-width:0;position:relative;height:380px}',
-    '.trend-chart-wrap canvas,.trend-chart-wrap div{width:100%!important;height:100%!important}',
-    '.trend-table-wrap{flex:1;max-height:360px;overflow-y:auto;min-width:0}',
-    '.trend-table-wrap table{width:100%;border-collapse:collapse;font-size:12px}',
-    '.trend-table-wrap th{padding:5px 8px;text-align:left;border-bottom:2px solid #e5e7eb;white-space:nowrap;background:#f8f9fa}',
-    '.trend-table-wrap th.num{text-align:right}',
-    '.trend-table-wrap td{padding:4px 8px;border-bottom:1px solid #f0f0f0;white-space:nowrap}',
-    '.trend-table-wrap td.num{text-align:right}',
-    '.trend-table-wrap .rank-tag{color:#9ca3af;font-size:11px}',
-  '',
+    '.trend-toolbar{background:var(--card);border-radius:8px;padding:14px 16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)}',
+'.trend-toolbar h3{font-size:15px;font-weight:700;margin-bottom:14px;color:#1e293b}',
+'.trend-batch-panel{display:flex;flex-direction:column;gap:10px}',
+'.trend-batch-row{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end}',
+'.trend-batch-row .tf-group{flex:1;min-width:160px}',
+'.trend-batch-row .tf-group label{font-size:11px;font-weight:600;color:#64748b;display:block;margin-bottom:3px}',
+'.trend-batch-row select,.trend-batch-row input{padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;width:100%;box-sizing:border-box}',
+'.trend-gen-btn{margin-top:8px;padding:9px 28px;background:#2563eb;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;letter-spacing:.5px;transition:background .15s}',
+'.trend-gen-btn:hover{background:#1d4ed8}',
+  '.trend-chart-table{display:flex;gap:16px;align-items:stretch}',
+  '.trend-chart-wrap{flex:1.5;min-width:0;position:relative;height:380px}',
+  '.trend-chart-wrap canvas,.trend-chart-wrap div{width:100%!important;height:100%!important}',
+  '.trend-table-wrap{flex:1;max-height:360px;overflow-y:auto;min-width:0}',
+
   '.trend-analysis-box{margin-top:12px;padding:12px 14px;background:#f8f9fa;border-radius:8px;border-left:3px solid #2563eb}',
   '.trend-analysis-title{font-size:13px;font-weight:600;margin-bottom:8px;color:#1e3a5f}',
   '.trend-analysis-item{font-size:12px;line-height:1.7;color:#374151;padding:3px 0}',
@@ -177,38 +155,56 @@ function removeCard(id){
 function renderCards(){
   var ct = document.getElementById('tab-trend');
   if(!ct) return;
-  
   var allMonths = getAvailableMonths();
   var fields = App.FIELDS || [];
   var fieldGroups = {};
   fields.forEach(function(f){ if(!fieldGroups[f.g]) fieldGroups[f.g] = []; fieldGroups[f.g].push(f); });
-  
   var branchNames = getBranchesInRegion('全国');
+  var regionNames = ['第一责任区','第二责任区','第三责任区','第四责任区'];
+  var allOrgs = ['全国'].concat(regionNames, branchNames);
   
   var h = '<div class="trend-toolbar">';
   h += '<h3>📉 多期趋势分析</h3>';
-  h += '<div class="tb-right">';
-  h += '<select id="trend-new-metric">';
+  h += '<div class="trend-batch-panel">';
+  
+  // 行1：分析机构 + 时间范围
+  h += '<div class="trend-batch-row">';
+  h += '<div class="tf-group"><label>分析机构</label><select id="batch-branch">';
+  allOrgs.forEach(function(o){ h += '<option value="'+o+'">'+o+'</option>'; });
+  h += '</select></div>';
+  h += '<div class="tf-group"><label>时间范围</label><select id="batch-preset" onchange="document.getElementById(\'batch-custom-wrap\').style.display=this.value===\'custom\'?\'flex\':\'none\'">';
+  h += '<option value="recent3">近3月</option>';
+  h += '<option value="recent6" selected>近6月</option>';
+  h += '<option value="recent12">近12月</option>';
+  h += '<option value="ytd">本年逐月</option>';
+  h += '<option value="yoy">年度同比</option>';
+  h += '<option value="custom">自定义</option>';
+  h += '</select></div>';
+  h += '<div id="batch-custom-wrap" class="tf-group" style="display:none;flex-direction:row;gap:4px;align-items:center"><label style="white-space:nowrap">起止</label><input type="month" id="batch-start"><span style="font-size:11px">至</span><input type="month" id="batch-end"></div>';
+  h += '</div>';
+  
+  // 行2：对比机构（多选下拉）
+  h += '<div class="tf-group"><label>对比机构</label><select id="batch-compare" multiple size="4">';
+  allOrgs.forEach(function(o){ h += '<option value="'+o+'">'+o+'</option>'; });
+  h += '</select><div class="tf-hint">按住 Ctrl 多选</div></div>';
+
+  // 行3：指标（多选下拉）
+  h += '<div class="tf-group"><label>分析指标</label><select id="batch-metrics" multiple size="6">';
   Object.keys(fieldGroups).forEach(function(g){
     h += '<optgroup label="'+g+'">';
     fieldGroups[g].forEach(function(f){ h += '<option value="'+f.k+'">'+f.l+'</option>'; });
     h += '</optgroup>';
   });
-  h += '</select>';
-  h += '<button onclick="Trend.addCard(document.getElementById(\'trend-new-metric\').value)">+ 添加图表</button>';
+  h += '</select><div class="tf-hint">按住 Ctrl 多选</div></div>';
+  // 生成按钮
+  h += '<button class="trend-gen-btn" onclick="Trend.generate()">⚙️ 生成趋势分析</button>';
   h += '</div></div>';
   
   h += '<div id="trend-cards">';
-  cards.forEach(function(card){
-    h += renderCardHTML(card, fieldGroups, branchNames, allMonths);
-  });
+  cards.forEach(function(card){ h += renderCardHTML(card, fieldGroups, branchNames, allMonths); });
   h += '</div>';
-  
   ct.innerHTML = h;
-  
-  cards.forEach(function(card){
-    renderCardChart(card);
-  });
+  cards.forEach(function(card){ renderCardChart(card); });
 }
 
 function renderCardHTML(card, fieldGroups, branchNames, allMonths){
@@ -216,9 +212,8 @@ function renderCardHTML(card, fieldGroups, branchNames, allMonths){
   
   var h = '<div class="trend-card">';
   
-  // 卡片头
+  // 卡片头：一行搞定 — 指标 | 类型切换 | 关闭
   h += '<div class="trend-card-head">';
-  h += '<div class="ch-left">';
   h += '<span class="ch-icon">📊</span>';
   h += '<select class="trend-metric-sel" onchange="Trend.updateCard(\''+s.id+'\',\'metric\',this.value)">';
   Object.keys(fieldGroups).forEach(function(g){
@@ -227,18 +222,14 @@ function renderCardHTML(card, fieldGroups, branchNames, allMonths){
     h += '</optgroup>';
   });
   h += '</select>';
-  h += '</div>';
-  // 图表类型切换
-  var chartType = s.chartType || 'line';
-  h += '<div style="display:flex;align-items:center;gap:8px">';
-  h += '<div class="trend-type-btns">';
-  h += '<button class="trend-type-btn'+(chartType==='line'?' active':'')+'" onclick="Trend.setChartType(\''+s.id+'\',\'line\')">折线图</button>';
-  h += '<button class="trend-type-btn'+(chartType==='bar'?' active':'')+'" onclick="Trend.setChartType(\''+s.id+'\',\'bar\')">柱状图</button>';
-  h += '</div>';
-  h += '<button class="trend-close-btn" onclick="Trend.removeCard(\''+s.id+'\')">✕ 关闭</button>';
-  h += '</div>';
-  h += '</div>';
   
+  var chartType = s.chartType || 'line';
+  h += '<div class="trend-type-btns">';
+  h += '<button class="trend-type-btn'+(chartType==='line'?' active':'')+'" onclick="Trend.setChartType(\''+s.id+'\',\'line\')">📈 折线</button>';
+  h += '<button class="trend-type-btn'+(chartType==='bar'?' active':'')+'" onclick="Trend.setChartType(\''+s.id+'\',\'bar\')">📊 柱状</button>';
+  h += '</div>';
+  h += '<button class="trend-close-btn" onclick="Trend.removeCard(\''+s.id+'\')">✕</button>';
+  h += '</div>';
   // 筛选行
   h += '<div class="trend-filters">';
   
@@ -419,7 +410,7 @@ function renderCardChart(card){
       options: {
         responsive: true,
         maintainAspectRatio: true,
-        aspectRatio: 2.4,
+        aspectRatio: 1.8,
         interaction: { mode: 'index', intersect: false },
         plugins: {
           barVals: false,
@@ -488,7 +479,7 @@ function renderCardChart(card){
       options: {
         responsive: true,
         maintainAspectRatio: true,
-        aspectRatio: 2.4,
+        aspectRatio: 1.8,
         interaction: { mode: 'index', intersect: false },
         plugins: {
           barVals: false,
@@ -772,6 +763,34 @@ window.Trend = {
     saveCardsState();
     renderCards();
   },
+  generate: function(){
+    var branchSel = document.getElementById("batch-branch");
+    var compareSel = document.getElementById("batch-compare");
+    var metricSel = document.getElementById("batch-metrics");
+    var presetSel = document.getElementById("batch-preset");
+    if(!branchSel || !metricSel) return;
+    var branch = branchSel.value;
+    var preset = presetSel ? presetSel.value : "recent6";
+    var customStart = "", customEnd = "";
+    if(preset === "custom"){
+      var ss = document.getElementById("batch-start");
+      var es = document.getElementById("batch-end");
+      customStart = ss ? ss.value : "";
+      customEnd = es ? es.value : "";
+      if(!customStart || !customEnd){ alert("请选择自定义时间范围"); return; }
+    }
+    var compareBranches = [];
+    if(compareSel){ for(var i=0;i<compareSel.options.length;i++){ if(compareSel.options[i].selected && compareSel.options[i].value !== branch) compareBranches.push(compareSel.options[i].value); } }
+    var metrics = [];
+    if(metricSel){ for(var j=0;j<metricSel.options.length;j++){ if(metricSel.options[j].selected) metrics.push(metricSel.options[j].value); } }
+    if(metrics.length === 0){ alert("请至少选择一个分析指标"); return; }
+    cards.forEach(function(card){ if(card.chart){ try{ card.chart.destroy(); }catch(e){} } });
+    cards = []; cardCounter = 0;
+    metrics.forEach(function(mk){ cardCounter++; cards.push({ id:"trend-card-"+cardCounter, metric:mk, branch:branch, preset:preset, customStart:customStart, customEnd:customEnd, compareBranches:compareBranches.slice(), chartType:"line", chart:null }); });
+    saveCardsState();
+    renderCards();
+  },
+
   removeCard: function(id){ removeCard(id); },
   updateCard: function(id, field, value){
     var card = cards.find(function(c){ return c.id === id; });
