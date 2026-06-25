@@ -350,16 +350,23 @@ function getOrgRank(orgName, month, metricKey, direction){
 // ── 渲染图表 ──
 // ── 渲染图表（ECharts） ──
 function renderCardChart(card){
-  if(card.chart){ try{ card.chart.destroy(); }catch(e){} }
-  var canvas = document.getElementById(card.id + '-chart');
-  if(!canvas) return;
+  // 销毁旧实例（Chart.js 或 ECharts）
+  if(card.chart){
+    try{
+      if(card.chart.dispose) card.chart.dispose();
+      else card.chart.destroy();
+    }catch(e){}
+  }
+  var dom = document.getElementById(card.id + '-chart');
+  if(!dom) return;
   
   var months = getMonths(card.preset, card.customStart, card.customEnd);
 
-  // 过滤掉所有机构都无数据的空月份
+  // 过滤空月份
   var unit = metricUnit(card.metric);
   var f = (App.FIELDS || []).find(function(x){ return x.k === card.metric; }) || {};
   var direction = f.rd || 'desc';
+  var metricName = f.l || card.metric;
   var allOrgs = [{name: card.branch, isMain: true}].concat(
     card.compareBranches.map(function(bn){ return {name: bn, isMain: false}; })
   );
@@ -378,96 +385,207 @@ function renderCardChart(card){
     if(v == null) return '无数据';
     return isPct ? (v*100).toFixed(2)+'%' : v.toFixed(2);
   }
+  function fmtAxisVal(v){
+    return isPct ? (v*100).toFixed(0)+'%' : v.toFixed(0);
+  }
   
-  var datasets = allOrgs.map(function(org, i){
-    var data = months.map(function(m){ return getMetricValue(m, org.name, card.metric); });
-    var ranks = months.map(function(m){ return getOrgRank(org.name, m, card.metric, direction); });
-    if(chartType === 'bar'){
+  var totalBranches = getBranchesInRegion('全国').length;
+  var regionNames = ['第一责任区','第二责任区','第三责任区','第四责任区'];
+  
+  if(chartType === 'bar'){
+    // ── ECharts 柱状图 ──
+    var categories = months.map(fmtMonth);
+    var echartSeries = allOrgs.map(function(org, i){
+      var data = months.map(function(m){ return getMetricValue(m, org.name, card.metric); });
+      var ranks = months.map(function(m){ return getOrgRank(org.name, m, card.metric, direction); });
+      var hasRank = org.name !== '全国' && org.name !== '整体';
+      var baseColor = COLORS[i % COLORS.length];
+      
+      // 柱状图数据带排名信息
+      var richData = data.map(function(v, idx){
+        var item = { value: v };
+        if(hasRank && v != null && ranks[idx]){
+          var rTotal = regionNames.indexOf(org.name) >= 0 ? 4 : totalBranches;
+          item.rank = ranks[idx];
+          item.rankTotal = rTotal;
+        }
+        return item;
+      });
+      
+      return {
+        name: org.name,
+        type: 'bar',
+        data: richData,
+        barMaxWidth: 32,
+        barGap: '15%',
+        barCategoryGap: '40%',
+        itemStyle: {
+          borderRadius: [0, 0, 0, 0],
+          color: {
+            type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: baseColor },
+              { offset: 1, color: baseColor + '60' }
+            ]
+          }
+        },
+        emphasis: {
+          itemStyle: {
+            color: {
+              type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+              colorStops: [
+                { offset: 0, color: baseColor },
+                { offset: 0.6, color: baseColor + 'aa' },
+                { offset: 1, color: baseColor + '30' }
+              ]
+            }
+          }
+        },
+        _ranks: ranks,
+        _hasRank: hasRank
+      };
+    });
+    
+    // Y 轴自动范围
+    var allVals = [];
+    echartSeries.forEach(function(s){ (s.data||[]).forEach(function(d){ if(d && d.value != null && !isNaN(d.value)) allVals.push(d.value); }); });
+    var yMin = Math.min.apply(null, allVals);
+    var yMax = Math.max.apply(null, allVals);
+    var yDiff = yMax - yMin;
+    if(yDiff === 0){ yMin -= 1; yMax += 1; }
+    else { var pad = yDiff * 0.2; yMin -= pad; yMax += pad; }
+    
+    var showLegend = card.compareBranches.length > 0;
+    
+    card.chart = echarts.init(dom, null, { renderer: 'canvas', devicePixelRatio: Math.min(window.devicePixelRatio || 2, 3) });
+    card.chart.setOption({
+      backgroundColor: 'transparent',
+      color: COLORS,
+      grid: { top: showLegend ? 48 : 18, right: 20, bottom: 28, left: isPct ? 58 : 52, containLabel: false },
+      tooltip: {
+        trigger: 'axis',
+        confine: true,
+        backgroundColor: '#fff',
+        borderColor: '#e2e8f0',
+        borderWidth: 1,
+        borderRadius: 8,
+        padding: [12, 16],
+        textStyle: { fontSize: 12, color: '#374151' },
+        extraCssText: 'box-shadow: 0 4px 20px rgba(0,0,0,0.08);',
+        axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(148,163,184,0.1)' } },
+        formatter: function(params){
+          if(!params || !params.length) return '';
+          var h = '<div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#1e293b;padding-bottom:6px;border-bottom:1px solid #e5e7eb">' + params[0].axisValue + '</div>';
+          params.forEach(function(p){
+            var val = (p.data && p.data.value != null) ? fmtVal(p.data.value) : '无数据';
+            h += '<div style="display:flex;justify-content:space-between;align-items:center;gap:24px;margin:4px 0">';
+            h += '<span style="color:' + p.color + ';font-weight:500"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:' + p.color + ';margin-right:8px"></span>' + p.seriesName + '</span>';
+            h += '<span style="font-weight:700;font-size:13px">' + val + '</span>';
+            if(p.data && p.data.rank){
+              h += '<span style="color:#9ca3af;font-size:11px;background:#f3f4f6;padding:1px 6px;border-radius:4px">第' + p.data.rank + '/' + p.data.rankTotal + '名</span>';
+            }
+            h += '</div>';
+          });
+          return h;
+        }
+      },
+      legend: showLegend ? {
+        top: 4, textStyle: { fontSize: 11, color: '#64748b' },
+        itemWidth: 14, itemHeight: 3, icon: 'roundRect', itemGap: 16
+      } : undefined,
+      xAxis: {
+        type: 'category', data: categories,
+        axisLine: { lineStyle: { color: '#e2e8f0', width: 1.5 } },
+        axisTick: { show: false },
+        axisLabel: { fontSize: 12, color: '#64748b', margin: 12, fontFamily: '-apple-system,sans-serif' }
+      },
+      yAxis: {
+        type: 'value', min: yMin, max: yMax, splitNumber: 5,
+        splitLine: { lineStyle: { color: '#f1f5f9', width: 1 } },
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { fontSize: 12, color: '#64748b', fontFamily: '-apple-system,sans-serif',
+          formatter: function(v){ return fmtAxisVal(v); }
+        }
+      },
+      series: echartSeries
+    });
+    
+    window.addEventListener('resize', function(){
+      if(card.chart && card.chart.dispose && !card.chart.isDisposed()){
+        try{ card.chart.resize(); }catch(e){}
+      }
+    });
+    
+  } else {
+    // ── Chart.js 折线图 ──
+    var datasets = allOrgs.map(function(org, i){
+      var data = months.map(function(m){ return getMetricValue(m, org.name, card.metric); });
+      var ranks = months.map(function(m){ return getOrgRank(org.name, m, card.metric, direction); });
       return {
         label: org.name,
         data: data,
         _ranks: ranks,
         _hasRank: org.name !== '全国' && org.name !== '整体',
-        backgroundColor: COLORS[i % COLORS.length] + (org.isMain ? 'cc' : '60'),
         borderColor: COLORS[i % COLORS.length],
-        borderWidth: org.isMain ? 2 : 1,
-        borderRadius: 0,
-        barPercentage: 0.9,
-        categoryPercentage: 1.0
+        backgroundColor: org.isMain ? COLORS[i % COLORS.length] + '18' : 'transparent',
+        fill: org.isMain && card.compareBranches.length === 0,
+        tension: 0.35,
+        pointRadius: 4,
+        pointHoverRadius: 7,
+        pointBackgroundColor: '#fff',
+        pointBorderWidth: 2,
+        spanGaps: true,
+        borderWidth: org.isMain ? 2.5 : 1.8
       };
-    }
-    return {
-      label: org.name,
-      data: data,
-      _ranks: ranks,
-      _hasRank: org.name !== '全国' && org.name !== '整体',
-      borderColor: COLORS[i % COLORS.length],
-      backgroundColor: org.isMain ? COLORS[i % COLORS.length] + '18' : 'transparent',
-      fill: org.isMain && card.compareBranches.length === 0,
-      tension: 0.35,
-      pointRadius: 4,
-      pointHoverRadius: 7,
-      pointBackgroundColor: '#fff',
-      pointBorderWidth: 2,
-      spanGaps: true,
-      borderWidth: org.isMain ? 2.5 : 1.8
-    };
-  });
-  
-  card.chart = new Chart(canvas, {
-    type: chartType,
-    data: { labels: months.map(fmtMonth), datasets: datasets },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      aspectRatio: 2.4,
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        barVals: false,
-        legend: {
-          display: card.compareBranches.length > 0,
-          position: 'bottom',
-          labels: { font: { size: 11 }, boxWidth: 12, padding: 12 }
-        },
-        tooltip: {
-          backgroundColor: 'rgba(255,255,255,0.96)',
-          titleColor: '#1e293b',
-          bodyColor: '#374151',
-          borderColor: '#e2e8f0',
-          borderWidth: 1,
-          cornerRadius: 8,
-          padding: 10,
-          callbacks: {
-            label: function(ctx){
-              var v = ctx.parsed.y;
-              var label = ctx.dataset.label + ': ' + fmtVal(v);
-              if(ctx.dataset._hasRank && v != null){
-                var rank = ctx.dataset._ranks[ctx.dataIndex];
-                if(rank){
-                  var rTotal = ['第一责任区','第二责任区','第三责任区','第四责任区'].indexOf(ctx.dataset.label) >= 0 ? 4 : getBranchesInRegion('全国').length;
-                  label += '  (第' + rank + '/' + rTotal + '名)';
+    });
+    
+    card.chart = new Chart(dom, {
+      type: 'line',
+      data: { labels: months.map(fmtMonth), datasets: datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        aspectRatio: 2.4,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          barVals: false,
+          legend: {
+            display: card.compareBranches.length > 0,
+            position: 'bottom',
+            labels: { font: { size: 11 }, boxWidth: 12, padding: 12 }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(255,255,255,0.96)',
+            titleColor: '#1e293b', bodyColor: '#374151',
+            borderColor: '#e2e8f0', borderWidth: 1, cornerRadius: 8, padding: 10,
+            callbacks: {
+              label: function(ctx){
+                var v = ctx.parsed.y;
+                var label = ctx.dataset.label + ': ' + fmtVal(v);
+                if(ctx.dataset._hasRank && v != null){
+                  var rank = ctx.dataset._ranks[ctx.dataIndex];
+                  if(rank){
+                    var rTotal = regionNames.indexOf(ctx.dataset.label) >= 0 ? 4 : totalBranches;
+                    label += '  (第' + rank + '/' + rTotal + '名)';
+                  }
                 }
+                return label;
               }
-              return label;
+            }
+          }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#64748b' } },
+          y: {
+            grid: { color: '#f1f5f9', drawBorder: false },
+            ticks: { font: { size: 11 }, color: '#64748b',
+              callback: function(v){ return fmtAxisVal(v); }
             }
           }
         }
-      },
-      scales: {
-        x: {
-          grid: { display: false },
-          ticks: { font: { size: 11 }, color: '#64748b' }
-        },
-        y: {
-          grid: { color: '#f1f5f9', drawBorder: false },
-          ticks: {
-            font: { size: 11 }, color: '#64748b',
-            callback: function(v){ return isPct ? (v*100).toFixed(0)+'%' : v.toFixed(0); }
-          }
-        }
       }
-    }
-  });
+    });
+  }
   
   renderDataTable(card, months);
   renderAnalysis(card, months);
