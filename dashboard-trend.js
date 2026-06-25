@@ -48,6 +48,13 @@ if(!document.getElementById('trend-css')){
     '.trend-table-wrap td.num{text-align:right}',
     '.trend-table-wrap .rank-tag{color:#9ca3af;font-size:11px}',
   '',
+  '.trend-batch-panel{display:flex;flex-direction:column;gap:10px;margin-top:12px}',
+  '.trend-batch-row{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end}',
+  '.trend-batch-row .tf-group{flex:1;min-width:0}',
+  '.trend-batch-row select[multiple]{font-size:12px;padding:4px;min-width:200px}',
+  '.trend-batch-row select[multiple] option{padding:2px 4px}',
+  '.trend-gen-btn{padding:8px 24px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap}',
+  '.trend-gen-btn:hover{background:#1d4ed8}',
   '.trend-analysis-box{margin-top:12px;padding:12px 14px;background:#f8f9fa;border-radius:8px;border-left:3px solid #2563eb}',
   '.trend-analysis-title{font-size:13px;font-weight:600;margin-bottom:8px;color:#1e3a5f}',
   '.trend-analysis-item{font-size:12px;line-height:1.7;color:#374151;padding:3px 0}',
@@ -177,38 +184,63 @@ function removeCard(id){
 function renderCards(){
   var ct = document.getElementById('tab-trend');
   if(!ct) return;
-  
   var allMonths = getAvailableMonths();
   var fields = App.FIELDS || [];
   var fieldGroups = {};
   fields.forEach(function(f){ if(!fieldGroups[f.g]) fieldGroups[f.g] = []; fieldGroups[f.g].push(f); });
-  
   var branchNames = getBranchesInRegion('全国');
+  var regionNames = ['第一责任区','第二责任区','第三责任区','第四责任区'];
+  var allOrgs = ['全国'].concat(regionNames, branchNames);
   
   var h = '<div class="trend-toolbar">';
   h += '<h3>📉 多期趋势分析</h3>';
-  h += '<div class="tb-right">';
-  h += '<select id="trend-new-metric">';
+  h += '<div class="trend-batch-panel">';
+  
+  // 行1：机构 + 对比机构
+  h += '<div class="trend-batch-row">';
+  h += '<div class="tf-group"><label>分析机构</label><select id="batch-branch">';
+  allOrgs.forEach(function(o){ h += '<option value="'+o+'">'+o+'</option>'; });
+  h += '</select></div>';
+  h += '<div class="tf-group"><label>对比机构（可多选，按住Ctrl）</label><select id="batch-compare" multiple size="4">';
+  allOrgs.forEach(function(o){ h += '<option value="'+o+'">'+o+'</option>'; });
+  h += '</select></div>';
+  h += '</div>';
+  
+  // 行2：指标多选 + 时间范围
+  h += '<div class="trend-batch-row">';
+  h += '<div class="tf-group"><label>分析指标（可多选，按住Ctrl）</label><select id="batch-metrics" multiple size="6">';
   Object.keys(fieldGroups).forEach(function(g){
     h += '<optgroup label="'+g+'">';
     fieldGroups[g].forEach(function(f){ h += '<option value="'+f.k+'">'+f.l+'</option>'; });
     h += '</optgroup>';
   });
+  h += '</select></div>';
+  h += '<div class="tf-group"><label>时间范围</label><select id="batch-preset" onchange="document.getElementById(\'batch-custom-wrap\').style.display=this.value===\'custom\'?\'flex\':\'none\'">';
+  h += '<option value="recent3">近3月</option>';
+  h += '<option value="recent6" selected>近6月</option>';
+  h += '<option value="recent12">近12月</option>';
+  h += '<option value="ytd">本年逐月</option>';
+  h += '<option value="yoy">年度同比</option>';
+  h += '<option value="custom">自定义</option>';
   h += '</select>';
-  h += '<button onclick="Trend.addCard(document.getElementById(\'trend-new-metric\').value)">+ 添加图表</button>';
+  h += '<div id="batch-custom-wrap" style="display:none;gap:4px;align-items:center;margin-top:4px">';
+  h += '<input type="month" id="batch-start">';
+  h += '<span style="font-size:11px;color:var(--muted)">至</span>';
+  h += '<input type="month" id="batch-end">';
+  h += '</div></div>';
+  h += '</div>';
+  
+  // 行3：生成按钮
+  h += '<div class="trend-batch-row" style="justify-content:flex-end">';
+  h += '<button class="trend-gen-btn" onclick="Trend.generate()">⚙️ 生成趋势分析</button>';
+  h += '</div>';
   h += '</div></div>';
   
   h += '<div id="trend-cards">';
-  cards.forEach(function(card){
-    h += renderCardHTML(card, fieldGroups, branchNames, allMonths);
-  });
+  cards.forEach(function(card){ h += renderCardHTML(card, fieldGroups, branchNames, allMonths); });
   h += '</div>';
-  
   ct.innerHTML = h;
-  
-  cards.forEach(function(card){
-    renderCardChart(card);
-  });
+  cards.forEach(function(card){ renderCardChart(card); });
 }
 
 function renderCardHTML(card, fieldGroups, branchNames, allMonths){
@@ -772,6 +804,34 @@ window.Trend = {
     saveCardsState();
     renderCards();
   },
+  generate: function(){
+    var branchSel = document.getElementById("batch-branch");
+    var compareSel = document.getElementById("batch-compare");
+    var metricSel = document.getElementById("batch-metrics");
+    var presetSel = document.getElementById("batch-preset");
+    if(!branchSel || !metricSel) return;
+    var branch = branchSel.value;
+    var preset = presetSel ? presetSel.value : "recent6";
+    var customStart = "", customEnd = "";
+    if(preset === "custom"){
+      var ss = document.getElementById("batch-start");
+      var es = document.getElementById("batch-end");
+      customStart = ss ? ss.value : "";
+      customEnd = es ? es.value : "";
+      if(!customStart || !customEnd){ alert("请选择自定义时间范围"); return; }
+    }
+    var compareBranches = [];
+    if(compareSel){ for(var i=0;i<compareSel.options.length;i++){ if(compareSel.options[i].selected && compareSel.options[i].value !== branch) compareBranches.push(compareSel.options[i].value); } }
+    var metrics = [];
+    if(metricSel){ for(var j=0;j<metricSel.options.length;j++){ if(metricSel.options[j].selected) metrics.push(metricSel.options[j].value); } }
+    if(metrics.length === 0){ alert("请至少选择一个分析指标"); return; }
+    cards.forEach(function(card){ if(card.chart){ try{ card.chart.destroy(); }catch(e){} } });
+    cards = []; cardCounter = 0;
+    metrics.forEach(function(mk){ cardCounter++; cards.push({ id:"trend-card-"+cardCounter, metric:mk, branch:branch, preset:preset, customStart:customStart, customEnd:customEnd, compareBranches:compareBranches.slice(), chartType:"line", chart:null }); });
+    saveCardsState();
+    renderCards();
+  },
+
   removeCard: function(id){ removeCard(id); },
   updateCard: function(id, field, value){
     var card = cards.find(function(c){ return c.id === id; });
