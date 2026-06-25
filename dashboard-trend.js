@@ -408,8 +408,8 @@ function renderCardChart(card){
         borderColor: COLORS[i % COLORS.length],
         borderWidth: org.isMain ? 2 : 1,
         borderRadius: 0,
-        barPercentage: 0.9,
-        categoryPercentage: 1.0
+        barPercentage: 0.6,
+        categoryPercentage: 0.7
       };
     });
     
