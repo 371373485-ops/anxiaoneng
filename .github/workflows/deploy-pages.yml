@@ -1,4 +1,4 @@
-name: Deploy encrypted GitHub Pages
+name: Deploy public GitHub Pages
 
 on:
   workflow_dispatch:
@@ -27,13 +27,10 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Test local encryption module
-        run: node --test tests/test_pages_crypto.mjs
-
-      - name: Test strict Pages build
+      - name: Test public Pages build
         run: node --test tests/test_pages_build.mjs
 
-      - name: Build static Pages artifact from locally encrypted files
+      - name: Build public static Pages artifact
         env:
           PAGES_BASE_PATH: /${{ github.event.repository.name }}/
         run: node scripts/build-pages.mjs
