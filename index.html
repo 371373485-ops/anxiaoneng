@@ -377,10 +377,7 @@ td.cmp-delta{transition:background .2s}
 <button class="btn" data-share-restricted onclick="document.getElementById('planFileInput').click()">📅 导入计划</button>
 <a href="安效能_实际数据导入模板.xlsx" download class="btn-dl" data-share-restricted>实际模板</a>
 <a href="安效能_计划数据导入模板.xlsx" download class="btn-dl" data-share-restricted>计划模板</a>
-<button class="btn" data-share-restricted onclick="exportData()">💾 导出备份</button>
-<button class="btn" data-share-restricted onclick="exportShareData()" title="导出数据为JSON文件">📤 导出分享数据</button>
-<button class="btn" data-share-restricted onclick="encryptShareData()" title="一键加密并下载，用于GitHub Pages分享">🔒 加密分享数据</button>
-<label class="btn-file" data-share-restricted>📂 恢复备份<input type="file" accept=".json" onchange="importData(this)" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden"></label>
+</div></div>
 </div></div>
 </div>
 <div id="shareBanner" class="share-banner"><span class="share-badge">只读分享</span><span>数据周期 <b id="sharePeriod">—</b></span><span>数据版本 <b id="shareVersion">—</b></span><span>发布时间 <b id="sharePublishedAt">—</b></span><span>分享模式 <b id="shareModeLabel">—</b></span></div>
@@ -413,7 +410,7 @@ td.cmp-delta{transition:background .2s}
 <div id="tab-overview" class="tab active"><div id="overview-kpi" class="kpi-row"></div><div id="overview-sections"></div></div>
 <div id="tab-regions" class="tab"><div id="regions-kpi" class="region-grid"></div><div id="regions-key-table"></div><div id="regions-charts"></div><div id="regions-detail"></div></div>
 <div id="tab-guide" class="tab"></div>
-<div id="tab-data" class="tab"><div id="data-panel"></div></div>
+<div id="tab-data" class="tab"><div id="data-panel"></div><div style="padding:12px 16px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="exportData()">💾 导出备份</button><button class="btn" onclick="exportShareData()" title="导出数据为JSON文件">📤 导出分享数据</button><button class="btn" onclick="encryptShareData()" title="一键加密并下载，用于GitHub Pages分享">🔒 加密分享数据</button><label class="btn-file">📂 恢复备份<input type="file" accept=".json" onchange="importData(this)"></label></div></div>
 <div id="tab-export" class="tab"></div>
 <div id="tab-branches" class="tab">
 <div id="branches-list-view"><div class="search-bar"><input type="text" id="branchSearch" placeholder="搜索分公司..." oninput="renderBranches()"><select id="branchGroup" onchange="renderBranches();if(window.App&&App.isCompareMode&&typeof applyCompareMode==='function')applyCompareMode()"><option value="all">全部指标</option><option value="保费">保费类</option><option value="效益">效益类</option><option value="效能">效能类</option><option value="人员">人员类</option></select><select id="branchRegion" onchange="renderBranches();if(window.App&&App.isCompareMode&&typeof applyCompareMode==='function')applyCompareMode()"><option value="all">全部责任区</option><option value="第一责任区">第一责任区</option><option value="第二责任区">第二责任区</option><option value="第三责任区">第三责任区</option><option value="第四责任区">第四责任区</option></select><span class="hint-text" style="font-size:11px;color:var(--text2);margin-left:8px">点击分公司行查看详情与排名</span></div><div id="branches-table" class="tbl-wrap"></div></div>
