@@ -951,32 +951,16 @@ window.generateDeepReading=function(branchName){
 
   var question='你是财产保险经营分析专家。以下是'+branchName+'在'+App.currentMonth+'的经营数据、近6个月趋势及规则诊断结果（JSON）。\\n\\n**重要：数据已格式化好——百分比类已是"98.47%"格式，金额类已是"5,023.50万元"格式，人数类已是"123人"格式。直接引用这些值，不要自己做任何转换。**\\n\\n请对该分公司做**一对一深度分析报告**。\\n\\n**关键要求：规则报告已经做了以下内容——指标逐项罗列、排名对比、经营模式标注、归因分解、分级建议。你的深度解读严禁重复这些内容。你应该说规则报告没说的东西：**\\n\\n1. **矛盾信号推理**：规则报告只会标注"增长陷阱"模式，你要做的是——为什么会出现这个矛盾？最可能的原因是什么？需要核查什么来验证？给出推理链条而非模式名称\\n2. **趋势走向预判**：规则报告只看当前月数据，你要做的是——基于6个月趋势序列，哪些指标在加速恶化？哪些在减速改善？如果趋势延续，下个月可能是什么值？何时会突破临界点？\\n3. **不可见的风险**：规则报告只能看到已触发的预警，你要做的是——当前看似正常但趋势在恶化的指标有哪些？哪些指标虽然没触发预警但已经接近阈值？\\n4. **业务经验判断**：基于财险经营经验，该分公司的指标组合是否暗示特定的业务问题（如渠道结构变化、核保标准放松、大案集中等）？给出判断依据和需要核实的数据\\n5. **差异化行动方案**：规则报告给的是通用建议，你要给的是——针对该分公司的具体指标组合，第一步应该做什么？预期效果是什么？如果无效的备选方案是什么？\\n\\n⚠️ 直接引用 context 中的格式化值，保持原始格式（2位小数+单位）。禁止编造数据。如数据不足明确说明。';
 
-  fetch('/ai/chat',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({question:question,context:context})
-  }).then(function(response){
-    if(!response.ok)throw new Error('请求失败('+response.status+')');
-    var reader=response.body.getReader(),decoder=new TextDecoder(),buffer='',text='',started=false;
-    ct.innerHTML='';
-    function read(){
-      return reader.read().then(function(res){
-        if(res.done){btn.disabled=false;btn.textContent='重新生成';return;}
-        buffer+=decoder.decode(res.value,{stream:true});
-        var lines=buffer.split('\n');buffer=lines.pop();
-        lines.forEach(function(line){
-          if(line.indexOf('data: ')!==0)return;
-          var dataStr=line.slice(6).trim();
-          if(dataStr==='[DONE]')return;
-          try{var data=JSON.parse(dataStr);
-            if(data.error)throw new Error(data.error);
-            if(data.content){if(!started){started=true;ct.innerHTML='';}text+=data.content;ct.innerHTML=fmtAI(text);}
-          }catch(e){}
-        });
-        ct.scrollTop=ct.scrollHeight;return read();
-      });
-    }
-    return read();
+  var _text='',_started=false;
+  ct.innerHTML='';
+  AICLIENT.stream([
+    {role:'system',content:'你是安效能数据看板AI助手。'+context},
+    {role:'user',content:question}
+  ],function(chunk){
+    if(chunk===null){btn.disabled=false;btn.textContent='重新生成';return;}
+    if(!_started){_started=true;ct.innerHTML='';}
+    _text+=chunk;ct.innerHTML=fmtAI(_text);
+    ct.scrollTop=ct.scrollHeight;
   }).catch(function(e){
     ct.innerHTML='<span style="color:#dc2626">生成失败：'+e.message+'</span>';
     btn.disabled=false;btn.textContent='生成 AI 深度解读';
@@ -1006,16 +990,11 @@ window.sendAnalyze=function(){
   var el=document.getElementById(aiId);
   el.innerHTML='<span class="ai-dots">●●●</span>';
 
-  fetch('/ai/analyze',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({question:question})
-  }).then(function(response){
-    if(!response.ok)throw new Error('请求失败('+response.status+')');
-    return response.json();
-  }).then(function(data){
-    if(data.error)throw new Error(data.error);
-    el.innerHTML=fmtAI(data.content||'（无内容）');
+  AICLIENT.chat([
+    {role:'system',content:'你是财产保险经营分析专家。基于看板数据分析问题，给出专业、简洁的分析。'},
+    {role:'user',content:question}
+  ]).then(function(content){
+    el.innerHTML=fmtAI(content||'（无内容）');
     el.scrollTop=el.scrollHeight;
   }).catch(function(e){
     el.innerHTML='<span style="color:#dc2626">分析失败：'+e.message+'</span>';

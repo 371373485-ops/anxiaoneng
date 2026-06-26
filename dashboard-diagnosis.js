@@ -285,33 +285,15 @@ window.sendDiagnosisQuestion=function(){
       inferences:(D.diagnosis&&D.diagnosis.inferences||[]).slice(0,8),
       recommendations:(D.diagnosis&&D.diagnosis.recommendations||[]).slice(0,5)
     };
-    fetch('/ai/chat',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      signal:D.controller.signal,
-      body:JSON.stringify({question:question,context:ctx})
-    }).then(function(response){
-      if(!response.ok)throw new Error('AI请求失败('+response.status+')');
-      var reader=response.body.getReader(),decoder=new TextDecoder(),buffer='';
-      function read(){
-        return reader.read().then(function(result){
-          if(result.done)return;
-          buffer+=decoder.decode(result.value,{stream:true});
-          var lines=buffer.split('\n');buffer=lines.pop();
-          lines.forEach(function(line){
-            if(line.indexOf('data: ')!==0)return;
-            var dataStr=line.slice(6).trim();
-            if(dataStr==='[DONE]')return;
-            try{
-              var data=JSON.parse(dataStr);
-              if(data.error)throw new Error(data.error);
-              if(data.content)stream.textContent+=data.content;
-            }catch(e){}
-          });
-          log.scrollTop=log.scrollHeight;return read();
-        });
-      }
-      return read();
+    var _stream=document.createElement('div');
+    stream.textContent='';
+    AICLIENT.stream([
+      {role:'system',content:'你是安效能诊断助手。'+JSON.stringify(ctx)},
+      {role:'user',content:question}
+    ],function(chunk){
+      if(chunk===null){D.controller=null;return;}
+      stream.textContent+=chunk;
+      log.scrollTop=log.scrollHeight;
     }).then(function(){D.controller=null;})
     .catch(function(e){
       if(e.name==='AbortError')return;
@@ -397,32 +379,16 @@ window.generateBranchDeepReading=function(branchName){
     '4. 改进建议：按优先级排序，每条需有具体行动方案和预期效果\n'+
     '5. 所有数据必须严格使用上下文中提供的数值，禁止编造或修改任何数字';
 
-  fetch('/ai/chat',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({question:question,context:ctx})
-  }).then(function(response){
-    if(!response.ok)throw new Error('请求失败('+response.status+')');
-    var reader=response.body.getReader(),decoder=new TextDecoder(),buffer='',text='',started=false;
-    ct.innerHTML='';
-    function read(){
-      return reader.read().then(function(res){
-        if(res.done){btn.disabled=false;btn.textContent='重新生成';return;}
-        buffer+=decoder.decode(res.value,{stream:true});
-        var lines=buffer.split('\n');buffer=lines.pop();
-        lines.forEach(function(line){
-          if(line.indexOf('data: ')!==0)return;
-          var dataStr=line.slice(6).trim();
-          if(dataStr==='[DONE]')return;
-          try{var data=JSON.parse(dataStr);
-            if(data.error)throw new Error(data.error);
-            if(data.content){if(!started){started=true;ct.innerHTML='';}text+=data.content;ct.innerHTML=fmtAI(text);}
-          }catch(e){}
-        });
-        ct.scrollTop=ct.scrollHeight;return read();
-      });
-    }
-    return read();
+  var _text='',_started=false;
+  ct.innerHTML='';
+  AICLIENT.stream([
+    {role:'system',content:'你是财产保险经营分析专家。'+JSON.stringify(ctx)},
+    {role:'user',content:question}
+  ],function(chunk){
+    if(chunk===null){btn.disabled=false;btn.textContent='重新生成';return;}
+    if(!_started){_started=true;ct.innerHTML='';}
+    _text+=chunk;ct.innerHTML=fmtAI(_text);
+    ct.scrollTop=ct.scrollHeight;
   }).catch(function(e){
     ct.innerHTML='<span style="color:#dc2626">生成失败：'+e.message+'</span>';
     btn.disabled=false;btn.textContent='生成 AI 深度解读';
@@ -447,32 +413,15 @@ window.sendAnalyze=function(){
   // sessionId 持久化
   var sid=localStorage.getItem('ai-agent-sid')||'';
 
-  fetch('/ai/agent',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({question:question,sessionId:sid})
-  }).then(function(response){
-    if(!response.ok)throw new Error('请求失败('+response.status+')');
-    var reader=response.body.getReader(),decoder=new TextDecoder(),buffer='',text='',started=false;
-    function read(){
-      return reader.read().then(function(res){
-        if(res.done)return;
-        buffer+=decoder.decode(res.value,{stream:true});
-        var lines=buffer.split('\n');buffer=lines.pop();
-        lines.forEach(function(line){
-          if(line.indexOf('data: ')!==0)return;
-          var dataStr=line.slice(6).trim();
-          if(dataStr==='[DONE]')return;
-          try{var data=JSON.parse(dataStr);
-            if(data.error)throw new Error(data.error);
-            if(data.sessionId){localStorage.setItem('ai-agent-sid',data.sessionId);return;}
-            if(data.content){if(!started){started=true;el.innerHTML='';}text+=data.content;el.innerHTML=fmtAI(text);}
-          }catch(e){}
-        });
-        el.scrollTop=el.scrollHeight;return read();
-      });
-    }
-    return read();
+  var _text2='',_started2=false;
+  AICLIENT.stream([
+    {role:'system',content:'你是安效能智能助手。用户会提问看板数据相关问题，请基于上下文分析回答。'},
+    {role:'user',content:question}
+  ],function(chunk){
+    if(chunk===null)return;
+    if(!_started2){_started2=true;el.innerHTML='';}
+    _text2+=chunk;el.innerHTML=fmtAI(_text2);
+    el.scrollTop=el.scrollHeight;
   }).catch(function(e){
     el.innerHTML='<span style="color:#dc2626">分析失败：'+e.message+'</span>';
   });
