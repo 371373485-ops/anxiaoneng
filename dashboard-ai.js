@@ -13,6 +13,89 @@ function _aiUnavailable(){
 // ══════════ 工具 ══════════
 function _fi(k){return (App.FIELDS||[]).find(function(x){return x.k===k;})||{};}
 function _fv(v,u){return typeof fmtVal==='function'?fmtVal(v,u):(v!=null?v.toFixed(2):'-');}
+
+// ══════════ 全局上下文构建 ══════════
+// 将整个看板数据编译为 AI 可读的上下文，确保 AI 能精准回答看板范围内的问题
+function _fmtValAI(v,u){
+  if(v==null||isNaN(Number(v)))return null;
+  v=Number(v);
+  if(u==='%')return (v*100).toFixed(2)+'%';
+  if(u==='人')return v.toFixed(0)+'人';
+  if(u==='万元/人')return v.toFixed(2)+'万/人';
+  return v.toFixed(2)+'万元';
+}
+function _buildGlobalContext(){
+  var period=App.currentMonth||'未知';
+  var fields=App.FIELDS||[];
+  var nat=App.DATA.national||{};
+  var regions=App.DATA.regions||{};
+  var branches=App.DATA.branches||[];
+  var alerts=App._alertResults||[];
+  var allMonths=Object.keys(App.ALL_DATA._merged||{}).sort();
+  // 字段定义（仅核心字段，避免 token 爆炸）
+  var coreFields=fields.filter(function(f){return f.c===1||['保费实际合计','经营利润','时间进度计划达成率','时间进度达成率','综合成本率实际（整体利润口径）','已赚赔付率实际','已赚费用率实际','整体人均产能实际','整体人均利润实际','整体人力成本保费率实际'].indexOf(f.k)>=0;});
+  var fieldDefs=coreFields.map(function(f){return{key:f.k,label:f.l,unit:f.u||'',direction:f.rd||''};});
+  // 全国整体数据
+  var natFmt={};
+  coreFields.forEach(function(f){var v=_fmtValAI(nat[f.k],f.u);if(v)natFmt[f.l]=v;});
+  // 责任区数据
+  var regionFmt={};
+  Object.keys(regions).forEach(function(rn){
+    var r=regions[rn];
+    regionFmt[rn]={};
+    coreFields.forEach(function(f){var v=_fmtValAI(r[f.k],f.u);if(v)regionFmt[rn][f.l]=v;});
+  });
+  // 分公司数据
+  var branchFmt=branches.map(function(b){
+    var d=b.d||b||{};
+    var o={name:b.n,region:b.r||''};
+    coreFields.forEach(function(f){var v=_fmtValAI(d[f.k],f.u);if(v)o[f.l]=v;});
+    return o;
+  });
+  // 预警信息
+  var alertFmt=alerts.map(function(a){
+    var fi=_fi(a.field);
+    return{branch:a.branchName,field:fi.l||a.field,severity:a.severity,value:_fmtValAI(a.currentValue,fi.u),threshold:_fmtValAI(a.threshold,fi.u),message:a.message||''};
+  });
+  // 近6个月趋势（全国）
+  var recentMonths=allMonths.slice(-6);
+  var trendFmt={};
+  coreFields.slice(0,12).forEach(function(f){
+    trendFmt[f.l]=[];
+    recentMonths.forEach(function(mk){
+      var mdata=(App.ALL_DATA._merged||{})[mk];
+      if(mdata&&mdata.national){
+        var v=_fmtValAI(mdata.national[f.k],f.u);
+        if(v)trendFmt[f.l].push({month:mk,value:v});
+      }
+    });
+  });
+  // 分公司排名（核心指标）
+  var rankings={};
+  ['保费实际合计','经营利润','综合成本率实际（整体利润口径）','已赚赔付率实际','时间进度计划达成率'].forEach(function(fk){
+    var fi=_fi(fk);
+    var sorted=branches.map(function(b){var d=b.d||b||{};return{name:b.n,v:Number(d[fk])||0};}).sort(function(a,b){return fi.rd==='asc'?a.v-b.v:b.v-a.v;});
+    rankings[fi.l||fk]=sorted.map(function(item,idx){return{rank:idx+1,name:item.name,value:_fmtValAI(item.v,fi.u)};}).slice(0,5).concat(sorted.slice(-3).map(function(item,idx){return{rank:sorted.length-2+idx,name:item.name,value:_fmtValAI(item.v,fi.u)};}));
+  });
+  return{
+    period:period,
+    availableMonths:allMonths,
+    fieldDefinitions:fieldDefs,
+    national:natFmt,
+    regions:regionFmt,
+    branches:branchFmt,
+    alerts:alertFmt,
+    recentTrends:trendFmt,
+    rankings:rankings,
+    summary:{
+      branchCount:branches.length,
+      regionCount:Object.keys(regions).length,
+      alertCount:alerts.length,
+      errorAlertCount:alerts.filter(function(a){return a.severity==='error';}).length,
+      warnAlertCount:alerts.filter(function(a){return a.severity==='warn';}).length
+    }
+  };
+}
 function _fdelta(v,u){if(u==='%')return (v*100).toFixed(0)+'pp';return _fv(v,u);}
 function _pct(v){return v!=null?(v*100).toFixed(0)+'%':'-';}
 function _eh(v){return typeof escapeHtml==='function'?escapeHtml(v):String(v==null?'':v);}
@@ -951,10 +1034,11 @@ window.generateDeepReading=function(branchName){
 
   var question='你是财产保险经营分析专家。以下是'+branchName+'在'+App.currentMonth+'的经营数据、近6个月趋势及规则诊断结果（JSON）。\\n\\n**重要：数据已格式化好——百分比类已是"98.47%"格式，金额类已是"5,023.50万元"格式，人数类已是"123人"格式。直接引用这些值，不要自己做任何转换。**\\n\\n请对该分公司做**一对一深度分析报告**。\\n\\n**关键要求：规则报告已经做了以下内容——指标逐项罗列、排名对比、经营模式标注、归因分解、分级建议。你的深度解读严禁重复这些内容。你应该说规则报告没说的东西：**\\n\\n1. **矛盾信号推理**：规则报告只会标注"增长陷阱"模式，你要做的是——为什么会出现这个矛盾？最可能的原因是什么？需要核查什么来验证？给出推理链条而非模式名称\\n2. **趋势走向预判**：规则报告只看当前月数据，你要做的是——基于6个月趋势序列，哪些指标在加速恶化？哪些在减速改善？如果趋势延续，下个月可能是什么值？何时会突破临界点？\\n3. **不可见的风险**：规则报告只能看到已触发的预警，你要做的是——当前看似正常但趋势在恶化的指标有哪些？哪些指标虽然没触发预警但已经接近阈值？\\n4. **业务经验判断**：基于财险经营经验，该分公司的指标组合是否暗示特定的业务问题（如渠道结构变化、核保标准放松、大案集中等）？给出判断依据和需要核实的数据\\n5. **差异化行动方案**：规则报告给的是通用建议，你要给的是——针对该分公司的具体指标组合，第一步应该做什么？预期效果是什么？如果无效的备选方案是什么？\\n\\n⚠️ 直接引用 context 中的格式化值，保持原始格式（2位小数+单位）。禁止编造数据。如数据不足明确说明。';
 
+  var globalCtx=_buildGlobalContext();
   var _text='',_started=false;
   ct.innerHTML='';
   AICLIENT.stream([
-    {role:'system',content:'你是安效能数据看板AI助手。'+context},
+    {role:'system',content:'你是安效能数据看板AI助手。以下是当前看板的完整数据上下文，包括全国、各责任区、各分公司的全部指标数据、预警信息、近6个月趋势和排名。请严格基于这些数据进行分析。\n\n## 全局数据上下文\n'+JSON.stringify(globalCtx,null,1)+'\n\n## 该分公司专项上下文\n'+JSON.stringify(context,null,1)},
     {role:'user',content:question}
   ],function(chunk){
     if(chunk===null){btn.disabled=false;btn.textContent='重新生成';return;}
@@ -990,8 +1074,9 @@ window.sendAnalyze=function(){
   var el=document.getElementById(aiId);
   el.innerHTML='<span class="ai-dots">●●●</span>';
 
+  var globalCtx=_buildGlobalContext();
   AICLIENT.chat([
-    {role:'system',content:'你是财产保险经营分析专家。基于看板数据分析问题，给出专业、简洁的分析。'},
+    {role:'system',content:'你是安效能数据看板AI助手。以下是当前看板的完整数据上下文（JSON）。请严格基于这些数据回答问题，不要编造数据。如果问题超出看板数据范围，明确告知。\n\n'+JSON.stringify(globalCtx,null,1)},
     {role:'user',content:question}
   ]).then(function(content){
     el.innerHTML=fmtAI(content||'（无内容）');
