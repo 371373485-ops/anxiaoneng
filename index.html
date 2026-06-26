@@ -13,14 +13,13 @@
 <style>
 :root{--bg:#f0f2f5;--card:#fff;--text:#1a1a2e;--muted:#888;--blue:#3b82f6;--green:#10b981;--red:#ef4444;--purple:#8b5cf6;--amber:#f59e0b}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--text);font-size:14px;overflow-x:hidden}
-.header{background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);color:#fff;padding:12px 24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;max-width:100%;overflow:hidden}
-.header>div{min-width:0;max-width:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+.header{background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);color:#fff;padding:12px 24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
 .header h1{font-size:20px;font-weight:600}
 .header .sub{font-size:12px;opacity:.7}
 /* ── Toolbar System ── */
-.toolbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;line-height:1;min-width:0;max-width:100%}
-.toolbar__group{display:inline-flex;align-items:center;gap:6px;min-width:0;max-width:100%;flex-wrap:wrap}
+.toolbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;line-height:1}
+.toolbar__group{display:inline-flex;align-items:center;gap:6px}
 .toolbar__sep{width:1px;height:20px;background:rgba(255,255,255,.2);flex-shrink:0}
 .toolbar label{font-size:12px;color:rgba(255,255,255,.7);white-space:nowrap}
 /* Unified control: same height for button/a/label/select */
@@ -65,7 +64,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei
 }
 #btnCompare:hover{background:rgba(59,130,246,.35);border-color:rgba(147,197,253,.6)}
 .toolbar input[type=file]{display:none}
-.nav{display:flex;background:var(--card);padding:0 24px;box-shadow:0 2px 8px rgba(0,0,0,.06);max-width:100%;overflow-x:auto}
+.nav{display:flex;background:var(--card);padding:0 24px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
 .nav button{padding:12px 20px;border:none;background:none;font-size:14px;cursor:pointer;color:var(--muted);border-bottom:3px solid transparent}
 .nav button:hover{color:var(--text)}
 .nav button.active{color:#0f3460;border-bottom-color:#0f3460;font-weight:600}
@@ -270,11 +269,11 @@ td.cmp-delta{transition:background .2s}
   .header{padding:10px 12px;flex-direction:column;align-items:flex-start}
   .header h1{font-size:16px}
   .header .sub{font-size:10px;display:block;margin-top:2px}
-  .toolbar{gap:6px;width:100%;align-items:flex-start;overflow:visible}
-  .toolbar__group{gap:4px;max-width:100%}
-  .toolbar__sep{display:none}
-  .toolbar button,.toolbar .btn-file,.toolbar .btn-dl,.toolbar select{height:28px;padding:0 8px;font-size:11px;border-radius:4px;min-width:0;max-width:100%}
+  .toolbar{gap:4px}
+  .toolbar__group{gap:4px}
+  .toolbar button,.toolbar .btn-file,.toolbar .btn-dl,.toolbar select{height:28px;padding:0 8px;font-size:11px;border-radius:4px}
   .toolbar label{font-size:11px}
+  .toolbar__sep{height:16px}
 
   /* ── Compare bar ── */
   #compareBar{flex-wrap:wrap;padding:6px 10px;gap:4px;font-size:11px}
@@ -378,6 +377,10 @@ td.cmp-delta{transition:background .2s}
 <button class="btn" data-share-restricted onclick="document.getElementById('planFileInput').click()">📅 导入计划</button>
 <a href="安效能_实际数据导入模板.xlsx" download class="btn-dl" data-share-restricted>实际模板</a>
 <a href="安效能_计划数据导入模板.xlsx" download class="btn-dl" data-share-restricted>计划模板</a>
+<button class="btn" data-share-restricted onclick="exportData()">💾 导出备份</button>
+<button class="btn" data-share-restricted onclick="exportShareData()" title="导出数据为JSON文件">📤 导出分享数据</button>
+<button class="btn" data-share-restricted onclick="encryptShareData()" title="一键加密并下载，用于GitHub Pages分享">🔒 加密分享数据</button>
+<label class="btn-file" data-share-restricted>📂 恢复备份<input type="file" accept=".json" onchange="importData(this)" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden"></label>
 </div></div>
 </div>
 <div id="shareBanner" class="share-banner"><span class="share-badge">只读分享</span><span>数据周期 <b id="sharePeriod">—</b></span><span>数据版本 <b id="shareVersion">—</b></span><span>发布时间 <b id="sharePublishedAt">—</b></span><span>分享模式 <b id="shareModeLabel">—</b></span></div>

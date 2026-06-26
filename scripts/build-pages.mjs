@@ -6,17 +6,24 @@ import { pathToFileURL } from 'node:url';
 
 const ROOT=path.resolve(import.meta.dirname,'..');
 const OUTPUT_NAME='pages-dist';
+
+// All runtime files — full feature set, nothing stripped
 const RUNTIME_FILES=[
-  'chart.umd.min.js',
+  'chart.umd.min.js','xlsx.full.min.js',
   'dashboard-data.js','dashboard-config.js','dashboard-compute.js','dashboard-metrics.js',
-  'dashboard-charts.js','dashboard-render.js','dashboard-alerts.js','dashboard-share.js','dashboard-trend.js',
-  'dashboard-main.js','dashboard-diagnosis.css',
+  'dashboard-charts.js','dashboard-render.js','dashboard-alerts.js','dashboard-share.js',
+  'dashboard-trend.js','dashboard-main.js',
+  'dashboard-export.js','dashboard-publish.js','dashboard-ai.js','dashboard-agent.js',
+  'dashboard-diagnosis.js','dashboard-remediation.js',
+  'dashboard-diagnosis.css','dashboard-publish.css',
+  'pages/crypto.js','pages/unlock.js','pages/unlock.css',
 ];
+
 const FORBIDDEN_NAMES=[
   /^\.env(?:\.|$)/i,/\.(?:db|sqlite|sqlite3)$/i,
   /\.decrypted\.json$/i,/\.tmp-encrypted-share/i,/\.py$/i,/\.log$/i,
 ];
-const FORBIDDEN_PARTS=new Set(['.git','backend','backups','docs','memory','plaintext-share','pages-private','tests','reports']);
+const FORBIDDEN_PARTS=new Set(['.git','backend','backups','docs','memory','plaintext-share','pages-private','tests','reports','evolution-drafts']);
 const SECRET_PATTERNS=[
   /postgres(?:ql)?:\/\//i,/DATABASE_URL/i,/POSTGRES_PASSWORD/i,/PROXY_SHARED_SECRET/i,
   /(?:OPENAI|ZAI|ANTHROPIC|GITHUB)_API_KEY/i,/sk-[A-Za-z0-9_-]{16,}/,
@@ -32,45 +39,13 @@ function normalizeBasePath(value){
   return base;
 }
 
-function publicReadonlyScript(publishedAt){
-  return `<script>
-(function(){
-  function installPublicReadonly(){
-    if(!window.App)return;
-    App.shareMode=true;
-    App.shareToken='public';
-    App.shareMeta={mode:'public',allowExport:false,dataVersion:{id:'public',period:App.currentMonth||'',publishedAt:${JSON.stringify(publishedAt)}}};
-    App.isReadOnly=function(){return true;};
-    App.shareCanExport=function(){return false;};
-    if(typeof applyShareVisibility==='function')applyShareVisibility();
-    if(typeof installShareGuards==='function')installShareGuards();
-  }
-  if(document.readyState==='loading'){
-    document.addEventListener('DOMContentLoaded',function(){setTimeout(installPublicReadonly,0);});
-  }else{
-    setTimeout(installPublicReadonly,0);
-  }
-})();
-</script>`;
-}
-
-function publicPage(source,basePath,publishedAt){
+function fullPage(source,basePath){
   let html=source;
-  const stripPatterns=[
-    /<script[^>]*src="(?:pages\/crypto|pages\/unlock|dashboard-publish|dashboard-ai|dashboard-agent|dashboard-diagnosis|dashboard-remediation|dashboard-export)\.js[^>]*><\/script>/g,
-    /<script[^>]*src="xlsx\.full\.min\.js[^>]*><\/script>/g,
-    /<link[^>]*href="(?:dashboard-publish|pages\/unlock)\.css[^>]*"\s*\/?>/g,
-    /href="[^"]*\.xlsx"/g,
-  ];
-  for(const pattern of stripPatterns)html=html.replace(pattern,'');
-  html=html.replace(/<[^>]+data-share-restricted[^>]*>[\s\S]*?<\/[^>]+>/gi,'');
-  html=html.replace(/<input[^>]+data-share-restricted[^>]*\/?\s*>/gi,'');
-  html=html.replace(/<[^>]+data-share-ai[^>]*>[\s\S]*?<\/[^>]+>/gi,'');
-  html=html.replace(/<[^>]+data-share-export[^>]*>[\s\S]*?<\/[^>]+>/gi,'');
+  // Set base href for GitHub Pages subpath
   html=html.replace(/<base\s+href="[^"]*"\s*\/?>/i,`<base href="${basePath}">`);
   if(!html.includes(`<base href="${basePath}">`))html=html.replace(/<head>/i,`<head><base href="${basePath}">`);
+  // Add noindex
   html=html.replace(/<meta name="viewport"/i,'<meta name="robots" content="noindex,nofollow"><meta name="viewport"');
-  html=html.replace(/<script src="dashboard-main\.js[^"]*"><\/script>/,publicReadonlyScript(publishedAt)+'<script src="dashboard-main.js?v=20260623"></script>');
   return html;
 }
 
@@ -78,15 +53,6 @@ function sensitiveEnvironmentValues(){
   return Object.entries(process.env)
     .filter(([name,value])=>/(?:PASSWORD|SECRET|TOKEN|API_KEY|DATABASE_URL)/i.test(name)&&typeof value==='string'&&value.length>=8)
     .map(([,value])=>value);
-}
-
-function validatePublicData(text){
-  let data;
-  try{data=JSON.parse(text);}catch(error){throw new Error('Public data JSON is invalid');}
-  if(!data||typeof data!=='object'||!data.actuals||!data._plans)throw new Error('Public data must contain actuals and _plans');
-  const serialized=JSON.stringify(data);
-  for(const pattern of SECRET_PATTERNS)if(pattern.test(serialized))throw new Error('Credential or database marker found in public data');
-  return data;
 }
 
 async function copyFile(root,temp,relative){
@@ -120,7 +86,6 @@ async function scanOutputContent(directory,files){
     const content=await fs.readFile(path.join(directory,relative),'utf8');
     for(const pattern of SECRET_PATTERNS)if(pattern.test(content))throw new Error(`Sensitive content found in output: ${relative}`);
     for(const secretValue of sensitiveEnvironmentValues())if(content.includes(secretValue))throw new Error(`Environment secret value found in output: ${relative}`);
-    if(relative==='_data_backup.json')validatePublicData(content);
   }
 }
 
@@ -128,16 +93,18 @@ export async function buildPages({root=ROOT,output=path.join(root,OUTPUT_NAME),b
   const base=normalizeBasePath(basePath),temp=path.join(path.dirname(output),`.${path.basename(output)}.${process.pid}.${Date.now()}.tmp`);
   await fs.rm(temp,{recursive:true,force:true});await fs.mkdir(temp,{recursive:true});
   try{
+    // Copy all runtime files
     for(const file of RUNTIME_FILES)await copyFile(root,temp,file);
+    // Copy data backup
+    const dataPath=path.join(root,'_data_backup.json');
+    const dataText=await fs.readFile(dataPath,'utf8');
+    // Validate it's valid JSON
+    try{JSON.parse(dataText);}catch{throw new Error('_data_backup.json is not valid JSON');}
+    await fs.writeFile(path.join(temp,'_data_backup.json'),dataText,'utf8');
+    // Build full-featured index.html (no stripping, no readonly injection)
     const sourceHtml=await fs.readFile(path.join(root,'index.html'),'utf8');
-    const publicDataPath=path.join(root,'pages/public-data.json');
-    const fallbackDataPath=path.join(root,'_data_backup.json');
-    let publicDataText;
-    try{publicDataText=await fs.readFile(publicDataPath,'utf8');}
-    catch(error){if(error.code==='ENOENT')publicDataText=await fs.readFile(fallbackDataPath,'utf8');else throw error;}
-    validatePublicData(publicDataText);
-    await fs.writeFile(path.join(temp,'_data_backup.json'),publicDataText,'utf8');
-    await fs.writeFile(path.join(temp,'index.html'),publicPage(sourceHtml,base,new Date().toISOString()),'utf8');
+    await fs.writeFile(path.join(temp,'index.html'),fullPage(sourceHtml,base),'utf8');
+    // Security scan
     const files=await listFiles(temp);scanOutputFiles(files);await scanOutputContent(temp,files);
     await fs.rm(output,{recursive:true,force:true});await fs.rename(temp,output);
     return {output,basePath:base,files:await listFiles(output)};
@@ -147,7 +114,7 @@ export async function buildPages({root=ROOT,output=path.join(root,OUTPUT_NAME),b
 async function main(){
   try{
     const result=await buildPages();
-    console.log(`Pages build complete: ${result.files.length} public file(s), base ${result.basePath}`);
+    console.log(`Pages build complete: ${result.files.length} files, full-featured, base ${result.basePath}`);
   }catch(error){
     console.error(`Pages build failed: ${error.message}`);
     process.exitCode=1;

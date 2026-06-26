@@ -1,4 +1,4 @@
-name: Deploy public GitHub Pages
+name: Deploy GitHub Pages
 
 on:
   workflow_dispatch:
@@ -27,10 +27,7 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Test public Pages build
-        run: node --test tests/test_pages_build.mjs
-
-      - name: Build public static Pages artifact
+      - name: Build full-featured static Pages
         env:
           PAGES_BASE_PATH: /${{ github.event.repository.name }}/
         run: node scripts/build-pages.mjs
