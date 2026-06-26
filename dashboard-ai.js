@@ -3,8 +3,8 @@
 // 零外部依赖，只读 App.* 数据
 
 (function(){
-// 分享模式（GitHub Pages）下无后端，禁用 AI 请求
-var SHARE_MODE=(location.pathname.includes('/share/')||document.body.classList.contains('share-mode')||!window._server_py);
+// 分享模式检测（仅真实分享链接路径触发）
+var SHARE_MODE=(location.pathname.includes('/share/')||document.body.classList.contains('share-mode'));
 function _aiUnavailable(){
   return SHARE_MODE;
 }
