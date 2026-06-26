@@ -24,6 +24,7 @@ from ..shared import (
     resolve_organization,
     ai_request,
     ai_error_type,
+    runtime_value,
     rule_fallback,
     db,
 )
@@ -141,7 +142,8 @@ def create_interpretation(diagnosis_id: str, user: Identity = Depends(identity))
     try:
         for attempt in range(2):
             try:
-                content, usage = ai_request([
+                request_ai = runtime_value("ai_request", ai_request)
+                content, usage = request_ai([
                     {"role": "system", "content": INTERPRETATION_PROMPT},
                     {"role": "user", "content": json.dumps(context, ensure_ascii=False)},
                 ], json_mode=True)

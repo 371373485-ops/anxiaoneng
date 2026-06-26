@@ -673,11 +673,16 @@ function renderDataTab(){
   }
   h+='</div>';
 
-  // 4. Actions
+  // 4. Backup and management actions
+  h+='<div class="data-section"><h4>备份与分享</h4>';
   h+='<div class="data-actions">';
+  h+='<button class="btn-sm" data-share-restricted onclick="exportData()">💾 导出备份</button>';
+  h+='<button class="btn-sm" data-share-restricted onclick="exportShareData()" title="导出数据为 JSON 文件">📤 导出分享数据</button>';
+  h+='<button class="btn-sm" data-share-restricted onclick="encryptShareData()" title="一键加密并下载，用于 GitHub Pages 分享">🔒 加密分享数据</button>';
+  h+='<label class="btn-sm" data-share-restricted style="display:inline-flex;align-items:center;gap:4px;cursor:pointer">📂 恢复备份<input type="file" accept=".json" onchange="importData(this)" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden"></label>';
   h+='<button class="btn-sm warn" onclick="confirmClearAll()">🗑️ 清空全部数据</button>';
-  h+='<span style="font-size:10px;color:#999;margin-left:8px">清空前建议先导出备份</span>';
-  h+='</div>';
+  h+='<span style="font-size:10px;color:#999;margin-left:8px;align-self:center">清空前建议先导出备份</span>';
+  h+='</div></div>';
 
   // 5. Alert config
   h += renderAlertConfig();

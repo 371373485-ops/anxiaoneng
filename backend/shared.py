@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import time
 import urllib.error
 import urllib.request
@@ -39,6 +40,11 @@ AUTH_TOKEN = os.getenv("API_AUTH_TOKEN", "")
 AUTH_MODE = os.getenv("AUTH_MODE", "development").lower()
 AI_ENABLED = os.getenv("AI_ENABLED", "false").lower() == "true"
 
+
+def runtime_value(name, default):
+    app_module = sys.modules.get("backend.app")
+    return getattr(app_module, name, default) if app_module is not None else default
+
 # ── Identity / Auth ──────────────────────────────────────────────────────────
 
 class Identity(BaseModel):
@@ -56,9 +62,11 @@ def identity(
     x_authenticated_role: str | None = Header(default=None),
     x_authenticated_branches: str | None = Header(default=None),
 ):
-    if AUTH_MODE == "token" and authorization != f"Bearer {AUTH_TOKEN}":
+    auth_mode = runtime_value("AUTH_MODE", AUTH_MODE)
+    auth_token = runtime_value("AUTH_TOKEN", AUTH_TOKEN)
+    if auth_mode == "token" and authorization != f"Bearer {auth_token}":
         raise HTTPException(401, "身份认证失败")
-    if AUTH_MODE == "proxy":
+    if auth_mode == "proxy":
         if not x_authenticated_user or not x_authenticated_role:
             raise HTTPException(401, "未收到可信身份网关信息")
         x_user_id = x_authenticated_user
@@ -348,7 +356,9 @@ def get_evidence_for_diagnosis(diagnosis_id):
 
 
 def ai_request(messages, json_mode=False):
-    if not AI_ENABLED or not AI_KEY:
+    ai_enabled = runtime_value("AI_ENABLED", AI_ENABLED)
+    ai_key = runtime_value("AI_KEY", AI_KEY)
+    if not ai_enabled or not ai_key:
         raise HTTPException(503, "生成式AI当前未启用，基础诊断仍可使用")
     request_body = {
         "model": MODEL, "messages": messages, "temperature": 0.2,
@@ -358,7 +368,7 @@ def ai_request(messages, json_mode=False):
         request_body["response_format"] = {"type": "json_object"}
     req = urllib.request.Request(
         AI_URL, data=json.dumps(request_body, ensure_ascii=False).encode("utf-8"),
-        headers={"Content-Type": "application/json", "Authorization": f"Bearer {AI_KEY}"},
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {ai_key}"},
         method="POST",
     )
     try:
@@ -374,7 +384,9 @@ def ai_request(messages, json_mode=False):
 
 
 def ai_error_type(exc):
-    if not AI_ENABLED or not AI_KEY:
+    ai_enabled = runtime_value("AI_ENABLED", AI_ENABLED)
+    ai_key = runtime_value("AI_KEY", AI_KEY)
+    if not ai_enabled or not ai_key:
         return "closed"
     if isinstance(exc, json.JSONDecodeError):
         return "format_error"

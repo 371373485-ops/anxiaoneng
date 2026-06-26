@@ -23,9 +23,9 @@ App.blockReadOnlyAction=function(action){
 };
 
 function emptyData(){return {_plans:{},actuals:{},currentMonth:'',currentPlanKey:'auto'};}
-function setText(id,value){var el=document.getElementById(id);if(el)el.textContent=value==null?'—':String(value);}
+function setText(id,value){var el=document.getElementById(id);if(el)el.textContent=value==null?'--':String(value);}
 function publishedText(value){
-  if(!value)return '—';
+  if(!value)return '--';
   var date=new Date(value);
   return isNaN(date.getTime())?String(value):date.toLocaleString();
 }
@@ -96,6 +96,7 @@ function wrap(name,label,allow){
   };
   guarded.__shareGuarded=true;guarded.__shareOriginal=original;window[name]=guarded;
 }
+
 function installShareGuards(){
   if(!App.shareMode)return;
   [
@@ -116,6 +117,17 @@ function installShareGuards(){
     ['advanceRemediationTask','更新整改任务'],['reviewRemediationTask','整改复盘']
   ].forEach(function(item){wrap(item[0],item[1]);});
   wrap('doExport','导出数据',App.shareCanExport);
+  var originalSwitch=window.switchTab;
+  if(typeof originalSwitch==='function'&&!originalSwitch.__shareGuarded){
+    window.switchTab=function(tab){
+      if(App.shareMode&&['ai','agent','remediation'].indexOf(tab)>=0){
+        App.blockReadOnlyAction('AI解读');return false;
+      }
+      return originalSwitch.apply(this,arguments);
+    };
+    window.switchTab.__shareGuarded=true;
+    window.switchTab.__shareOriginal=originalSwitch;
+  }
 }
 
 window.loadSharedDashboard=loadSharedDashboard;

@@ -9,9 +9,20 @@ except Exception as e:
     handle_agent_request = None
     SessionManager = None
 
-PORT = 8921
-DIR = os.path.dirname(os.path.abspath(__file__))
+PORT = int(os.environ.get("SERVER_PORT", "8921"))
+DIR = os.environ.get("SERVER_DATA_DIR", os.path.dirname(os.path.abspath(__file__)))
 os.chdir(DIR)
+SERVER_HOST = os.environ.get("SERVER_HOST", "127.0.0.1")
+ALLOWED_ORIGINS = {
+    origin.strip()
+    for origin in os.environ.get(
+        "SERVER_ALLOWED_ORIGINS",
+        "http://127.0.0.1:8921,http://localhost:8921",
+    ).split(",")
+    if origin.strip()
+}
+SAVE_BACKUP_MAX_BYTES = int(os.environ.get("SAVE_BACKUP_MAX_BYTES", str(5 * 1024 * 1024)))
+AI_CHAT_MAX_BYTES = int(os.environ.get("AI_CHAT_MAX_BYTES", str(2 * 1024 * 1024)))
 
 # ── Zhipu GLM API config ──
 def _get_api_key():
@@ -362,8 +373,11 @@ class H(http.server.SimpleHTTPRequestHandler):
         super().end_headers()
 
     def do_OPTIONS(self):
+        if not self._origin_allowed():
+            self._send_json({'ok': False, 'error': 'origin not allowed'}, 403)
+            return
         self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
+        self._send_cors()
         self.send_header('Access-Control-Allow-Methods', 'POST, GET, PATCH, DELETE, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.end_headers()
@@ -379,40 +393,62 @@ class H(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
 
     def _send_cors(self):
-        self.send_header('Access-Control-Allow-Origin', '*')
+        origin = self.headers.get('Origin')
+        if origin and origin in ALLOWED_ORIGINS:
+            self.send_header('Access-Control-Allow-Origin', origin)
+
+    def _origin_allowed(self):
+        origin = self.headers.get('Origin')
+        return not origin or origin in ALLOWED_ORIGINS
+
+    def _read_limited_body(self, max_bytes):
+        raw_length = self.headers.get('Content-Length', '0')
+        try:
+            length = int(raw_length)
+        except (TypeError, ValueError):
+            raise ValueError('invalid Content-Length')
+        if length > max_bytes:
+            raise OverflowError('request body too large')
+        return self.rfile.read(length)
 
     def do_POST(self):
         if self.path == '/save-backup':
             client_addr = self.client_address[0]
             if client_addr not in ('127.0.0.1', '::1', 'localhost'):
-                self.send_response(403)
-                self._send_cors()
-                self.end_headers()
-                self.wfile.write(json.dumps({'error': 'forbidden: localhost only'}).encode())
+                self._send_json({'ok': False, 'error': 'forbidden: localhost only'}, 403)
+                return
+            if not self._origin_allowed():
+                self._send_json({'ok': False, 'error': 'origin not allowed'}, 403)
                 return
             try:
-                length = int(self.headers.get('Content-Length', 0))
-                data = self.rfile.read(length)
+                data = self._read_limited_body(SAVE_BACKUP_MAX_BYTES)
+                try:
+                    json.loads(data.decode('utf-8'))
+                except Exception:
+                    self._send_json({'ok': False, 'error': 'invalid JSON'}, 400)
+                    return
                 bkpath = os.path.join(DIR, '_data_backup.json')
                 with open(bkpath, 'wb') as f:
                     f.write(data)
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json')
-                self._send_cors()
-                self.end_headers()
-                self.wfile.write(json.dumps({'ok': True, 'size': len(data)}).encode())
+                self._send_json({'ok': True, 'size': len(data)})
                 print('[Backup] Saved', len(data), 'bytes to', bkpath, flush=True)
+            except OverflowError:
+                self._send_json({'ok': False, 'error': 'request body too large'}, 413)
+            except ValueError:
+                self._send_json({'ok': False, 'error': 'invalid Content-Length'}, 400)
             except Exception as e:
-                self.send_response(500)
-                self.send_header('Content-Type', 'application/json')
-                self._send_cors()
-                self.end_headers()
-                self.wfile.write(json.dumps({'ok': False, 'error': str(e)}).encode())
+                self._send_json({'ok': False, 'error': str(e)}, 500)
 
         elif self.path == '/ai/chat':
+            if not self._origin_allowed():
+                self._send_json({'ok': False, 'error': 'origin not allowed'}, 403)
+                return
             self._handle_ai_chat()
 
         elif self.path == '/ai/health':
+            if not self._origin_allowed():
+                self._send_json({'ok': False, 'error': 'origin not allowed'}, 403)
+                return
             self._handle_ai_health()
 
         elif self.path == '/ai/analyze':
@@ -675,8 +711,15 @@ class H(http.server.SimpleHTTPRequestHandler):
 
     def _handle_ai_chat(self):
         try:
-            length = int(self.headers.get('Content-Length', 0))
-            body = json.loads(self.rfile.read(length).decode('utf-8'))
+            try:
+                data = self._read_limited_body(AI_CHAT_MAX_BYTES)
+            except OverflowError:
+                self._send_json({'ok': False, 'error': 'request body too large'}, 413)
+                return
+            except ValueError:
+                self._send_json({'ok': False, 'error': 'invalid Content-Length'}, 400)
+                return
+            body = json.loads(data.decode('utf-8') or '{}')
             question = body.get('question', '')
             context = body.get('context', {})
 
@@ -996,10 +1039,15 @@ class H(http.server.SimpleHTTPRequestHandler):
                 pass
 
 
-socketserver.ThreadingTCPServer.allow_reuse_address = True
-print(f'http://localhost:{PORT}/', flush=True)
-print(f'AI endpoint: http://localhost:{PORT}/ai/chat', flush=True)
-print(f'AI model: {ZHIPU_MODEL}', flush=True)
-print(f'API Key: {"已配置" if ZHIPU_API_KEY else "❌ 未配置！请设置 ZAI_API_KEY 环境变量"}', flush=True)
-with socketserver.ThreadingTCPServer(('', PORT), H) as h:
-    h.serve_forever()
+def main():
+    socketserver.ThreadingTCPServer.allow_reuse_address = True
+    print(f'http://{SERVER_HOST}:{PORT}/', flush=True)
+    print(f'AI endpoint: http://{SERVER_HOST}:{PORT}/ai/chat', flush=True)
+    print(f'AI model: {ZHIPU_MODEL}', flush=True)
+    print(f'API Key: {"已配置" if ZHIPU_API_KEY else "❌ 未配置！请设置 ZAI_API_KEY 环境变量"}', flush=True)
+    with socketserver.ThreadingTCPServer((SERVER_HOST, PORT), H) as h:
+        h.serve_forever()
+
+
+if __name__ == "__main__":
+    main()

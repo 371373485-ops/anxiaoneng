@@ -6,26 +6,29 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from . import db
+from . import db, shared
 
 ROOT = Path(__file__).resolve().parents[1]
 AUTH_MODE = os.getenv("AUTH_MODE", "development").lower()
 AUTH_TOKEN = os.getenv("API_AUTH_TOKEN", "")
+AI_ENABLED = shared.AI_ENABLED
+AI_KEY = shared.AI_KEY
+ai_request = shared.ai_request
 
 
 @asynccontextmanager
 async def lifespan(_app):
     if os.getenv("APP_ENV", "development").lower() == "production":
         if AUTH_MODE not in {"proxy", "token"}:
-            raise RuntimeError("生产环境 AUTH_MODE 必须�?proxy �?token")
+            raise RuntimeError("production AUTH_MODE must be proxy or token")
         if AUTH_MODE == "token" and not AUTH_TOKEN:
-            raise RuntimeError("token 鉴权模式必须配置 API_AUTH_TOKEN")
+            raise RuntimeError("token auth mode requires API_AUTH_TOKEN")
     db.init_db()
     yield
 
 
 app = FastAPI(
-    title="智能经营诊断与整改闭环API",
+    title="鏅鸿兘缁忚惀璇婃柇涓庢暣鏀归棴鐜疉PI",
     version="1.0.0",
     lifespan=lifespan,
 )

@@ -28,10 +28,15 @@ server_stdout.log
 server_stderr.log
 _server.log
 
+_data_backup.json
 diagnosis.db
 *-temp.db
 runtime-*.db
 *.bak
+backups/
+temp/
+evaluation-output/
+evaluation-results/
 
 # Packaged/generated deploy artifacts
 *.zip

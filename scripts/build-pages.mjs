@@ -14,9 +14,8 @@ const RUNTIME_FILES=[
   'chart.umd.min.js',
   'dashboard-data.js','dashboard-config.js','dashboard-compute.js','dashboard-metrics.js',
   'dashboard-charts.js','dashboard-render.js','dashboard-alerts.js','dashboard-share.js',
-  'dashboard-main.js','dashboard-diagnosis.css','dashboard-publish.css',
-  'dashboard-export.js','dashboard-publish.js','dashboard-ai.js','dashboard-agent.js',
-  'dashboard-diagnosis.js','dashboard-remediation.js','xlsx.full.min.js',
+  'dashboard-main.js','dashboard-diagnosis.css',
+  'dashboard-export.js','xlsx.full.min.js',
   'pages/crypto.js','pages/unlock.js','pages/unlock.css',
 ];
 const FORBIDDEN_NAMES=[

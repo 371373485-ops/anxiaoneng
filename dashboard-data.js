@@ -307,6 +307,7 @@ function refreshMergedData(){
   var rm={};
   for(var ri=0;ri<mb.length;ri++){var rr=mb[ri].r;if(!rm[rr])rm[rr]=[];rm[rr].push(mb[ri]);}
   var na={};
+  if(!App.ALL_DATA[mk][App.currentMonth].regions)App.ALL_DATA[mk][App.currentMonth].regions={};
   App.REGIONS.forEach(function(rn){
     var bl=rm[rn]||[];if(bl.length===0)return;
     var agg={};
