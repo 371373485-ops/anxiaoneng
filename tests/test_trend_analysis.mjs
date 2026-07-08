@@ -126,7 +126,7 @@ assert(mockGetMetricValue('2026-01', '不存在', 'COR') === null, 'nonexistent 
 assert(mockGetMetricValue('2026-02', '全国', 'COR') === null, 'nonexistent month');
 
 // 6. 时间范围预设
-const allMonths = ['2025-10','2025-11','2025-12','2026-01','2026-02','2026-03','2026-04','2026-05'];
+const allMonths = ['2024-11','2024-12','2025-10','2025-11','2025-12','2026-01','2026-02','2026-03','2026-04','2026-05','2026-12'];
 
 function getMonths(preset, customStart, customEnd, currentMonth) {
   if (preset === 'custom' && customStart && customEnd)
@@ -143,15 +143,24 @@ function getMonths(preset, customStart, customEnd, currentMonth) {
       (m.startsWith(String(parseInt(yr2)-1)) && m.endsWith('-'+mo))
     ).sort();
   }
+  if (preset === 'annualDec') return allMonths.filter(m => /-12$/.test(m)).sort();
   if (preset === 'recent3') return allMonths.slice(-3);
   if (preset === 'recent12') return allMonths.slice(-12);
   return allMonths.slice(-6);
 }
 
-assert(JSON.stringify(getMonths('recent3')) === JSON.stringify(['2026-03','2026-04','2026-05']), 'recent3');
-assert(JSON.stringify(getMonths('recent6')) === JSON.stringify(['2025-12','2026-01','2026-02','2026-03','2026-04','2026-05']), 'recent6');
-assert(JSON.stringify(getMonths('ytd','','','2026-04')) === JSON.stringify(['2026-01','2026-02','2026-03','2026-04','2026-05']), 'ytd');
+assert(JSON.stringify(getMonths('recent3')) === JSON.stringify(['2026-04','2026-05','2026-12']), 'recent3');
+assert(JSON.stringify(getMonths('recent6')) === JSON.stringify(['2026-01','2026-02','2026-03','2026-04','2026-05','2026-12']), 'recent6');
+assert(JSON.stringify(getMonths('ytd','','','2026-04')) === JSON.stringify(['2026-01','2026-02','2026-03','2026-04','2026-05','2026-12']), 'ytd');
 assert(JSON.stringify(getMonths('custom','2026-01','2026-03')) === JSON.stringify(['2026-01','2026-02','2026-03']), 'custom');
+assert(JSON.stringify(getMonths('annualDec')) === JSON.stringify(['2024-12','2025-12','2026-12']), 'annualDec uses December only');
+
+function fmtPeriod(m, preset) {
+  if (!m) return '';
+  return preset === 'annualDec' ? m.split('-')[0] + '年' : m.split('-')[1] + '月';
+}
+assert(fmtPeriod('2025-12', 'annualDec') === '2025年', 'annualDec label uses year');
+assert(fmtPeriod('2025-12', 'recent6') === '12月', 'monthly label unchanged');
 
 // 7. 排名计算
 function getBranchRank(branches, name, key, direction) {

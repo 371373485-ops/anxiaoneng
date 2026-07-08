@@ -13,7 +13,7 @@ const RUNTIME_FILES=[
   'dashboard-data.js','dashboard-config.js','dashboard-compute.js','dashboard-metrics.js',
   'dashboard-charts.js','dashboard-render.js','dashboard-alerts.js','dashboard-share.js',
   'dashboard-trend.js','dashboard-main.js',
-  'dashboard-export.js','dashboard-publish.js','ai-client.js','dashboard-ai.js','dashboard-agent.js',
+  'dashboard-export.js','dashboard-publish.js','ai-client.js','dashboard-ai-engine.js','dashboard-diagnosis-index.js','dashboard-ai.js','dashboard-agent.js',
   'dashboard-diagnosis.js','dashboard-remediation.js',
   'dashboard-diagnosis.css','dashboard-publish.css',
   'pages/crypto.js','pages/unlock.js','pages/unlock.css',

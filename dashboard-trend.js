@@ -124,6 +124,11 @@ function fmtMonth(m){
   return m.split('-')[1] + '月';
 }
 
+function fmtPeriod(m, preset){
+  if(!m) return '';
+  return preset === 'annualDec' ? m.split('-')[0] + '年' : fmtMonth(m);
+}
+
 function metricUnit(key){
   var f = (App.FIELDS || []).find(function(x){ return x.k === key; });
   return f ? (f.u || '') : '';
@@ -147,6 +152,9 @@ function getMonths(preset, customStart, customEnd){
       return (m.startsWith(yr2) && m.endsWith('-'+mo)) ||
              (m.startsWith(String(parseInt(yr2)-1)) && m.endsWith('-'+mo));
     }).sort();
+  }
+  if(preset === 'annualDec'){
+    return all.filter(function(m){ return /-12$/.test(m); }).sort();
   }
   if(preset === 'recent3') return all.slice(-3);
   if(preset === 'recent12') return all.slice(-12);
@@ -249,6 +257,7 @@ function renderCards(){
   h += '<option value="recent12">近12月</option>';
   h += '<option value="ytd">本年逐月</option>';
   h += '<option value="yoy">年度同比</option>';
+  h += '<option value="annualDec">每年度对比（12月）</option>';
   h += '<option value="custom">自定义</option>';
   h += '</select></div>';
   h += '<div id="batch-custom-wrap" class="tf-group" style="display:none;flex:0 0 auto;flex-direction:row;gap:4px;align-items:center"><input type="month" id="batch-start" min="'+dataMin+'" max="'+dataMax+'"><span style="font-size:11px">至</span><input type="month" id="batch-end" min="'+dataMin+'" max="'+dataMax+'"></div>';
@@ -308,6 +317,7 @@ function renderCardHTML(card, fieldGroups, branchNames, allMonths){
   h += '<option value="recent12"'+(s.preset==='recent12'?' selected':'')+'>近12个月</option>';
   h += '<option value="ytd"'+(s.preset==='ytd'?' selected':'')+'>本年逐月</option>';
   h += '<option value="yoy"'+(s.preset==='yoy'?' selected':'')+'>年度同比</option>';
+  h += '<option value="annualDec"'+(s.preset==='annualDec'?' selected':'')+'>每年度对比（12月）</option>';
   h += '<option value="custom"'+(s.preset==='custom'?' selected':'')+'>自定义</option>';
   h += '</select></div>';
   
@@ -463,7 +473,7 @@ function renderCardChart(card){
     
     card.chart = new Chart(dom, {
       type: 'bar',
-      data: { labels: months.map(fmtMonth), datasets: barDatasets },
+      data: { labels: months.map(function(m){ return fmtPeriod(m, card.preset); }), datasets: barDatasets },
       options: {
         devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
         responsive: true,
@@ -532,7 +542,7 @@ function renderCardChart(card){
     
     card.chart = new Chart(dom, {
       type: 'line',
-      data: { labels: months.map(fmtMonth), datasets: datasets },
+      data: { labels: months.map(function(m){ return fmtPeriod(m, card.preset); }), datasets: datasets },
       options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -600,7 +610,7 @@ function renderDataTable(card, months){
   
   var h = '<table><thead><tr>';
   h += '<th>机构</th>';
-  months.forEach(function(m){ h += '<th class="num">'+fmtMonth(m)+'</th>'; });
+  months.forEach(function(m){ h += '<th class="num">'+fmtPeriod(m, card.preset)+'</th>'; });
   h += '</tr></thead><tbody>';
   
   allOrgs.forEach(function(org, i){
@@ -695,8 +705,8 @@ function generateAnalysis(card, months){
         var momPct = vals[i-1] !== 0 ? mom / Math.abs(vals[i-1]) * 100 : 0;
         // 百分比指标用绝对差值×100（加减法）；额度指标用相对变化（增减幅）
         var momDisp = isPct ? mom * 100 : momPct;
-        if (momDisp > Math.abs(maxMomUp)) { maxMomUp = momDisp; maxMomUpMonth = fmtMonth(months[i]); }
-        if (momDisp < -Math.abs(maxMomDown)) { maxMomDown = momDisp; maxMomDownMonth = fmtMonth(months[i]); }
+        if (momDisp > Math.abs(maxMomUp)) { maxMomUp = momDisp; maxMomUpMonth = fmtPeriod(months[i], card.preset); }
+        if (momDisp < -Math.abs(maxMomDown)) { maxMomDown = momDisp; maxMomDownMonth = fmtPeriod(months[i], card.preset); }
       }
     }
     
@@ -760,8 +770,9 @@ function generateAnalysis(card, months){
     text += '，' + trendDir + '。';
     text += '期间最高' + fv(maxVal) + '，最低' + fv(minVal) + '，平均' + fv(avgVal) + '，' + volatilityDesc + '。';
     // 月度最大波动
-    if (maxMomUp > 1) text += maxMomUpMonth + '环比增加' + maxMomUp.toFixed(2) + '%，';
-    if (maxMomDown < -1) text += maxMomDownMonth + '环比减少' + Math.abs(maxMomDown).toFixed(2) + '%，';
+    var periodCompareLabel = card.preset === 'annualDec' ? '较上年' : '环比';
+    if (maxMomUp > 1) text += maxMomUpMonth + periodCompareLabel + '增加' + maxMomUp.toFixed(2) + '%，';
+    if (maxMomDown < -1) text += maxMomDownMonth + periodCompareLabel + '减少' + Math.abs(maxMomDown).toFixed(2) + '%，';
     if (maxMomUp > 1 || maxMomDown < -1) text = text.replace(/，$/, '。');
     if (rankText) text += rankText + '。';
     if (compareText) text += compareText + '。';

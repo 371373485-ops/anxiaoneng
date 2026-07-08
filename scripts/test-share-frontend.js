@@ -175,6 +175,8 @@ async function testShareLoadsWithoutStorageAndRebuildsMerged() {
     'dashboard-data.js',
     'dashboard-config.js',
     'dashboard-compute.js',
+    'dashboard-diagnosis-index.js',
+    'dashboard-ai-engine.js',
     'dashboard-share.js',
     'dashboard-main.js',
     'dashboard-export.js',
@@ -209,18 +211,127 @@ async function testShareLoadsWithoutStorageAndRebuildsMerged() {
   assert.strictEqual(context.deletePlanVersion('2026-v1'), false);
   assert.strictEqual(context.exportData(), false);
   assert.strictEqual(context.doExport(), false);
-  assert.strictEqual(context.switchTab('ai'), false);
+  assert.notStrictEqual(context.switchTab('ai'), false);
   context.renderAITab();
   context.renderAgentWorkspace();
   context.generateInterpretation();
   context.sendDiagnosisQuestion();
   context.createRemediationDraft();
   context.editAlertRule();
-  assert.strictEqual(context.aiCalled, undefined);
+  assert.strictEqual(context.aiCalled, true);
   assert.strictEqual(context.ruleCalled, undefined);
   assert.strictEqual(context.remediationCalled, undefined);
   assert.strictEqual(JSON.stringify(context.App.ALL_DATA), before);
   assert.strictEqual(context.__test.storageCalls.set, 0);
+  const knownMetric = (
+    context.App.FIELDS.find((field) => field.k === '经营利润')
+    || context.App.FIELDS.find((field) => String(field.k || '').includes('经营利润'))
+    || context.App.FIELDS.find((field) => field.c)
+    || context.App.FIELDS[0]
+  ).k;
+  context.App.DATA.branches[0].d[knownMetric] = 123;
+  context.App.ALL_DATA._merged['2026-06'].branches[0].d[knownMetric] = 123;
+  const local = await context.AIEngine.ask(`${context.App.DATA.branches[0].n} 2026-06 ${knownMetric} 鎯呭喌`);
+  assert.strictEqual(local.local, true, 'share mode must use local deterministic AI analysis');
+  assert.ok(local.answer.usedEvidence.length > 0, 'local answer should cite evidence');
+}
+
+async function testShareDiagnosisQuestionDoesNotCallRemoteAI() {
+  const context = createContext({
+    search: '?share=diagnosis-token',
+    response: sharedResponse(false),
+  });
+  load(context, [
+    'dashboard-data.js',
+    'dashboard-config.js',
+    'dashboard-compute.js',
+    'dashboard-diagnosis-index.js',
+    'dashboard-ai-engine.js',
+    'dashboard-share.js',
+    'dashboard-main.js',
+  ]);
+  await context.loadSharedDashboard();
+  context.App.shareMode = true;
+  context.AICLIENT = {
+    calls: [],
+    chat(messages) {
+      this.calls.push(messages);
+      return Promise.resolve('remote should not be called');
+    },
+  };
+  const branchName = context.App.DATA.branches[0].n;
+  const metric = (
+    context.App.FIELDS.find((field) => field.k === '缁忚惀鍒╂鼎')
+    || context.App.FIELDS.find((field) => String(field.k || '').includes('缁忚惀鍒╂鼎'))
+    || context.App.FIELDS.find((field) => field.c)
+    || context.App.FIELDS[0]
+  ).k;
+  const record = {
+    orgName: branchName,
+    orgId: 'ORG_A',
+    orgType: 'branch',
+    region: 'Region One',
+    period: '2026-06',
+    riskLevel: 'HIGH_RISK',
+    riskScore: 90,
+    summary: 'share diagnosis risk summary',
+    triggeredAlerts: [{
+      ruleId: 'share_diag_rule',
+      severity: 'error',
+      field: metric,
+      fieldLabel: 'Share Metric',
+      currentValue: 123,
+      threshold: 100,
+      op: '>',
+      msg: 'share diagnosis alert',
+      unit: 'unit',
+      branchName,
+    }],
+    triggeredMetrics: [metric],
+    facts: [{ text: 'share diagnosis fact', evidenceId: 'ev_share_diag' }],
+    patterns: [{ name: 'share diagnosis pattern' }],
+    inferences: [{ text: 'share diagnosis reason' }],
+    recommendations: [{ action: 'share diagnosis recommendation' }],
+    evidenceMetrics: [{
+      id: 'ev_share_diag',
+      orgName: branchName,
+      period: '2026-06',
+      metricKey: metric,
+      metricId: 'metric_share_diag',
+      metricLabel: 'Share Metric',
+      currentValue: 123,
+      formattedValue: '123.00unit',
+      benchmarkValue: 100,
+      differenceValue: 23,
+      unit: 'unit',
+      severity: 'error',
+      ruleId: 'share_diag_rule',
+      source: 'share-diagnosis-mock',
+    }],
+    source: 'local_diagnosis',
+    calculationVersion: 'share-test-v1',
+  };
+  context.DiagnosisIndex = context.window.DiagnosisIndex = {
+    build() { return [record]; },
+    get(orgName, period) { return orgName === branchName && period === '2026-06' ? record : null; },
+    list(period) { return period === '2026-06' ? [record] : []; },
+    searchByRisk() { return [record]; },
+    searchByMetric() { return [record]; },
+    getEvidence(orgName, period) { return orgName === branchName && period === '2026-06' ? record.evidenceMetrics : []; },
+  };
+
+  const result = await context.AIEngine.ask('这个机构为什么是高风险？', {
+    org: branchName,
+    period: '2026-06',
+    useDiagnosis: true,
+    mode: 'deep',
+  });
+  assert.strictEqual(result.local, true);
+  assert.strictEqual(context.AICLIENT.calls.length, 0);
+  assert.ok(result.answer.usedEvidence.length > 0);
+  assert.strictEqual(result.answer.riskLevel, 'HIGH_RISK');
+  assert.ok((result.answer.triggeredAlerts || []).some((alert) => alert.ruleId === 'share_diag_rule'));
+  assert.ok((result.answer.recommendations || []).some((item) => String(item).includes('share diagnosis recommendation')));
 }
 
 async function testShareLoadsWithEmptyStorage() {
@@ -287,11 +398,13 @@ function testNormalModeStillUsesExistingStorageFlow() {
 async function main() {
   await testShareLoadsWithEmptyStorage();
   await testShareLoadsWithoutStorageAndRebuildsMerged();
+  await testShareDiagnosisQuestionDoesNotCallRemoteAI();
   await testPathTokenAndInvalidShareNeverFallsBack();
   testNormalModeStillUsesExistingStorageFlow();
   console.log('PASS share loads with empty/foreign localStorage ignored');
   console.log('PASS filtered data rebuilds _merged in browser');
   console.log('PASS read-only, export, AI and remediation guards');
+  console.log('PASS share diagnosis questions stay local and do not call remote AI');
   console.log('PASS invalid token never falls back to old local data');
   console.log('PASS ordinary non-share mode remains unchanged');
 }

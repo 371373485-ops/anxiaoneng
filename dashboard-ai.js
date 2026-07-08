@@ -1094,4 +1094,44 @@ window.renderNavBadge=function(results){
   if(b){var c=(results||App._alertResults||[]).length;b.textContent=c;b.style.display=c>0?'inline-block':'none';}
 };
 
+// Evidence-based AI entrypoints. The shared AI engine performs deterministic
+// browser-side queries first, then lets the admin AI explain only the evidence pack.
+window.generateDeepReading=function(branchName){
+  var btn=document.getElementById('ai-deep-btn');
+  var ct=document.getElementById('ai-deep-content');
+  if(!btn||!ct)return;
+  if(!window.AIEngine){ct.innerHTML='<span style="color:#dc2626">AI查询底座未加载</span>';return;}
+  if(App.shareMode){ct.innerHTML='<div style="padding:16px;color:var(--muted)">分享模式提供本地智能分析，不开放大模型深度解读。</div>';return;}
+  btn.disabled=true;btn.textContent='生成中…';
+  ct.innerHTML='<span style="color:var(--muted)">正在查询证据并生成深度分析…</span>';
+  var question='请基于证据包，对 '+branchName+' 做经营深度分析：说明关键事实、趋势判断、风险原因、具体建议和数据限制。';
+  AIEngine.ask(question,{org:branchName,mode:'deep'}).then(function(result){
+    ct.innerHTML=AIEngine.renderAnswer(result);
+  }).catch(function(error){
+    ct.innerHTML='<span style="color:#dc2626">分析失败：'+_eh(error.message)+'</span>';
+  }).finally(function(){btn.disabled=false;btn.textContent='重新生成';});
+};
+
+window.sendAnalyze=function(){
+  var input=document.getElementById('ai-ca-input');
+  if(!input)return;
+  var question=input.value.trim();
+  if(!question)return;
+  input.value='';
+  var msgs=document.getElementById('ai-ca-msgs');
+  if(!msgs)return;
+  msgs.insertAdjacentHTML('beforeend',
+    '<div style="text-align:right;margin-bottom:8px"><span style="display:inline-block;padding:8px 14px;background:#2563eb;color:#fff;border-radius:12px 12px 2px 12px;font-size:13px">'+_eh(question)+'</span></div>');
+  var aiId='ai-evidence-'+Date.now();
+  msgs.insertAdjacentHTML('beforeend','<div id="'+aiId+'" style="margin-bottom:12px"><span style="color:var(--muted)">正在查询看板数据和证据…</span></div>');
+  var el=document.getElementById(aiId);
+  if(!window.AIEngine){el.innerHTML='<span style="color:#dc2626">AI查询底座未加载</span>';return;}
+  AIEngine.ask(question).then(function(result){
+    el.innerHTML=AIEngine.renderAnswer(result);
+    el.scrollTop=el.scrollHeight;
+  }).catch(function(error){
+    el.innerHTML='<span style="color:#dc2626">分析失败：'+_eh(error.message)+'</span>';
+  });
+};
+
 })();

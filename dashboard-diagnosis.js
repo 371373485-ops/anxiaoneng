@@ -426,4 +426,61 @@ window.sendAnalyze=function(){
     el.innerHTML='<span style="color:#dc2626">分析失败：'+e.message+'</span>';
   });
 };
+// Evidence-based diagnosis AI overrides.
+window.generateBranchDeepReading=function(branchName){
+  var btn=document.getElementById('ai-deep-btn-'+branchName);
+  var ct=document.getElementById('ai-deep-content-'+branchName);
+  if(!btn||!ct)return;
+  if(!window.AIEngine){ct.innerHTML='<span style="color:#dc2626">AI查询底座未加载</span>';return;}
+  if(App.shareMode){ct.innerHTML='<div style="padding:16px;color:var(--muted)">分享模式提供本地智能分析，不开放大模型深度解读。</div>';return;}
+  btn.disabled=true;btn.textContent='生成中…';
+  ct.innerHTML='<span style="color:var(--muted)">正在查询证据并生成深度分析…</span>';
+  AIEngine.ask('请基于证据包，对 '+branchName+' 做经营深度分析，输出关键事实、风险判断、建议和限制。',{org:branchName,mode:'deep'})
+    .then(function(result){ct.innerHTML=AIEngine.renderAnswer(result);})
+    .catch(function(error){ct.innerHTML='<span style="color:#dc2626">分析失败：'+esc(error.message)+'</span>';})
+    .finally(function(){btn.disabled=false;btn.textContent='重新生成';});
+};
+
+window.sendDiagnosisQuestion=function(){
+  var input=document.getElementById('diagnosis-question'), question=input&&input.value.trim();if(!question)return;
+  var log=document.getElementById('diagnosis-chat-log');if(!log)return;
+  log.querySelector('.empty-copy')&&log.querySelector('.empty-copy').remove();
+  log.insertAdjacentHTML('beforeend','<div class="chat-message user">'+esc(question)+'</div><div class="chat-message assistant"><span class="chat-stream">正在查询证据…</span></div>');
+  var stream=log.querySelector('.chat-message:last-child .chat-stream');input.value='';
+  if(!window.AIEngine){stream.textContent='AI查询底座未加载';return;}
+  AIEngine.ask(question,{
+    org:D.diagnosis&&D.diagnosis.branch,
+    period:D.diagnosis&&D.diagnosis.period,
+    mode:'deep',
+    useDiagnosis:true,
+    diagnosisContext:D.diagnosis||null
+  }).then(function(result){
+    stream.innerHTML=AIEngine.renderAnswer(result);
+    log.scrollTop=log.scrollHeight;
+  }).catch(function(error){
+    stream.textContent='分析失败：'+error.message;
+  });
+};
+
+window.sendAnalyze=function(){
+  var input=document.getElementById('ai-ca-input');
+  if(!input)return;
+  var question=input.value.trim();
+  if(!question)return;
+  input.value='';
+  var msgs=document.getElementById('ai-ca-msgs');
+  if(!msgs)return;
+  msgs.insertAdjacentHTML('beforeend',
+    '<div style="text-align:right;margin-bottom:8px"><span style="display:inline-block;padding:8px 14px;background:#2563eb;color:#fff;border-radius:12px 12px 2px 12px;font-size:13px">'+esc(question)+'</span></div>');
+  var aiId='ai-evidence-'+Date.now();
+  msgs.insertAdjacentHTML('beforeend','<div id="'+aiId+'" style="margin-bottom:12px"><span style="color:var(--muted)">正在查询看板数据和证据…</span></div>');
+  var el=document.getElementById(aiId);
+  if(!window.AIEngine){el.innerHTML='<span style="color:#dc2626">AI查询底座未加载</span>';return;}
+  AIEngine.ask(question).then(function(result){
+    el.innerHTML=AIEngine.renderAnswer(result);
+    msgs.scrollTop=msgs.scrollHeight;
+  }).catch(function(error){
+    el.innerHTML='<span style="color:#dc2626">分析失败：'+esc(error.message)+'</span>';
+  });
+};
 })();
