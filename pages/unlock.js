@@ -56,7 +56,7 @@
         return new Promise(function(resolve,reject){
           renderUnlock(host,function(password){return controller.unlock(password).then(function(payload){
             app.ALL_DATA=JSON.parse(JSON.stringify(payload));app.currentMonth=payload.currentMonth;app.currentPlanKey=payload.currentPlanKey;app.currentYear=(app.currentMonth||'').split('-')[0]||'';
-            app.shareMeta={mode:'encrypted',allowExport:false,aiEnabled:false,dataVersion:{id:meta.dataVersion,period:app.currentMonth,publishedAt:meta.createdAt}};
+            app.shareMeta={mode:'encrypted',allowExport:true,aiEnabled:true,dataVersion:{id:meta.dataVersion,period:app.currentMonth,publishedAt:meta.createdAt}};
             if(typeof root.refreshMergedData!=='function')throw new Error('看板计算模块未加载');
             root.refreshMergedData();host.innerHTML='';if(typeof root.applyShareVisibility==='function')root.applyShareVisibility();resolve(app.shareMeta);return payload;
           }).catch(function(error){throw error;});});

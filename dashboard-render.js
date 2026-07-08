@@ -605,157 +605,6 @@ function injectBranchesCompare(){
   });
   requestAnimationFrame(function(){requestAnimationFrame(function(){var t=document.querySelector('#branches-table table');if(t)fixStickyColumns(t);});});
 }
-function populateTrendIndicatorSelect(){
-  var sel=document.getElementById('trendIndicator');if(!sel)return;
-  var selected=sel.value;
-  while(sel.options.length>1)sel.remove(1);
-  var groups={},seen={};
-  (App.FIELDS||[]).forEach(function(f){
-    if(!f||!f.k||seen[f.k])return;seen[f.k]=1;
-    var group=f.g||'其他';
-    if(!groups[group]){
-      groups[group]=document.createElement('optgroup');
-      groups[group].label=group;
-      sel.appendChild(groups[group]);
-    }
-    var o=document.createElement('option');
-    o.value=f.k;
-    o.textContent=(f.l||f.k)+(f.u?'（'+f.u+'）':'');
-    groups[group].appendChild(o);
-  });
-  if(selected&&seen[selected])sel.value=selected;
-  // Populate branch select
-  var bs=document.getElementById('trendBranch');if(!bs||bs.options.length>1)return;
-  if(App.DATA.branches){
-    App.DATA.branches.forEach(function(b){
-      var o=document.createElement('option');o.value=b.n;o.textContent=b.n;bs.appendChild(o);
-    });
-  }
-}
-
-var __trendChart=null;
-function buildTrendSummary(field,bn,compareType,labels,values){
-  if(!values.length)return '';
-  var unit=field.u||'';
-  var name=field.l||field.k;
-  var scope=bn==='all'?'全部汇总':bn;
-  var first=values[0].y,last=values[values.length-1].y;
-  var min=values[0],max=values[0],up=0,down=0,flat=0;
-  for(var i=0;i<values.length;i++){
-    if(values[i].y<min.y)min=values[i];
-    if(values[i].y>max.y)max=values[i];
-    if(i>0){
-      var step=values[i].y-values[i-1].y;
-      var stepTolerance=Math.max(Math.abs(values[i-1].y)*0.001,1e-9);
-      if(step>stepTolerance)up++;
-      else if(step<-stepTolerance)down++;
-      else flat++;
-    }
-  }
-  var delta=last-first;
-  var tolerance=Math.max(Math.abs(first)*0.005,1e-9);
-  var direction=delta>tolerance?'上升':(delta<-tolerance?'下降':'基本持平');
-  var deltaText=unit==='%'?(Math.abs(delta)*100).toFixed(2)+'个百分点':fmtVal(Math.abs(delta),unit);
-  var relative='';
-  if(first<0&&last>=0)relative='，由负转正';
-  else if(first>=0&&last<0)relative='，由正转负';
-  else if(first!==0)relative='，相对首期变化 '+(Math.abs(delta/first)*100).toFixed(2)+'%';
-  var periodText=compareType==='yoy'?'同月跨年':'本年度逐月';
-  if(values.length===1){
-    return scope+'的'+name+'仅有 '+labels[0]+' 1期有效数据，当前值为 '+fmtVal(last,unit)+'，暂不足以判断趋势。';
-  }
-  return scope+'的'+name+'按'+periodText+'口径共展示 '+values.length+' 期：从 '+labels[0]+' 的 '+fmtVal(first,unit)+' 变为 '+labels[labels.length-1]+' 的 '+fmtVal(last,unit)+'，整体'+direction+' '+deltaText+relative+'。期间最高值为 '+fmtVal(max.y,unit)+'（'+max.x+'），最低值为 '+fmtVal(min.y,unit)+'（'+min.x+'）；相邻期中上升 '+up+' 次、下降 '+down+' 次'+(flat?'、持平 '+flat+' 次':'')+'。以上仅描述数据变化，不代表因果关系。';
-}
-function renderTrendChart(){
-  var sel=document.getElementById('trendIndicator');if(!sel)return;
-  var fk=sel.value;if(!fk)return;
-  var bs=document.getElementById('trendBranch');if(!bs)return;
-  var bn=bs.value;
-  var compareSel=document.getElementById('trendCompareType');
-  var compareType=compareSel?compareSel.value:'mom';
-  var hint=document.getElementById('trendCompareHint');
-  
-  // Get field info
-  var field=App.FIELDS.find(function(x){return x.k===fk;});
-  if(!field)return;
-  
-  // Collect data across all months
-  var acts=App.ALL_DATA.actuals||{};
-  var months=Object.keys(acts).sort();
-  if(months.length===0){toast('暂无历史数据，请先导入','info');return;}
-  var currentPeriod=App.currentMonth||months[months.length-1]||'';
-  if(compareType==='yoy'){
-    var currentMonth=currentPeriod.split('-')[1];
-    months=months.filter(function(month){return month.split('-')[1]===currentMonth;});
-    if(hint)hint.textContent='按'+(parseInt(currentMonth,10)||currentMonth)+'月跨年度对比';
-  }else{
-    var currentYear=currentPeriod.split('-')[0];
-    months=months.filter(function(month){return month.split('-')[0]===currentYear;});
-    if(hint)hint.textContent='仅展示'+currentYear+'年度内逐月变化';
-  }
-  
-  var labels=[];
-  var values=[];
-  var frm=field.u||'';
-  
-  months.forEach(function(mk){
-    // Historical actuals only contain imported source fields. Rebuild the
-    // month with the same calculation pipeline used by the dashboard so
-    // derived metrics (COR, attainment rates, productivity, etc.) are usable.
-    var data=typeof computeMonthData==='function'?computeMonthData(mk):acts[mk];
-    if(!data||!data.branches)return;
-    var v=null;
-    if(bn==='all'){
-      // National aggregate
-      var na=data.national;
-      v=na&&na.hasOwnProperty(fk)&&na[fk]!==''&&na[fk]!=null?Number(na[fk]):null;
-    }else{
-      var b=data.branches.find(function(x){return x.n===bn;});
-      v=b&&b.d&&b.d.hasOwnProperty(fk)&&b.d[fk]!==''&&b.d[fk]!=null?Number(b.d[fk]):null;
-    }
-    if(v==null||!isFinite(v))return;
-    labels.push(mk);
-    values.push({x:mk,y:v});
-  });
-  
-  if(values.length===0){
-    var emptySummary=document.getElementById('trendSummary');
-    if(emptySummary){emptySummary.style.display='block';emptySummary.textContent=compareType==='yoy'?'当前月份没有可用的跨年度同期数据。':'当前年度没有该指标的有效月度数据。';}
-    toast(compareType==='yoy'?'所选指标没有可用的同月跨年数据':'所选指标无历史数据','info');
-    return;
-  }
-  
-  // Destroy old chart
-  if(__trendChart){__trendChart.destroy();__trendChart=null;}
-  if(App.charts&&App.charts.trend){App.charts.trend.destroy();delete App.charts.trend;}
-  
-  var ctx=document.getElementById('trendChart');
-  if(!ctx)return;
-  
-  var compareLabel=compareType==='yoy'?'同比':'环比';
-  var title=(field.l||field.k)+' · '+(bn==='all'?'全部汇总':bn)+' · '+compareLabel;
-  if(!App.charts)App.charts={};
-  __trendChart=new Chart(ctx,{
-    type:'line',
-    data:{labels:labels,datasets:[{
-      label:title,data:values.map(function(x){return x.y;}),
-      borderColor:'#2563eb',backgroundColor:'rgba(37,99,235,.1)',
-      borderWidth:2,pointRadius:4,pointBackgroundColor:'#2563eb',
-      tension:.3,fill:true
-    }]},
-    options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:true,position:'top'},tooltip:{callbacks:{label:function(ctx){return title+': '+fmtVal(ctx.raw,frm);}}}},
-      scales:{x:{title:{display:true,text:compareType==='yoy'?'同比月份（同月跨年）':'环比月份（本年逐月）'},ticks:{maxRotation:45}},y:{title:{display:true,text:frm},beginAtZero:false}}
-    }
-  });
-  var summary=document.getElementById('trendSummary');
-  if(summary){
-    summary.style.display='block';
-    summary.textContent=buildTrendSummary(field,bn,compareType,labels,values);
-  }
-}
-
-// ── Data Management Tab ──
 function renderDataTab(){
   var panel=document.getElementById('data-panel');
   if(!panel)return;
@@ -824,11 +673,16 @@ function renderDataTab(){
   }
   h+='</div>';
 
-  // 4. Actions
+  // 4. Backup and management actions
+  h+='<div class="data-section"><h4>备份与分享</h4>';
   h+='<div class="data-actions">';
+  h+='<button class="btn-sm" data-share-restricted onclick="exportData()">💾 导出备份</button>';
+  h+='<button class="btn-sm" data-share-restricted onclick="exportShareData()" title="导出数据为 JSON 文件">📤 导出分享数据</button>';
+  h+='<button class="btn-sm" data-share-restricted onclick="encryptShareData()" title="一键加密并下载，用于 GitHub Pages 分享">🔒 加密分享数据</button>';
+  h+='<label class="btn-sm" data-share-restricted style="display:inline-flex;align-items:center;gap:4px;cursor:pointer">📂 恢复备份<input type="file" accept=".json" onchange="importData(this)" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden"></label>';
   h+='<button class="btn-sm warn" onclick="confirmClearAll()">🗑️ 清空全部数据</button>';
-  h+='<span style="font-size:10px;color:#999;margin-left:8px">清空前建议先导出备份</span>';
-  h+='</div>';
+  h+='<span style="font-size:10px;color:#999;margin-left:8px;align-self:center">清空前建议先导出备份</span>';
+  h+='</div></div>';
 
   // 5. Alert config
   h += renderAlertConfig();
@@ -850,7 +704,7 @@ function renderEmptyState(reason){
   var ov=document.createElement('div');
   ov.className='empty-overlay';
   ov.style.cssText='display:flex;align-items:center;justify-content:center;padding:80px 20px;min-height:300px;text-align:center';
-  ov.innerHTML='<div>'+msg+'</div>';
+  ov.innerHTML='<div>'+escapeHtml(msg)+'</div>';
   var main=document.querySelector('.main');
   if(main)main.appendChild(ov);
 }

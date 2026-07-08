@@ -2,27 +2,27 @@
 
 // 调试：在浏览器控制台执行 debugAlerts() 查看所有预警详情
 function debugAlerts() {
-  if (!App._alertResults) { console.log('尚未运行预警，请先切换Tab或刷新'); return; }
+  if (!App._alertResults) { if(App&&App.debug)console.log('尚未运行预警，请先切换Tab或刷新'); return; }
   var results = App._alertResults;
   var rules = App.ALL_DATA._alertRules || App.DEFAULT_ALERT_RULES;
-  console.log('=== 预警规则 (' + rules.length + '条) ===');
+  if(App&&App.debug)console.log('=== 预警规则 (' + rules.length + '条) ===');
   rules.forEach(function(r, i) {
     var status = r.disabled ? ' [已禁用]' : '';
     var fi = App.FIELDS.find(function(f) { return f.k === r.field; });
-    console.log((i+1) + '. ' + (fi ? fi.l : r.field) + ' ' + r.op + ' ' + r.value + ' (' + r.severity + ')' + status);
+    if(App&&App.debug)console.log((i+1) + '. ' + (fi ? fi.l : r.field) + ' ' + r.op + ' ' + r.value + ' (' + r.severity + ')' + status);
   });
-  console.log('=== 触发结果 (' + results.length + '条) ===');
-  if (results.length === 0) { console.log('(无触发)'); return; }
+  if(App&&App.debug)console.log('=== 触发结果 (' + results.length + '条) ===');
+  if (results.length === 0) { if(App&&App.debug)console.log('(无触发)'); return; }
   // 按层级分组
   var nat = results.filter(function(r) { return !r.branchName && !r.regionName; });
   var reg = results.filter(function(r) { return r.regionName; });
   var br = results.filter(function(r) { return r.branchName; });
-  console.log('--- 全国 (' + nat.length + ') ---');
-  nat.forEach(function(r) { console.log(r.severity + ' | ' + r.fieldLabel + ' = ' + r.currentValue + ' ' + r.op + ' ' + r.threshold); });
-  console.log('--- 责任区 (' + reg.length + ') ---');
-  reg.forEach(function(r) { console.log(r.severity + ' | ' + r.regionName + ' | ' + r.fieldLabel + ' = ' + r.currentValue + ' ' + r.op + ' ' + r.threshold); });
-  console.log('--- 分公司 (' + br.length + ') ---');
-  br.forEach(function(r) { console.log(r.severity + ' | ' + r.branchName + ' | ' + r.fieldLabel + ' = ' + r.currentValue + ' ' + r.op + ' ' + r.threshold); });
+  if(App&&App.debug)console.log('--- 全国 (' + nat.length + ') ---');
+  nat.forEach(function(r) { if(App&&App.debug)console.log(r.severity + ' | ' + r.fieldLabel + ' = ' + r.currentValue + ' ' + r.op + ' ' + r.threshold); });
+  if(App&&App.debug)console.log('--- 责任区 (' + reg.length + ') ---');
+  reg.forEach(function(r) { if(App&&App.debug)console.log(r.severity + ' | ' + r.regionName + ' | ' + r.fieldLabel + ' = ' + r.currentValue + ' ' + r.op + ' ' + r.threshold); });
+  if(App&&App.debug)console.log('--- 分公司 (' + br.length + ') ---');
+  br.forEach(function(r) { if(App&&App.debug)console.log(r.severity + ' | ' + r.branchName + ' | ' + r.fieldLabel + ' = ' + r.currentValue + ' ' + r.op + ' ' + r.threshold); });
 }
 
 // 调试：查看指定分公司/责任区所有指标值
@@ -32,28 +32,28 @@ function dumpData(name) {
   var nat = App.DATA.national || {};
   
   if (!name || name === '全国') {
-    console.log('=== 全国数据 ===');
-    App.FIELDS.forEach(function(f) { console.log(f.l + ': ' + (nat[f.k]!=null ? nat[f.k] : '(无)')); });
+    if(App&&App.debug)console.log('=== 全国数据 ===');
+    App.FIELDS.forEach(function(f) { if(App&&App.debug)console.log(f.l + ': ' + (nat[f.k]!=null ? nat[f.k] : '(无)')); });
     return;
   }
   
   // Check regions
   if (regions[name]) {
-    console.log('=== 责任区: ' + name + ' ===');
-    App.FIELDS.forEach(function(f) { console.log(f.l + ': ' + (regions[name][f.k]!=null ? regions[name][f.k] : '(无)')); });
+    if(App&&App.debug)console.log('=== 责任区: ' + name + ' ===');
+    App.FIELDS.forEach(function(f) { if(App&&App.debug)console.log(f.l + ': ' + (regions[name][f.k]!=null ? regions[name][f.k] : '(无)')); });
     return;
   }
   
   // Check branches
   var b = branches.find(function(b) { return b.n === name; });
   if (b) {
-    console.log('=== 分公司: ' + name + ' ===');
+    if(App&&App.debug)console.log('=== 分公司: ' + name + ' ===');
     var d = b.d || {};
-    App.FIELDS.forEach(function(f) { console.log(f.l + ': ' + (d[f.k]!=null ? d[f.k] : '(无)')); });
+    App.FIELDS.forEach(function(f) { if(App&&App.debug)console.log(f.l + ': ' + (d[f.k]!=null ? d[f.k] : '(无)')); });
     return;
   }
   
-  console.log('未找到: ' + name + '。用法: dumpData("分公司名") 或 dumpData("全国") 或 dumpData("责任区名")');
+  if(App&&App.debug)console.log('未找到: ' + name + '。用法: dumpData("分公司名") 或 dumpData("全国") 或 dumpData("责任区名")');
 }
 
 // 默认预警规则（注意：% 类指标内部是小数，阈值用小数；万元/人/万元类用实际值）

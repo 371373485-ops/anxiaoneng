@@ -1,0 +1,913 @@
+// dashboard-trend.js — 多期趋势分析模块 v2
+// 交互逻辑：每个指标 = 一个独立图表卡片，平级排列
+// 卡片内：选指标 → 选机构 → 选时间 → 可选添加对比机构
+
+(function(){
+'use strict';
+
+var COLORS = ['#2563eb','#dc2626','#059669','#d97706','#7c3aed','#0891b2','#db2777','#65a30d'];
+
+// 注入 CSS（含移动端适配）
+if(!document.getElementById('trend-css')){
+  var style = document.createElement('style');
+  style.id = 'trend-css';
+  style.textContent = [
+    '.trend-toolbar{background:var(--card);border-radius:8px;padding:16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)}',
+    '.trend-toolbar h3{font-size:15px;font-weight:600;margin-bottom:12px;color:#1a1a2e}',
+    '.trend-batch-panel{display:flex;flex-direction:column;gap:12px}',
+    '.trend-batch-row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}',
+    '.trend-batch-row .tf-group{flex:1;min-width:160px}',
+    '.tf-group label{font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px}',
+    '.tf-group select,.tf-group input{padding:6px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;width:100%;box-sizing:border-box;background:#fff}',
+    '.tf-group select:focus,.tf-group input:focus{border-color:#3b82f6;outline:none}',
+    '.tf-hint{font-size:11px;color:#9ca3af;margin-top:3px}',
+    '.tf-group select[multiple]{min-height:140px;resize:vertical;overflow-y:auto}',
+    '.tf-collapse-head{font-size:13px;font-weight:600;color:#334155;padding:10px 14px;background:#fafbfc;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;transition:.15s;margin-bottom:4px}',
+'.tf-collapse-head:hover{background:#f1f5f9;border-color:#b8c9d9}',
+'.tf-collapse-head::after{content:\'▶\';font-size:9px;color:#94a3b8;transition:.15s}',
+'.tf-collapse-head.open::after{transform:rotate(90deg)}',
+'.tf-count{font-size:11px;color:#0f3460;font-weight:700;margin-left:4px}',
+
+'.tag-select{border:1px solid #e2e8f0;border-radius:8px;padding:12px;max-height:260px;overflow-y:auto;background:#fff;display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px}',
+'.tag-item{display:inline-flex;align-items:center;justify-content:center;padding:5px 8px;border:1px solid #d9dfe8;border-radius:6px;font-size:13px;cursor:pointer;user-select:none;transition:.15s;background:#fff;color:#475569;line-height:1.4;text-align:center}',
+'.tag-item:hover{border-color:#93c5fd;background:#f0f7ff;box-shadow:0 1px 3px rgba(59,130,246,.15)}',
+'.tag-item.selected{background:linear-gradient(135deg,#0f3460,#1a1a2e);color:#fff;border-color:#0f3460;box-shadow:0 2px 6px rgba(15,52,96,.35)}',
+'.tag-group-title{grid-column:1/-1;font-size:12px;font-weight:700;color:#0f3460;padding:8px 4px 3px;border-bottom:2px solid #e2e8f0;margin-top:6px;letter-spacing:.5px;text-transform:none;background:#f8fafc;border-radius:4px}',
+'.trend-gen-btn{margin-top:4px;padding:8px 28px;background:#0f3460;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;transition:.2s}',
+    '.trend-gen-btn:hover{background:#1a1a2e}',
+    '.trend-card{background:var(--card);border-radius:8px;padding:16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)}',
+    '.trend-card-head{display:flex;align-items:center;gap:8px;padding-bottom:10px;border-bottom:1px solid #eef2f7;margin-bottom:10px}',
+    '.trend-card-head .ch-icon{font-size:16px}',
+    '.trend-card-head .trend-metric-sel{flex:1;min-width:0;padding:6px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;font-weight:600}',
+    '.trend-type-btns{display:flex;gap:2px;background:#f1f5f9;border-radius:6px;padding:2px;flex-shrink:0}',
+    '.trend-type-btn{padding:4px 10px;border:none;border-radius:4px;cursor:pointer;font-size:12px;background:transparent;color:#64748b;transition:.15s}',
+    '.trend-type-btn.active{background:#fff;color:#0f3460;font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.08)}',
+    '.trend-close-btn{width:28px;height:28px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;color:#94a3b8;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.15s}',
+    '.trend-close-btn:hover{border-color:#ef4444;background:#fef2f2;color:#ef4444}',
+    '.trend-filters{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px}',
+    '.trend-filters .tf-group{min-width:120px}',
+    '.trend-filters select,.trend-filters input{padding:6px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px}',
+    '.tf-custom{display:flex;gap:4px;align-items:center}',
+    '.trend-compare-tags{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}',
+    '.trend-compare-tags .ct-tag{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:11px;color:#fff}',
+    '.trend-compare-tags .ct-tag button{border:none;background:none;cursor:pointer;color:#fff;font-size:13px;padding:0;line-height:1}',
+    '.trend-chart-table{display:flex;gap:16px;align-items:stretch}',
+    '.trend-chart-wrap{flex:1.5;min-width:0;position:relative;height:400px}',
+    '.trend-chart-wrap canvas{position:absolute;top:0;left:0;width:100%!important;height:100%!important}',
+    '.trend-table-wrap{flex:1;max-height:360px;overflow-y:auto;min-width:0}',
+    '.trend-table-wrap table{width:100%;border-collapse:collapse;font-size:12px}',
+    '.trend-table-wrap th{padding:5px 8px;text-align:left;border-bottom:2px solid #e5e7eb;white-space:nowrap;background:#f8f9fa}',
+    '.trend-table-wrap th.num{text-align:right}',
+    '.trend-table-wrap td{padding:4px 8px;border-bottom:1px solid #f0f0f0;white-space:nowrap}',
+    '.trend-table-wrap td.num{text-align:right}',
+    '.trend-table-wrap .rank-tag{color:#9ca3af;font-size:11px}',
+    '.trend-analysis-box{margin-top:12px;padding:12px 14px;background:#f8f9fa;border-radius:8px;border-left:3px solid #0f3460}',
+    '.trend-analysis-title{font-size:13px;font-weight:600;margin-bottom:8px;color:#1a1a2e}',
+    '.trend-analysis-item{font-size:12px;line-height:1.7;color:#374151;padding:3px 0}',
+    '.trend-analysis-item:not(:last-child){border-bottom:1px dashed #e5e7eb;padding-bottom:6px;margin-bottom:6px}',
+    '@media(max-width:768px){',
+    '  .trend-batch-row{flex-direction:column;width:100%}',
+    '  .trend-batch-row .tf-group{width:100%}',
+    '  .trend-card{padding:12px}',
+    '  .trend-card-head .trend-metric-sel{font-size:12px}',
+    '  .trend-filters{gap:6px}',
+    '  .trend-filters select,.trend-filters input{min-width:0;font-size:11px;padding:4px 6px}',
+    '  .trend-chart-table{flex-direction:column;gap:12px}',
+    '  .trend-chart-wrap{height:260px;flex:none;width:100%}',
+    '  .trend-table-wrap{max-height:none;overflow-x:auto;flex:none;width:100%}',
+    '  .trend-table-wrap table{font-size:10px}',
+    '  .trend-table-wrap th,.trend-table-wrap td{padding:3px 4px}',
+    '}'
+  ].join('\n');
+  document.head.appendChild(style);
+}
+
+// ── 可用月份 ──
+function getAvailableMonths(){
+  var merged = (App.ALL_DATA && App.ALL_DATA._merged) || {};
+  return Object.keys(merged).sort();
+}
+
+// ── 取数据 ──
+function getMetricValue(month, org, metricKey){
+  var merged = (App.ALL_DATA && App.ALL_DATA._merged) || {};
+  var mdata = merged[month];
+  if(!mdata) return null;
+  if(org === '全国' || org === '整体'){
+    var v = (mdata.national || {})[metricKey];
+    return (v != null && !isNaN(v)) ? v : null;
+  }
+  if(mdata.regions && mdata.regions[org]){
+    var rv = mdata.regions[org][metricKey];
+    return (rv != null && !isNaN(rv)) ? rv : null;
+  }
+  var b = (mdata.branches || []).find(function(x){ return x.n === org; });
+  if(b && b.d){
+    var bv = b.d[metricKey];
+    return (bv != null && !isNaN(bv)) ? bv : null;
+  }
+  return null;
+}
+
+function getBranchesInRegion(regionName){
+  var merged = (App.ALL_DATA && App.ALL_DATA._merged) || {};
+  var firstMonth = Object.keys(merged)[0];
+  if(!firstMonth) return [];
+  var mdata = merged[firstMonth];
+  return (mdata.branches || []).filter(function(b){
+    return !regionName || regionName==='全国' || b.r === regionName;
+  }).map(function(b){ return b.n; });
+}
+
+function fmtMonth(m){
+  if(!m) return '';
+  return m.split('-')[1] + '月';
+}
+
+function fmtPeriod(m, preset){
+  if(!m) return '';
+  return preset === 'annualDec' ? m.split('-')[0] + '年' : fmtMonth(m);
+}
+
+function metricUnit(key){
+  var f = (App.FIELDS || []).find(function(x){ return x.k === key; });
+  return f ? (f.u || '') : '';
+}
+
+// ── 解析时间范围 ──
+function getMonths(preset, customStart, customEnd){
+  var all = getAvailableMonths();
+  if(!all.length) return [];
+  if(preset === 'custom' && customStart && customEnd){
+    return all.filter(function(m){ return m >= customStart && m <= customEnd; });
+  }
+  if(preset === 'ytd'){
+    var yr = (App.currentMonth || all[all.length-1]).split('-')[0];
+    return all.filter(function(m){ return m.startsWith(yr); });
+  }
+  if(preset === 'yoy'){
+    var yr2 = (App.currentMonth || all[all.length-1]).split('-')[0];
+    var mo = (App.currentMonth || all[all.length-1]).split('-')[1];
+    return all.filter(function(m){
+      return (m.startsWith(yr2) && m.endsWith('-'+mo)) ||
+             (m.startsWith(String(parseInt(yr2)-1)) && m.endsWith('-'+mo));
+    }).sort();
+  }
+  if(preset === 'annualDec'){
+    return all.filter(function(m){ return /-12$/.test(m); }).sort();
+  }
+  if(preset === 'recent3') return all.slice(-3);
+  if(preset === 'recent12') return all.slice(-12);
+  return all.slice(-6);
+}
+
+// ══════════ 图表卡片 ══════════
+
+var cards = [];
+var cardCounter = 0;
+
+function addCard(metricKey){
+  cardCounter++;
+  var card = {
+    id: 'trend-card-' + cardCounter,
+    metric: metricKey || '综合成本率实际（整体利润口径）',
+    branch: '全国',
+    preset: 'recent6',
+    customStart: '',
+    customEnd: '',
+    compareBranches: [],
+    chartType: 'line',
+    chart: null
+  };
+  cards.push(card);
+  saveCardsState();
+  renderCards();
+}
+
+function removeCard(id){
+  cards = cards.filter(function(c){ return c.id !== id; });
+  if(cards.length === 0) addCard();
+  else { saveCardsState(); renderCards(); }
+}
+
+// ── 渲染所有卡片 ──
+function renderCards(){
+  var ct = document.getElementById('tab-trend');
+  if(!ct) return;
+  var allMonths = getAvailableMonths();
+  var fields = App.FIELDS || [];
+  var fieldGroups = {};
+  fields.forEach(function(f){ if(!fieldGroups[f.g]) fieldGroups[f.g] = []; fieldGroups[f.g].push(f); });
+  var branchNames = getBranchesInRegion('全国');
+  var regionNames = App.REGIONS;
+  var allOrgs = ['全国'].concat(regionNames, branchNames);
+  
+  var h = '<div class="trend-toolbar">';
+  h += '<h3>📉 多期趋势分析</h3>';
+  h += '<div class="trend-batch-panel">';
+  
+  // 行1：三列并排 — 分析机构 | 对比机构 | 分析指标
+  h += '<div class="trend-batch-row" style="align-items:stretch">';
+  
+  // 分析机构 — 按类别分组
+  var regionNames = App.REGIONS;
+  h += '<div class="tf-group"><div class="tf-collapse-head" onclick="this.classList.toggle(\'open\');this.nextElementSibling.style.display=this.classList.contains(\'open\')?\'block\':\'none\'">分析机构 <span class="tf-count" id="branch-count">0</span></div>';
+  h += '<div class="tag-select" id="batch-branch-box" data-name="branch" style="display:none">';
+  // 全国
+  h += '<div class="tag-group-title">全国</div>';
+  h += '<span class="tag-item" data-val="全国" onclick="Trend.toggleTag(this)">全国</span>';
+  // 责任区
+  h += '<div class="tag-group-title">责任区</div>';
+  regionNames.forEach(function(r){ h += '<span class="tag-item" data-val="'+r+'" onclick="Trend.toggleTag(this)">'+r+'</span>'; });
+  // 分公司
+  h += '<div class="tag-group-title">分公司</div>';
+  branchNames.forEach(function(b){ if(b!=='全国' && regionNames.indexOf(b)<0) h += '<span class="tag-item" data-val="'+b+'" onclick="Trend.toggleTag(this)">'+b+'</span>'; });
+  h += '</div></div>';
+  
+  // 对比机构 — 按类别分组
+  h += '<div class="tf-group"><div class="tf-collapse-head" onclick="this.classList.toggle(\'open\');this.nextElementSibling.style.display=this.classList.contains(\'open\')?\'block\':\'none\'">对比机构 <span class="tf-count" id="compare-count">0</span></div>';
+  h += '<div class="tag-select" id="batch-compare-box" data-name="compare" style="display:none">';
+  h += '<div class="tag-group-title">全国</div>';
+  h += '<span class="tag-item" data-val="全国" onclick="Trend.toggleTag(this)">全国</span>';
+  h += '<div class="tag-group-title">责任区</div>';
+  regionNames.forEach(function(r){ h += '<span class="tag-item" data-val="'+r+'" onclick="Trend.toggleTag(this)">'+r+'</span>'; });
+  h += '<div class="tag-group-title">分公司</div>';
+  branchNames.forEach(function(b){ if(b!=='全国' && regionNames.indexOf(b)<0) h += '<span class="tag-item" data-val="'+b+'" onclick="Trend.toggleTag(this)">'+b+'</span>'; });
+  h += '</div></div>';
+  
+  // 分析指标
+  h += '<div class="tf-group" style="flex:2"><div class="tf-collapse-head" onclick="this.classList.toggle(\'open\');this.nextElementSibling.style.display=this.classList.contains(\'open\')?\'block\':\'none\'">分析指标 <span class="tf-count" id="metric-count">0</span></div>';
+  h += '<div class="tag-select" id="batch-metrics-box" data-name="metric" style="display:none">';
+  Object.keys(fieldGroups).forEach(function(g){
+    h += '<div class="tag-group-title">'+g+'</div>';
+    fieldGroups[g].forEach(function(f){ h += '<span class="tag-item" data-val="'+f.k+'" onclick="Trend.toggleTag(this)">'+f.l+'</span>'; });
+  });
+  h += '</div></div>';
+  
+  h += '</div>'; // end row1
+  
+  // 行2：时间范围 + 生成按钮
+  var availMonths = getAvailableMonths();
+  var dataMin = availMonths.length ? availMonths[0] : '';
+  var dataMax = availMonths.length ? availMonths[availMonths.length-1] : '';
+  h += '<div class="trend-batch-row" style="align-items:center;margin-top:4px">';
+  h += '<div class="tf-group" style="flex:0 0 auto;min-width:160px"><label>时间范围</label><select id="batch-preset" onchange="document.getElementById(\'batch-custom-wrap\').style.display=this.value===\'custom\'?\'flex\':\'none\'">';
+  h += '<option value="recent3">近3月</option>';
+  h += '<option value="recent6" selected>近6月</option>';
+  h += '<option value="recent12">近12月</option>';
+  h += '<option value="ytd">本年逐月</option>';
+  h += '<option value="yoy">年度同比</option>';
+  h += '<option value="annualDec">每年度对比（12月）</option>';
+  h += '<option value="custom">自定义</option>';
+  h += '</select></div>';
+  h += '<div id="batch-custom-wrap" class="tf-group" style="display:none;flex:0 0 auto;flex-direction:row;gap:4px;align-items:center"><input type="month" id="batch-start" min="'+dataMin+'" max="'+dataMax+'"><span style="font-size:11px">至</span><input type="month" id="batch-end" min="'+dataMin+'" max="'+dataMax+'"></div>';
+  h += '<button class="trend-gen-btn" onclick="Trend.generate()">⚙️ 生成趋势分析</button>';
+  h += '</div>';
+  
+  h += '</div></div>'; // end panel + toolbar
+  
+  h += '<div id="trend-cards">';
+  cards.forEach(function(card){ h += renderCardHTML(card, fieldGroups, branchNames, allMonths); });
+  h += '</div>';
+  ct.innerHTML = h;
+  cards.forEach(function(card){ renderCardChart(card); });
+}
+
+function renderCardHTML(card, fieldGroups, branchNames, allMonths){
+  var s = card;
+  
+  var h = '<div class="trend-card">';
+  
+  // 卡片头：一行搞定 — 指标 | 类型切换 | 关闭
+  h += '<div class="trend-card-head">';
+  h += '<span class="ch-icon">📊</span>';
+  h += '<select class="trend-metric-sel" onchange="Trend.updateCard(\''+s.id+'\',\'metric\',this.value)">';
+  Object.keys(fieldGroups).forEach(function(g){
+    h += '<optgroup label="'+g+'">';
+    fieldGroups[g].forEach(function(f){ h += '<option value="'+f.k+'"'+(s.metric===f.k?' selected':'')+'>'+f.l+'</option>'; });
+    h += '</optgroup>';
+  });
+  h += '</select>';
+  
+  var chartType = s.chartType || 'line';
+  h += '<div class="trend-type-btns">';
+  h += '<button class="trend-type-btn'+(chartType==='line'?' active':'')+'" onclick="Trend.setChartType(\''+s.id+'\',\'line\')">📈 折线</button>';
+  h += '<button class="trend-type-btn'+(chartType==='bar'?' active':'')+'" onclick="Trend.setChartType(\''+s.id+'\',\'bar\')">📊 柱状</button>';
+  h += '</div>';
+  h += '<button class="trend-close-btn" onclick="Trend.removeCard(\''+s.id+'\')">✕</button>';
+  h += '</div>';
+  // 筛选行
+  h += '<div class="trend-filters">';
+  
+  h += '<div class="tf-group"><label>机构</label>';
+  h += '<select onchange="Trend.updateCard(\''+s.id+'\',\'branch\',this.value)">';
+  h += '<option value="全国"'+(s.branch==='全国'?' selected':'')+'>全国汇总</option>';
+  App.REGIONS.forEach(function(r){
+    h += '<option value="'+r+'"'+(s.branch===r?' selected':'')+'>'+r+'</option>';
+  });
+  branchNames.forEach(function(bn){
+    h += '<option value="'+bn+'"'+(s.branch===bn?' selected':'')+'>'+bn+'</option>';
+  });
+  h += '</select></div>';
+  
+  h += '<div class="tf-group"><label>时间范围</label>';
+  h += '<select id="'+s.id+'-preset" onchange="Trend.updateCard(\''+s.id+'\',\'preset\',this.value);var cw=document.getElementById(\''+s.id+'-custom\');cw.style.display=this.value===\'custom\'?\'flex\':\'none\'">';
+  h += '<option value="recent6"'+(s.preset==='recent6'?' selected':'')+'>近6个月</option>';
+  h += '<option value="recent3"'+(s.preset==='recent3'?' selected':'')+'>近3个月</option>';
+  h += '<option value="recent12"'+(s.preset==='recent12'?' selected':'')+'>近12个月</option>';
+  h += '<option value="ytd"'+(s.preset==='ytd'?' selected':'')+'>本年逐月</option>';
+  h += '<option value="yoy"'+(s.preset==='yoy'?' selected':'')+'>年度同比</option>';
+  h += '<option value="annualDec"'+(s.preset==='annualDec'?' selected':'')+'>每年度对比（12月）</option>';
+  h += '<option value="custom"'+(s.preset==='custom'?' selected':'')+'>自定义</option>';
+  h += '</select></div>';
+  
+  h += '<div id="'+s.id+'-custom" class="tf-custom" style="display:'+(s.preset==='custom'?'flex':'none')+'">';
+  h += '<input type="month" value="'+s.customStart+'" min="'+allMonths[0]+'" max="'+allMonths[allMonths.length-1]+'" onchange="Trend.updateCard(\''+s.id+'\',\'customStart\',this.value)" title="起始月">';
+  h += '<input type="month" value="'+s.customEnd+'" min="'+allMonths[0]+'" max="'+allMonths[allMonths.length-1]+'" onchange="Trend.updateCard(\''+s.id+'\',\'customEnd\',this.value)" title="结束月">';
+  h += '</div>';
+  
+  h += '<div class="tf-group"><label>+ 对比机构</label>';
+  h += '<select onchange="if(this.value){Trend.addCompare(\''+s.id+'\',this.value);this.value=\'\'}">';
+  h += '<option value="">添加对比...</option>';
+  ['全国'].concat(App.REGIONS).forEach(function(r){
+    if(r !== s.branch) h += '<option value="'+r+'">'+r+'</option>';
+  });
+  branchNames.forEach(function(bn){
+    if(bn !== s.branch && s.compareBranches.indexOf(bn) < 0) h += '<option value="'+bn+'">'+bn+'</option>';
+  });
+  h += '</select></div>';
+  
+  h += '</div>';
+  
+  // 对比标签
+  if(s.compareBranches.length > 0){
+    h += '<div class="trend-compare-tags">';
+    s.compareBranches.forEach(function(bn, i){
+      var c = COLORS[(i+1)%COLORS.length];
+      h += '<span class="ct-tag" style="background:'+c+'">'+bn+'<button onclick="Trend.removeCompare(\''+s.id+'\',\''+bn.replace(/'/g,'\\\'')+'\')">×</button></span>';
+    });
+    h += '</div>';
+  }
+  
+  // 图表 + 表格
+  h += '<div class="trend-chart-table">';
+  h += '<div class="trend-chart-wrap"><canvas id="'+s.id+'-chart"></canvas></div>';
+  h += '<div id="'+s.id+'-table" class="trend-table-wrap"></div>';
+  h += '</div>';
+  
+  // 分析描述
+  h += '<div id="'+s.id+'-analysis"></div>';
+  
+  h += '</div>';
+  return h;
+}
+
+// ── 排名函数 ──
+function getBranchRank(branchName, month, metricKey, direction){
+  var merged = (App.ALL_DATA && App.ALL_DATA._merged) || {};
+  var mdata = merged[month];
+  if(!mdata) return null;
+  var allVals = [];
+  (mdata.branches || []).forEach(function(b){
+    var v = b.d && b.d[metricKey];
+    if(v != null && !isNaN(v)) allVals.push({name: b.n, value: v});
+  });
+  if(!allVals.length) return null;
+  allVals.sort(function(a,b){ return direction==='asc' ? a.value - b.value : b.value - a.value; });
+  var target = allVals.find(function(x){ return x.name === branchName; });
+  if(!target) return null;
+  return allVals.indexOf(target) + 1;
+}
+
+function getRegionRank(regionName, month, metricKey, direction){
+  var merged = (App.ALL_DATA && App.ALL_DATA._merged) || {};
+  var mdata = merged[month];
+  if(!mdata) return null;
+  var regions = App.REGIONS;
+  var allVals = [];
+  regions.forEach(function(rn){
+    var rd = mdata.regions && mdata.regions[rn];
+    if(rd && rd[metricKey] != null && !isNaN(rd[metricKey])){
+      allVals.push({name: rn, value: rd[metricKey]});
+    }
+  });
+  if(!allVals.length) return null;
+  allVals.sort(function(a,b){ return direction==='asc' ? a.value - b.value : b.value - a.value; });
+  var target = allVals.find(function(x){ return x.name === regionName; });
+  if(!target) return null;
+  return allVals.indexOf(target) + 1;
+}
+
+function getOrgRank(orgName, month, metricKey, direction){
+  if(orgName === '全国' || orgName === '整体') return null;
+  var branchNames = getBranchesInRegion('全国');
+  if(branchNames.indexOf(orgName) >= 0) return getBranchRank(orgName, month, metricKey, direction);
+  var regionNames = App.REGIONS;
+  if(regionNames.indexOf(orgName) >= 0) return getRegionRank(orgName, month, metricKey, direction);
+  return null;
+}
+
+// ── 渲染图表 ──
+// ── 渲染图表（ECharts） ──
+function renderCardChart(card){
+  // 销毁旧实例（Chart.js 或 ECharts）
+  if(card.chart){
+    try{
+      if(card.chart.dispose) card.chart.dispose();
+      else card.chart.destroy();
+    }catch(e){}
+  }
+  var dom = document.getElementById(card.id + '-chart');
+  if(!dom) return;
+  
+  var months = getMonths(card.preset, card.customStart, card.customEnd);
+
+  // 过滤空月份
+  var unit = metricUnit(card.metric);
+  var f = (App.FIELDS || []).find(function(x){ return x.k === card.metric; }) || {};
+  var direction = f.rd || 'desc';
+  var metricName = f.l || card.metric;
+  var allOrgs = [{name: card.branch, isMain: true}].concat(
+    card.compareBranches.map(function(bn){ return {name: bn, isMain: false}; })
+  );
+  var activeMonths = months.filter(function(m){
+    return allOrgs.some(function(org){
+      var v = getMetricValue(m, org.name, card.metric);
+      return v != null && !isNaN(v);
+    });
+  });
+  if(activeMonths.length === 0) activeMonths = months;
+  months = activeMonths;
+  var isPct = unit === '%';
+  var chartType = card.chartType || 'line';
+  
+  function fmtVal(v){
+    if(v == null) return '无数据';
+    return isPct ? (v*100).toFixed(2)+'%' : v.toFixed(2);
+  }
+  function fmtAxisVal(v){
+    return isPct ? (v*100).toFixed(0)+'%' : v.toFixed(0);
+  }
+  
+  var totalBranches = getBranchesInRegion('全国').length;
+  var regionNames = App.REGIONS;
+  
+  if(chartType === 'bar'){
+    // ── Chart.js 柱状图（与折线图同配色） ──
+    var barDatasets = allOrgs.map(function(org, i){
+      var data = months.map(function(m){ return getMetricValue(m, org.name, card.metric); });
+      var ranks = months.map(function(m){ return getOrgRank(org.name, m, card.metric, direction); });
+      return {
+        label: org.name,
+        data: data,
+        _ranks: ranks,
+        _hasRank: org.name !== '全国' && org.name !== '整体',
+        backgroundColor: COLORS[i % COLORS.length] + (org.isMain ? 'cc' : '60'),
+        borderColor: COLORS[i % COLORS.length],
+        borderWidth: org.isMain ? 2 : 1,
+        borderRadius: 4,
+        barPercentage: 0.8,
+        categoryPercentage: 0.8
+      };
+    });
+    
+    card.chart = new Chart(dom, {
+      type: 'bar',
+      data: { labels: months.map(function(m){ return fmtPeriod(m, card.preset); }), datasets: barDatasets },
+      options: {
+        devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          barVals: false,
+          legend: {
+            display: card.compareBranches.length > 0,
+            position: 'bottom',
+            labels: { font: { size: 11 }, boxWidth: 12, padding: 16 }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(30,41,59,0.92)',
+            titleColor: '#f1f5f9', bodyColor: '#e2e8f0',
+            borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1, cornerRadius: 8, padding: 12, titleFont: { size: 13, weight: 'bold' }, bodyFont: { size: 12 },
+            callbacks: {
+              label: function(ctx){
+                var v = ctx.parsed.y;
+                var label = ctx.dataset.label + ': ' + fmtVal(v);
+                if(ctx.dataset._hasRank && v != null){
+                  var rank = ctx.dataset._ranks[ctx.dataIndex];
+                  if(rank){
+                    var rTotal = regionNames.indexOf(ctx.dataset.label) >= 0 ? 4 : totalBranches;
+                    label += '  (第' + rank + '/' + rTotal + '名)';
+                  }
+                }
+                return label;
+              }
+            }
+          }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#64748b' } },
+          y: {
+            grid: { color: '#f1f5f9', drawBorder: false },
+            ticks: { font: { size: 11 }, color: '#64748b',
+              callback: function(v){ return fmtAxisVal(v); }
+            }
+          }
+        }
+      }
+    });
+    } else {
+    // ── Chart.js 折线图 ──
+    var datasets = allOrgs.map(function(org, i){
+      var data = months.map(function(m){ return getMetricValue(m, org.name, card.metric); });
+      var ranks = months.map(function(m){ return getOrgRank(org.name, m, card.metric, direction); });
+      return {
+        label: org.name,
+        data: data,
+        _ranks: ranks,
+        _hasRank: org.name !== '全国' && org.name !== '整体',
+        borderColor: COLORS[i % COLORS.length],
+        backgroundColor: org.isMain ? COLORS[i % COLORS.length] + '18' : 'transparent',
+        fill: org.isMain && card.compareBranches.length === 0,
+        tension: 0.35,
+        pointRadius: 4,
+        pointHoverRadius: 7,
+        pointBackgroundColor: '#fff',
+        pointBorderWidth: 2,
+        spanGaps: true,
+        borderWidth: org.isMain ? 2.5 : 1.8
+      };
+    });
+    
+    card.chart = new Chart(dom, {
+      type: 'line',
+      data: { labels: months.map(function(m){ return fmtPeriod(m, card.preset); }), datasets: datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: {
+            display: card.compareBranches.length > 0,
+            position: 'bottom',
+            labels: { font: { size: 11 }, boxWidth: 12, padding: 12 }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(255,255,255,0.96)',
+            titleColor: '#1e293b', bodyColor: '#374151',
+            borderColor: '#e2e8f0', borderWidth: 1, cornerRadius: 8, padding: 10,
+            callbacks: {
+              label: function(ctx){
+                var v = ctx.parsed.y;
+                var label = ctx.dataset.label + ': ' + fmtVal(v);
+                if(ctx.dataset._hasRank && v != null){
+                  var rank = ctx.dataset._ranks[ctx.dataIndex];
+                  if(rank){
+                    var rTotal = regionNames.indexOf(ctx.dataset.label) >= 0 ? 4 : totalBranches;
+                    label += '  (第' + rank + '/' + rTotal + '名)';
+                  }
+                }
+                return label;
+              }
+            }
+          }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#64748b' } },
+          y: {
+            grid: { color: '#f1f5f9', drawBorder: false },
+            ticks: { font: { size: 11 }, color: '#64748b',
+              callback: function(v){ return fmtAxisVal(v); }
+            }
+          }
+        }
+      }
+    });
+  }
+  
+  renderDataTable(card, months);
+  renderAnalysis(card, months);
+}
+
+// ── 渲染表格 ──
+function renderDataTable(card, months){
+  var el = document.getElementById(card.id + '-table');
+  if(!el) return;
+  var unit = metricUnit(card.metric);
+  var isPct = unit === '%';
+  var f = (App.FIELDS || []).find(function(x){ return x.k === card.metric; }) || {};
+  var direction = f.rd || 'desc';
+  
+  function fv(v){
+    if(v == null) return '—';
+    return isPct ? (v*100).toFixed(2)+'%' : v.toFixed(2);
+  }
+  
+  var allOrgs = [{name: card.branch, isMain: true}].concat(
+    card.compareBranches.map(function(bn){ return {name: bn, isMain: false}; })
+  );
+  
+  var h = '<table><thead><tr>';
+  h += '<th>机构</th>';
+  months.forEach(function(m){ h += '<th class="num">'+fmtPeriod(m, card.preset)+'</th>'; });
+  h += '</tr></thead><tbody>';
+  
+  allOrgs.forEach(function(org, i){
+    var isBranch = org.name !== '全国' && org.name !== '整体';
+    var bg = org.isMain ? ' style="background:#f0f7ff"' : '';
+    h += '<tr'+bg+'>';
+    h += '<td style="font-weight:'+(org.isMain?'600':'400')+';color:'+COLORS[i%COLORS.length]+'">'+org.name+'</td>';
+    months.forEach(function(m){
+      var v = getMetricValue(m, org.name, card.metric);
+      var rank = isBranch ? getOrgRank(org.name, m, card.metric, direction) : null;
+      h += '<td class="num">' + fv(v);
+      if(rank) h += ' <span class="rank-tag">#'+rank+'</span>';
+      h += '</td>';
+    });
+    h += '</tr>';
+  });
+  
+  h += '</tbody></table>';
+  el.innerHTML = h;
+}
+
+// ── 生成趋势分析描述 ──
+function generateAnalysis(card, months){
+  var unit = metricUnit(card.metric);
+  var isPct = unit === '%';
+  var f = (App.FIELDS || []).find(function(x){ return x.k === card.metric; }) || {};
+  var direction = f.rd || 'desc';
+  var metricName = f.l || card.metric;
+  
+  function fv(v){
+    if(v == null) return null;
+    return isPct ? (v*100).toFixed(2)+'%' : v.toFixed(2);
+  }
+  
+  var allOrgs = [{name: card.branch, isMain: true}].concat(
+    card.compareBranches.map(function(bn){ return {name: bn, isMain: false}; })
+  );
+  var analyses = [];
+  
+  // 预计算所有机构数据用于对比
+  var allData = allOrgs.map(function(org){
+    var vals = months.map(function(m){ return getMetricValue(m, org.name, card.metric); });
+    var valid = vals.filter(function(v){ return v != null && !isNaN(v); });
+    return { org: org, vals: vals, valid: valid };
+  });
+  
+  allData.forEach(function(d){
+    var org = d.org;
+    var vals = d.vals;
+    var validVals = d.valid;
+    if(validVals.length < 2){
+      analyses.push(org.name + '：数据不足，无法分析趋势。');
+      return;
+    }
+    var first = validVals[0];
+    var last = validVals[validVals.length - 1];
+    var change = last - first;
+    var changePct = first !== 0 ? (change / Math.abs(first) * 100) : 0;  // 相对变化（增减幅），用于额度指标
+    var changeAbs = last - first; // 绝对差值，用于百分比指标
+    var maxVal = Math.max.apply(null, validVals);
+    var minVal = Math.min.apply(null, validVals);
+    var avgVal = validVals.reduce(function(a,b){ return a+b; }, 0) / validVals.length;
+    var range = maxVal - minVal;
+    var isImproving = direction === 'desc' ? change > 0 : change < 0;
+    var absChangePct = Math.abs(changePct);
+    // 百分比指标用绝对差值×100（加减法）；额度指标用相对变化（增减幅）
+    var changeDispVal = isPct ? Math.abs(changeAbs * 100) : Math.abs(changePct);
+    var changeMeasure = changeDispVal;
+    
+    // 趋势方向（客观描述）
+    var trendDir;
+    // 百分比指标>1%才描述，额度指标>2%
+    var flatThreshold = isPct ? 1 : 2;
+    if (changeMeasure < flatThreshold) trendDir = '基本持平，无明显变化';
+    else if (changeMeasure < 3) trendDir = isImproving ? '略有改善' : '略有下降';
+    else if (changeMeasure < 10) trendDir = isImproving ? '有所改善' : '有所下降';
+    else trendDir = isImproving ? '明显改善' : '明显下降';
+    
+    // 波动描述（客观）
+    var volatility = avgVal !== 0 ? (range / Math.abs(avgVal) * 100) : 0;
+    var volatilityDesc;
+    if (volatility < 3) volatilityDesc = '走势平稳，波动很小';
+    else if (volatility < 8) volatilityDesc = '有一定波动';
+    else if (volatility < 20) volatilityDesc = '波动较为明显';
+    else volatilityDesc = '波动较大';
+    
+    // 月度环比变化（找最大环比涨跌）
+    var maxMomUp = 0, maxMomDown = 0, maxMomUpMonth = '', maxMomDownMonth = '';
+    for (var i = 1; i < vals.length; i++) {
+      if (vals[i] != null && vals[i-1] != null) {
+        var mom = vals[i] - vals[i-1];
+        var momPct = vals[i-1] !== 0 ? mom / Math.abs(vals[i-1]) * 100 : 0;
+        // 百分比指标用绝对差值×100（加减法）；额度指标用相对变化（增减幅）
+        var momDisp = isPct ? mom * 100 : momPct;
+        if (momDisp > Math.abs(maxMomUp)) { maxMomUp = momDisp; maxMomUpMonth = fmtPeriod(months[i], card.preset); }
+        if (momDisp < -Math.abs(maxMomDown)) { maxMomDown = momDisp; maxMomDownMonth = fmtPeriod(months[i], card.preset); }
+      }
+    }
+    
+    // 排名变化
+    var rankText = '';
+    var isBranch = org.name !== '全国' && org.name !== '整体';
+    var isRegion = App.REGIONS.indexOf(org.name) >= 0;
+    var total = isRegion ? 4 : getBranchesInRegion('全国').length;
+    if(isBranch){
+      var firstRank = getOrgRank(org.name, months[0], card.metric, direction);
+      var lastRank = getOrgRank(org.name, months[months.length-1], card.metric, direction);
+      if(firstRank && lastRank){
+        if(firstRank === lastRank) rankText = '排名稳定在第' + firstRank + '/' + total + '名';
+        else if(lastRank < firstRank) rankText = '排名从第' + firstRank + '升至第' + lastRank + '/' + total + '名（上升' + (firstRank-lastRank) + '位）';
+        else rankText = '排名从第' + firstRank + '降至第' + lastRank + '/' + total + '名（下降' + (lastRank-firstRank) + '位）';
+      }
+    }
+    
+    // 与其他机构对比
+    var compareText = '';
+    if (allData.length > 1) {
+      var myAvg = avgVal;
+      var others = allData.filter(function(x){ return x.org.name !== org.name && x.valid.length >= 2; });
+      if (others.length > 0) {
+        var otherAvgs = others.map(function(x){ return x.valid.reduce(function(a,b){return a+b},0)/x.valid.length; });
+        var groupAvg = otherAvgs.reduce(function(a,b){return a+b},0) / otherAvgs.length;
+        var diff = myAvg - groupAvg;
+        var diffPct = groupAvg !== 0 ? diff / Math.abs(groupAvg) * 100 : 0;
+        // 百分比指标用绝对差值×100；额度指标用相对变化
+        var diffDispVal = isPct ? Math.abs(diff * 100) : Math.abs(diffPct);
+        var diffDisp = diffDispVal.toFixed(2) + '%';
+        var betterThan = direction === 'desc' ? diff > 0 : diff < 0;
+        if (diffDispVal < 2) {
+          compareText = '与对比机构平均水平基本一致';
+        } else {
+          compareText = betterThan ? '高于对比机构平均水平' + diffDisp : '低于对比机构平均水平' + diffDisp
+        }
+        // 找差距最大的机构
+        var maxGapOrg = null, maxGap = 0;
+        others.forEach(function(x){
+          var oAvg = x.valid.reduce(function(a,b){return a+b},0)/x.valid.length;
+          var gap = Math.abs(myAvg - oAvg);
+          if (gap > maxGap) { maxGap = gap; maxGapOrg = x.org.name; }
+        });
+        if (maxGapOrg) {
+          var oAvgVal = others.find(function(x){return x.org.name===maxGapOrg}).valid.reduce(function(a,b){return a+b},0)/others.find(function(x){return x.org.name===maxGapOrg}).valid.length;
+          var gapPct = oAvgVal !== 0 ? (myAvg - oAvgVal)/Math.abs(oAvgVal)*100 : 0;
+          // 百分比指标用绝对差值×100；额度指标用相对变化
+          var gapDispVal = isPct ? Math.abs(myAvg - oAvgVal) * 100 : Math.abs(gapPct);
+          var gapDisp = gapDispVal.toFixed(2) + '%';
+          if (gapDispVal >= 5) {
+            compareText += '，与' + maxGapOrg + '差距' + gapDisp;
+          }
+        }
+      }
+    }
+    
+    // 组织文字
+    var text = org.name + '：' + metricName + '从' + fv(first) + '变为' + fv(last);
+    if (changeMeasure >= 0.01) text += '（' + (change >= 0 ? '增加' : '减少') + changeDispVal.toFixed(2) + '%）';
+    text += '，' + trendDir + '。';
+    text += '期间最高' + fv(maxVal) + '，最低' + fv(minVal) + '，平均' + fv(avgVal) + '，' + volatilityDesc + '。';
+    // 月度最大波动
+    var periodCompareLabel = card.preset === 'annualDec' ? '较上年' : '环比';
+    if (maxMomUp > 1) text += maxMomUpMonth + periodCompareLabel + '增加' + maxMomUp.toFixed(2) + '%，';
+    if (maxMomDown < -1) text += maxMomDownMonth + periodCompareLabel + '减少' + Math.abs(maxMomDown).toFixed(2) + '%，';
+    if (maxMomUp > 1 || maxMomDown < -1) text = text.replace(/，$/, '。');
+    if (rankText) text += rankText + '。';
+    if (compareText) text += compareText + '。';
+    analyses.push(text);
+  });
+  return analyses;
+}
+
+// ── 渲染分析描述 ──
+function renderAnalysis(card, months){
+  var el = document.getElementById(card.id + '-analysis');
+  if(!el) return;
+  var analyses = generateAnalysis(card, months);
+  var h = '<div class="trend-analysis-box">';
+  h += '<div class="trend-analysis-title">📋 趋势分析描述</div>';
+  analyses.forEach(function(text){
+    h += '<div class="trend-analysis-item">' + text + '</div>';
+  });
+  h += '</div>';
+  el.innerHTML = h;
+}
+
+// ══════════ 操作 API ══════════
+
+// ── 持久化卡片状态 ──
+var TREND_STORAGE_KEY = 'trend_cards_state';
+
+function saveCardsState(){
+  try{
+    var state = cards.map(function(c){
+      return {
+        id: c.id, metric: c.metric, branch: c.branch,
+        preset: c.preset, customStart: c.customStart, customEnd: c.customEnd,
+        compareBranches: c.compareBranches, chartType: c.chartType || 'line'
+      };
+    });
+    localStorage.setItem(TREND_STORAGE_KEY, JSON.stringify(state));
+  }catch(e){}
+}
+
+function loadCardsState(){
+  try{
+    var s = localStorage.getItem(TREND_STORAGE_KEY);
+    if(!s) return false;
+    var state = JSON.parse(s);
+    if(!state || !state.length) return false;
+    cards = state.map(function(c){
+      c.chart = null; // chart 实例不持久化
+      return c;
+    });
+    cardCounter = cards.length;
+    return true;
+  }catch(e){ return false; }
+}
+
+window.Trend = {
+  render: function(){
+    if(cards.length === 0){
+      if(!loadCardsState()) { renderCards(); return; }
+    }
+    renderCards();
+  },
+  addCard: function(metricKey){ addCard(metricKey); },
+  setChartType: function(id, type){
+    var card = cards.find(function(c){ return c.id === id; });
+    if(!card) return;
+    card.chartType = type;
+    saveCardsState();
+    renderCards();
+  },
+  toggleTag: function(el){
+    el.classList.toggle('selected');
+    // update count
+    var box = el.closest('.tag-select');
+    if(box){ var n = box.querySelectorAll('.tag-item.selected').length; var cEl = box.previousElementSibling; if(cEl){ var cSpan = cEl.querySelector('.tf-count'); if(cSpan) cSpan.textContent = n > 0 ? '('+n+')' : ''; } }
+  },
+  generate: function(){
+    var branchBox = document.getElementById("batch-branch-box");
+    var compareBox = document.getElementById("batch-compare-box");
+    var metricBox = document.getElementById("batch-metrics-box");
+    var presetSel = document.getElementById("batch-preset");
+    if(!branchBox || !metricBox) return;
+    function getSelected(box){ var s=[]; if(box){ box.querySelectorAll(".tag-item.selected").forEach(function(t){ s.push(t.getAttribute("data-val")); }); } return s; }
+    var branches = getSelected(branchBox);
+    var compareBranches = getSelected(compareBox);
+    var metrics = getSelected(metricBox);
+    if(branches.length === 0){ alert("请至少选择一个分析机构"); return; }
+    if(metrics.length === 0){ alert("请至少选择一个分析指标"); return; }
+    var preset = presetSel ? presetSel.value : "recent6";
+    var customStart = "", customEnd = "";
+    if(preset === "custom"){
+      var ss = document.getElementById("batch-start");
+      var es = document.getElementById("batch-end");
+      customStart = ss ? ss.value : "";
+      customEnd = es ? es.value : "";
+      if(!customStart || !customEnd){ alert("请选择自定义时间范围"); return; }
+    }
+    cards.forEach(function(card){ if(card.chart){ try{ card.chart.destroy(); }catch(e){} } });
+    cards = []; cardCounter = 0;
+    metrics.forEach(function(mk){
+      branches.forEach(function(br){
+        var cmp = compareBranches.filter(function(c){ return c !== br; });
+        cardCounter++;
+        cards.push({ id:"trend-card-"+cardCounter, metric:mk, branch:br, preset:preset, customStart:customStart, customEnd:customEnd, compareBranches:cmp, chartType:"line", chart:null });
+      });
+    });
+    saveCardsState();
+    renderCards();
+  },
+
+  removeCard: function(id){ removeCard(id); },
+  updateCard: function(id, field, value){
+    var card = cards.find(function(c){ return c.id === id; });
+    if(!card) return;
+    card[field] = value;
+    saveCardsState();
+    renderCards();
+  },
+  addCompare: function(id, branchName){
+    var card = cards.find(function(c){ return c.id === id; });
+    if(!card) return;
+    if(card.compareBranches.length >= 9) return;
+    if(card.compareBranches.indexOf(branchName) < 0 && branchName !== card.branch){
+      card.compareBranches.push(branchName);
+      saveCardsState();
+      renderCards();
+    }
+  },
+  removeCompare: function(id, branchName){
+    var card = cards.find(function(c){ return c.id === id; });
+    if(!card) return;
+    card.compareBranches = card.compareBranches.filter(function(b){ return b !== branchName; });
+    saveCardsState();
+    renderCards();
+  }
+};
+
+})();

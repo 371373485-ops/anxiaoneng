@@ -1,5 +1,4 @@
-var App=window.App||{};App.charts=App.charts||{};
-if(window.__anxiaonengEncryptedSharePending){App.shareMode=true;App.encryptedShareMode=true;}
+﻿var App={};App.charts={};
 
 var INDICATOR_DESC=[
   {g:"保费", items:[
@@ -129,7 +128,7 @@ function getCompareData(scope){
   var d=(App.ALL_DATA&&App.ALL_DATA[mk]&&App.ALL_DATA[mk][App.compareMonth])?App.ALL_DATA[mk][App.compareMonth]:null;
   if(!d){
     // No comparison data - return empty structure (doesn't crash)
-    console.log('No data for compare month:',App.compareMonth);
+    if(App&&App.debug)console.log('No data for compare month:',App.compareMonth);
     return scope==='branches'?[]:{};
   }
   return scope==='branches'?d.branches:(scope==='regions'?d.regions:d.national);
@@ -159,27 +158,20 @@ App.PLAN_KEYS=["车险计划", "财产险计划", "人身险计划", "经营利�
 
 App.ACTUAL_KEYS=["车险实际", "财产险实际", "人身险实际", "已赚保费", "经营利润", "当月经营利润", "已赚赔付率实际", "已赚费用率实际", "前台人员实际", "前台平均人数", "后台人员实际", "后台平均人数", "整体平均人数", "前台人力成本实际", "后台人力成本实际", "整体人力成本实际"];
 
-App.ALL_DATA=App.encryptedShareMode?{_plans:{},actuals:{},currentMonth:'',currentPlanKey:'auto'}:App.DEFAULT_DATA;
+App.ALL_DATA=App.DEFAULT_DATA;
 
-App.currentMonth=App.encryptedShareMode?'':(App.DEFAULT_DATA.currentMonth||'2026-04');
+App.currentMonth=App.DEFAULT_DATA.currentMonth||'2026-04';
 
-App.currentPlanKey=App.encryptedShareMode?'auto':(App.DEFAULT_DATA.currentPlanKey||'auto');
+App.currentPlanKey=App.DEFAULT_DATA.currentPlanKey||'auto';
 
 
 function initData(){
-  if(App.shareMode)return;
   var loaded=false;
   try{var s=localStorage.getItem(App.STORAGE_KEY);if(s){var p=JSON.parse(s);App.ALL_DATA=p;App.currentMonth=p.currentMonth||'2026-04';App.currentPlanKey=p.currentPlanKey||'auto';loaded=true;}}
   catch(e){}
-  // 🔁 Development-only fallback: production deliberately disables disk backup APIs.
+  // 🔁 Fallback: restore from disk backup if localStorage is empty
   var isGithubPages=typeof location!=='undefined'&&/\.github\.io$/i.test(location.hostname||'');
-  var isProduction=false;
-  try{
-    var healthXhr=new XMLHttpRequest();
-    healthXhr.open('GET','/api/health',false);healthXhr.send();
-    if(healthXhr.status===200)isProduction=JSON.parse(healthXhr.responseText).appEnv==='production';
-  }catch(healthError){}
-  if((!loaded||!App.ALL_DATA||Object.keys(App.ALL_DATA.actuals||{}).length===0)&&!isGithubPages&&!isProduction){
+  if(!loaded||!App.ALL_DATA||Object.keys(App.ALL_DATA.actuals||{}).length===0){
     try{
       var xhr=new XMLHttpRequest();
     xhr.open('GET','_data_backup.json?t='+Date.now(),false);
@@ -188,12 +180,28 @@ function initData(){
         var bp=JSON.parse(xhr.responseText);if(bp&&bp.actuals&&Object.keys(bp.actuals).length>0){
           App.ALL_DATA=bp;App.currentMonth=bp.currentMonth||'2026-04';App.currentPlanKey=bp.currentPlanKey||'auto';
           localStorage.setItem(App.STORAGE_KEY,JSON.stringify(bp));
-          console.log('[AutoRestore] Data restored from disk backup ('+Object.keys(bp.actuals).length+' months)');
+          if(App&&App.debug)console.log('[AutoRestore] Data restored from disk backup ('+Object.keys(bp.actuals).length+' months)');
         }
       }
     }catch(e2){}
   }
   App.currentYear=App.currentMonth.split('-')[0];
+  // 清理 _merged 中不在 actuals 里的过期月份（防止 localStorage 残留）
+  if(App.ALL_DATA._merged && App.ALL_DATA.actuals){
+    var actualMonths = Object.keys(App.ALL_DATA.actuals);
+    var mergedMonths = Object.keys(App.ALL_DATA._merged);
+    var removed = [];
+    for(var mi=0; mi<mergedMonths.length; mi++){
+      if(actualMonths.indexOf(mergedMonths[mi]) < 0){
+        delete App.ALL_DATA._merged[mergedMonths[mi]];
+        removed.push(mergedMonths[mi]);
+      }
+    }
+    if(removed.length > 0){
+      if(App&&App.debug)console.log('[Data Cleanup] Removed stale months from _merged:', removed.join(', '));
+      saveAllData();
+    }
+  }
   saveAllData();
   updateYearUI();
   updateMonthUI();
@@ -208,7 +216,6 @@ function cancelPendingSave(){
 }
 
 function saveAllData(){
-  if(App.shareMode){if(App.blockReadOnlyAction)App.blockReadOnlyAction('保存数据');return false;}
   try{
     var j=JSON.stringify(App.ALL_DATA);
     localStorage.setItem(App.STORAGE_KEY,j);
@@ -257,8 +264,6 @@ function refreshMergedData(){
   if(!plan){
     // No plan - use actual data only (plan fields will be 0)
     App.ALL_DATA[mk][App.currentMonth]=JSON.parse(JSON.stringify(actual));
-    App.ALL_DATA[mk][App.currentMonth].regions=App.ALL_DATA[mk][App.currentMonth].regions||{};
-    App.ALL_DATA[mk][App.currentMonth].national=App.ALL_DATA[mk][App.currentMonth].national||{};
     var empty={};
     for(var i=0;i<App.PLAN_KEYS.length;i++)empty[App.PLAN_KEYS[i]]=0;
     if(App.ALL_DATA[mk][App.currentMonth].national)Object.assign(App.ALL_DATA[mk][App.currentMonth].national,empty);
@@ -290,9 +295,6 @@ function refreshMergedData(){
     }
     App.ALL_DATA[mk][App.currentMonth]=merged;
   }
-  // Shared payloads omit server aggregates; rebuild only from authorized branches.
-  App.ALL_DATA[mk][App.currentMonth].regions={};
-  App.ALL_DATA[mk][App.currentMonth].national={};
   // Compute COR计划 first, then computeDerived so 与本年计划比较 uses correct COR计划
   var mb=App.ALL_DATA[mk][App.currentMonth].branches||[];
   for(var mi=0;mi<mb.length;mi++){
@@ -305,6 +307,7 @@ function refreshMergedData(){
   var rm={};
   for(var ri=0;ri<mb.length;ri++){var rr=mb[ri].r;if(!rm[rr])rm[rr]=[];rm[rr].push(mb[ri]);}
   var na={};
+  if(!App.ALL_DATA[mk][App.currentMonth].regions)App.ALL_DATA[mk][App.currentMonth].regions={};
   App.REGIONS.forEach(function(rn){
     var bl=rm[rn]||[];if(bl.length===0)return;
     var agg={};
@@ -397,7 +400,6 @@ function computeMonthData(mk){
 }
 
 function resetAllData(){
-  if(App.shareMode){if(App.blockReadOnlyAction)App.blockReadOnlyAction('重置数据');return false;}
   if(!confirm('确认还原为默认数据？所有导入的计划和实际数据将被清除。'))return;
   App.ALL_DATA={_plans:{},actuals:{},currentMonth:App.currentMonth||'2026-04',currentPlanKey:'auto'};
   App.currentMonth=App.ALL_DATA.currentMonth||'2026-04';

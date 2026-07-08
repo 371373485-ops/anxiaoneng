@@ -23,9 +23,9 @@ App.blockReadOnlyAction=function(action){
 };
 
 function emptyData(){return {_plans:{},actuals:{},currentMonth:'',currentPlanKey:'auto'};}
-function setText(id,value){var el=document.getElementById(id);if(el)el.textContent=value==null?'—':String(value);}
+function setText(id,value){var el=document.getElementById(id);if(el)el.textContent=value==null?'--':String(value);}
 function publishedText(value){
-  if(!value)return '—';
+  if(!value)return '--';
   var date=new Date(value);
   return isNaN(date.getTime())?String(value):date.toLocaleString();
 }
@@ -38,7 +38,7 @@ function escapeText(value){
 function applyShareVisibility(){
   if(!App.shareMode)return;
   if(document.body)document.body.classList.add('share-mode');
-  document.querySelectorAll('[data-share-restricted],[data-share-ai]').forEach(function(el){
+  document.querySelectorAll('[data-share-restricted]').forEach(function(el){
     el.style.display='none';el.setAttribute('aria-hidden','true');
   });
   document.querySelectorAll('[data-share-export]').forEach(function(el){
@@ -90,12 +90,14 @@ function loadSharedDashboard(){
 
 function wrap(name,label,allow){
   var original=window[name];if(typeof original!=='function'||original.__shareGuarded)return;
+  if(App.shareMode&&({renderAITab:1,askPreset:1,sendDiagnosisQuestion:1,sendAnalyze:1,quickAnalyze:1})[name])return;
   var guarded=function(){
     if(App.shareMode&&!(allow&&allow())){App.blockReadOnlyAction(label);return false;}
     return original.apply(this,arguments);
   };
   guarded.__shareGuarded=true;guarded.__shareOriginal=original;window[name]=guarded;
 }
+
 function installShareGuards(){
   if(!App.shareMode)return;
   [
@@ -116,6 +118,17 @@ function installShareGuards(){
     ['advanceRemediationTask','更新整改任务'],['reviewRemediationTask','整改复盘']
   ].forEach(function(item){wrap(item[0],item[1]);});
   wrap('doExport','导出数据',App.shareCanExport);
+  var originalSwitch=window.switchTab;
+  if(typeof originalSwitch==='function'&&!originalSwitch.__shareGuarded){
+    window.switchTab=function(tab){
+      if(App.shareMode&&['agent','remediation'].indexOf(tab)>=0){
+        App.blockReadOnlyAction('AI解读');return false;
+      }
+      return originalSwitch.apply(this,arguments);
+    };
+    window.switchTab.__shareGuarded=true;
+    window.switchTab.__shareOriginal=originalSwitch;
+  }
 }
 
 window.loadSharedDashboard=loadSharedDashboard;

@@ -3,7 +3,7 @@ window.onerror=function(msg,url,line,col,err){
   var p=document.getElementById('errPanel');
   if(p){
     p.style.display='block';
-    p.innerHTML='ERROR: '+msg+' (line '+line+':'+col+')<br><small>'+url+'</small>';
+    p.innerHTML='ERROR: '+escapeHtml(msg)+' (line '+line+':'+col+')<br><small>'+escapeHtml(url)+'</small>';
   }
   console.error(msg,err);
   return false;
@@ -47,9 +47,9 @@ function resolvePlanKey(){
   return best||(y+'-v1');
 }
 
-function switchMonth(m){App.currentMonth=m;App.ALL_DATA.currentMonth=m;App.currentYear=m.split('-')[0];refreshMergedData();saveAllData();updateMonthUI();updatePlanUI();if(typeof updateMonthDropdown==='function')updateMonthDropdown();updateYearUI();destroyCharts();if(typeof runAlerts==='function')runAlerts();switchTab('overview');}
+function switchMonth(m){App.currentMonth=m;App.ALL_DATA.currentMonth=m;App.currentYear=m.split('-')[0];refreshMergedData();saveAllData();updateMonthUI();updatePlanUI();if(typeof updateMonthDropdown==='function')updateMonthDropdown();updateYearUI();destroyCharts();var _aict=document.getElementById('ai-content');if(_aict)_aict.removeAttribute('data-rendered');if(typeof runAlerts==='function')runAlerts();switchTab('overview');}
 
-function switchPlan(pk){App.currentPlanKey=pk;App.ALL_DATA.currentPlanKey=pk;refreshMergedData();saveAllData();updatePlanUI();destroyCharts();if(typeof runAlerts==='function')runAlerts();switchTab('overview');}
+function switchPlan(pk){App.currentPlanKey=pk;App.ALL_DATA.currentPlanKey=pk;refreshMergedData();saveAllData();updatePlanUI();destroyCharts();var _aict=document.getElementById('ai-content');if(_aict)_aict.removeAttribute('data-rendered');if(typeof runAlerts==='function')runAlerts();switchTab('overview');}
 
 function updateMonthUI(){
   var lb=document.getElementById('monthLabel');
@@ -166,7 +166,6 @@ function setDataMonth(m){
 }
 
 function switchTab(t){
-  if(App.shareMode&&(t==='data'||t==='ai'||(t==='export'&&!App.shareCanExport()))){if(App.blockReadOnlyAction)App.blockReadOnlyAction(t==='export'?'导出数据':'访问管理功能');return false;}
   try{
     // Remove any empty-state overlay first
     var ov=document.querySelector('.empty-overlay');if(ov)ov.remove();
@@ -179,11 +178,12 @@ function switchTab(t){
     try{destroyCharts();}catch(e2){}
     if(t==='overview')try{renderOverview();}catch(e3){showError('概览渲染失败: '+e3.message);}
     if(t==='regions')try{renderRegions();}catch(e3){showError('责任区渲染失败: '+e3.message);}
-    if(t==='branches'){hideBranchDetail();try{renderBranches();setTimeout(function(){populateTrendIndicatorSelect();if(document.getElementById('trendIndicator').value)renderTrendChart();},100);}catch(e3){showError('分公司渲染失败: '+e3.message);}}
+    if(t==='branches'){hideBranchDetail();try{renderBranches();}catch(e3){showError('分公司渲染失败: '+e3.message);}}
     if(t==='export')try{renderExportTab();}catch(e3){showError('数据导出渲染失败: '+e3.message);}
     if(t==='data')try{renderDataTab();}catch(e3){showError('数据管理渲染失败: '+e3.message);}
     if(t==='guide')try{renderGuideTab();}catch(e3){showError('指标说明渲染失败: '+e3.message);}
     if(t==='ai')try{renderAITab();}catch(e3){showError('AI解读渲染失败: '+e3.message);}
+    if(t==='trend')try{Trend.render();}catch(e3){showError('趋势渲染失败: '+e3.message);}
     if(App.isCompareMode)try{applyCompareMode();}catch(e3){showError('对比模式注入失败: '+e3.message);}
   }catch(e){
     showError('switchTab 崩溃: '+e.message);
@@ -192,8 +192,8 @@ function switchTab(t){
 
 // 批量导入实际数据（支持多文件同时选中）
 var _actualBatchFiles=[];_actualBatchIdx=0;_actualBatchCount=0;var _actualBatchSuccess=0;var _actualBatchFail=0;
-function importExcel(input){if(App.shareMode){if(App.blockReadOnlyAction)App.blockReadOnlyAction('导入实际数据');return false;}
-console.log("importExcel batch, files="+(input.files?input.files.length:0));
+function importExcel(input){
+if(App&&App.debug)console.log("importExcel batch, files="+(input.files?input.files.length:0));
 _actualBatchFiles=Array.prototype.slice.call(input.files||[]);
 _actualBatchIdx=0;_actualBatchCount=_actualBatchFiles.length;_actualBatchSuccess=0;_actualBatchFail=0;
 if(_actualBatchCount===0)return;
@@ -285,8 +285,8 @@ reader.readAsArrayBuffer(file);
 
 // 批量导入计划数据（支持多文件同时选中）
 var _planBatchFiles=[];var _planBatchIdx=0;var _planBatchCount=0;var _planBatchSuccess=0;var _planBatchFail=0;
-function importPlanExcel(input){if(App.shareMode){if(App.blockReadOnlyAction)App.blockReadOnlyAction('导入计划数据');return false;}
-console.log("importPlanExcel batch, files="+(input.files?input.files.length:0));
+function importPlanExcel(input){
+if(App&&App.debug)console.log("importPlanExcel batch, files="+(input.files?input.files.length:0));
 _planBatchFiles=Array.prototype.slice.call(input.files||[]);
 _planBatchIdx=0;_planBatchCount=_planBatchFiles.length;_planBatchSuccess=0;_planBatchFail=0;
 if(_planBatchCount===0)return;
@@ -504,7 +504,6 @@ function setComparePeriod(){
 }
 
 function exportData(){
-  if(App.shareMode){if(App.blockReadOnlyAction)App.blockReadOnlyAction('导出备份');return false;}
   var json=JSON.stringify(App.ALL_DATA,null,2);
   var blob=new Blob([json],{type:'application/json'});
   var url=URL.createObjectURL(blob);
@@ -518,7 +517,6 @@ function exportData(){
 }
 
 function importData(input){
-  if(App.shareMode){if(App.blockReadOnlyAction)App.blockReadOnlyAction('恢复备份');return false;}
   var file=input.files[0];
   if(!file)return;
   if(!confirm('恢复备份将覆盖当前所有数据（包括已导入的计划和实际数据），确认继续？')){input.value='';return;}
@@ -578,7 +576,6 @@ function quickCompare(type){
 
 // ── Data management CRUD ──
 function deletePlanVersion(pk){
-  if(App.shareMode){if(App.blockReadOnlyAction)App.blockReadOnlyAction('删除计划');return false;}
   if(!confirm('确定删除计划版本 '+pk+' ？此操作不可恢复。'))return;
   if(App.ALL_DATA._plans)delete App.ALL_DATA._plans[pk];
   if(App.ALL_DATA._importTimes&&App.ALL_DATA._importTimes.plans)delete App.ALL_DATA._importTimes.plans[pk];
@@ -588,13 +585,11 @@ function deletePlanVersion(pk){
 }
 
 function confirmClearAll(){
-  if(App.shareMode){if(App.blockReadOnlyAction)App.blockReadOnlyAction('清空数据');return false;}
   if(!confirm('⚠️ 确定清空所有导入数据？\n此操作不可恢复！\n\n建议先点击「导出全部备份」保存当前数据。'))return;
   clearAllData();
 }
 
 function clearAllData(){
-  if(App.shareMode){if(App.blockReadOnlyAction)App.blockReadOnlyAction('清空数据');return false;}
   cancelPendingSave();
   App.ALL_DATA._plans={};
   App.ALL_DATA.actuals={};
@@ -634,38 +629,29 @@ function clearAllData(){
   }
   var b=document.getElementById('btnCompare');
   if(b){
-    console.log('bindBtn: btnCompare found, attaching click');
+    if(App&&App.debug)console.log('bindBtn: btnCompare found, attaching click');
     b.addEventListener('click',function(e){e.preventDefault();
       try{toggleCompareMode();}catch(err){showError('对比模式错误: '+err.message);}
     });
-  }else{console.log('bindBtn: btnCompare NOT FOUND');}
+  }else{if(App&&App.debug)console.log('bindBtn: btnCompare NOT FOUND');}
 })();
 
 // --- Robust initialization ---
 (function init(){
   if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',init);return;}
-  console.log('init: DOM ready, App version check:',typeof App);
+  if(App&&App.debug)console.log('init: DOM ready, App version check:',typeof App);
   try{
     if(typeof App==='undefined'){showError('App 对象未定义，请检查 dashboard-data.js 是否正常加载');return;}
+    if(App.encryptedShareMode)return;
     // Show boot success briefly
     var ep=document.getElementById('errPanel');
     if(ep){ep.style.display='block';ep.style.background='#efe';ep.style.color='#060';ep.style.borderTop='2px solid green';ep.textContent='看板启动成功 | App: OK | currentMonth: '+(App.currentMonth||'未设置');setTimeout(function(){if(ep.textContent.indexOf('启动成功')>=0)ep.style.display='none';},3000);}
-    function finishInit(){
-      if(typeof installShareGuards==='function')installShareGuards();
-      if(typeof initAlertRules==='function')initAlertRules();
-      if(typeof runAlerts==='function')runAlerts();
-      updateYearUI();updateMonthUI();updatePlanUI();
-      if(typeof updateMonthDropdown==='function')updateMonthDropdown();
-      if(typeof applyShareVisibility==='function')applyShareVisibility();
-      switchTab('overview');
-      console.log('init OK, month=',App.currentMonth,'share=',!!App.shareMode);
-    }
-    if(App.shareMode&&typeof loadSharedDashboard==='function'){
-      if(typeof installShareGuards==='function')installShareGuards();
-      loadSharedDashboard().then(finishInit).catch(function(error){console.warn('share init failed:',error.message);});
-    }else{
-      initData();finishInit();
-    }
+    initData();
+    if(typeof initAlertRules==='function')initAlertRules();
+    if (typeof runAlerts === 'function') runAlerts();
+    updateYearUI();
+    if(typeof updateMonthDropdown==='function')updateMonthDropdown();
+    if(App&&App.debug)console.log('init OK, month=',App.currentMonth);
   }catch(e){
     showError('看板初始化失败: '+e.message);
     console.error('init error:',e);
