@@ -18,6 +18,11 @@ const runtime=[
   'pages/crypto.js','pages/unlock.js','pages/unlock.css',
 ];
 
+async function optionalDirectoryEntries(directory,options={}){
+  try{return await fs.readdir(directory,options);}
+  catch(error){if(error.code==='ENOENT')return [];throw error;}
+}
+
 test('buildPages produces a full-featured static site',async()=>{
   const tmp=await fs.mkdtemp(path.join(os.tmpdir(),'pages-test-'));
   try{
@@ -29,6 +34,15 @@ test('buildPages produces a full-featured static site',async()=>{
     assert.ok(result.files.includes('_data_backup.json'),'_data_backup.json missing');
     // All runtime files must be present
     for(const f of runtime)assert.ok(result.files.includes(f),`runtime file missing: ${f}`);
+    // Existing encrypted share payloads and unlock pages must be published too.
+    const encryptedDataFiles=(await optionalDirectoryEntries(path.join(repo,'pages','data'),{withFileTypes:true}))
+      .filter(entry=>entry.isFile()&&entry.name.endsWith('.json'))
+      .map(entry=>`pages/data/${entry.name}`);
+    for(const f of encryptedDataFiles)assert.ok(result.files.includes(f),`encrypted share data missing: ${f}`);
+    const sharePages=(await optionalDirectoryEntries(path.join(repo,'share'),{withFileTypes:true}))
+      .filter(entry=>entry.isDirectory())
+      .map(entry=>`share/${entry.name}/index.html`);
+    for(const f of sharePages)assert.ok(result.files.includes(f),`share unlock page missing: ${f}`);
     // base href must be set
     const html=await fs.readFile(path.join(result.output,'index.html'),'utf8');
     assert.ok(html.includes('<base href="/test/">'),'base href not set correctly');

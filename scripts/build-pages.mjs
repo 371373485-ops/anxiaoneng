@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 
 const ROOT=path.resolve(import.meta.dirname,'..');
 const OUTPUT_NAME='pages-dist';
+const SHARE_TOKEN_RE=/^[A-Za-z0-9_-]{20,128}$/;
 
 // All runtime files — full feature set, nothing stripped
 const RUNTIME_FILES=[
@@ -76,8 +77,38 @@ function scanOutputFiles(files){
     const normalized=relative.replace(/\\/g,'/'),parts=normalized.split('/'),name=parts.at(-1);
     if(parts.some(part=>FORBIDDEN_PARTS.has(part))||FORBIDDEN_NAMES.some(pattern=>pattern.test(name)))throw new Error(`Forbidden output file: ${normalized}`);
     if(allowed.has(normalized))continue;
+    if(/^pages\/data\/[A-Za-z0-9_-]{20,128}\.json$/.test(normalized))continue;
+    if(/^share\/[A-Za-z0-9_-]{20,128}\/index\.html$/.test(normalized))continue;
     throw new Error(`Output file is outside the strict allowlist: ${normalized}`);
   }
+}
+
+async function copyEncryptedShares(root,temp){
+  let dataCount=0,shareCount=0;
+  const dataDirectory=path.join(root,'pages','data');
+  try{
+    for(const entry of await fs.readdir(dataDirectory,{withFileTypes:true})){
+      if(!entry.isFile()||!entry.name.endsWith('.json'))continue;
+      const token=entry.name.slice(0,-'.json'.length);
+      if(!SHARE_TOKEN_RE.test(token))throw new Error(`Invalid encrypted share data filename: ${entry.name}`);
+      await copyFile(root,temp,`pages/data/${entry.name}`);
+      dataCount+=1;
+    }
+  }catch(error){if(error.code!=='ENOENT')throw error;}
+
+  const shareDirectory=path.join(root,'share');
+  try{
+    for(const entry of await fs.readdir(shareDirectory,{withFileTypes:true})){
+      if(!entry.isDirectory())continue;
+      if(!SHARE_TOKEN_RE.test(entry.name))throw new Error(`Invalid share token directory: ${entry.name}`);
+      const relative=`share/${entry.name}/index.html`;
+      try{
+        await copyFile(root,temp,relative);
+        shareCount+=1;
+      }catch(error){if(error.code!=='ENOENT')throw error;}
+    }
+  }catch(error){if(error.code!=='ENOENT')throw error;}
+  return {dataCount,shareCount};
 }
 
 async function scanOutputContent(directory,files){
@@ -104,6 +135,8 @@ export async function buildPages({root=ROOT,output=path.join(root,OUTPUT_NAME),b
     // Build full-featured index.html (no stripping, no readonly injection)
     const sourceHtml=await fs.readFile(path.join(root,'index.html'),'utf8');
     await fs.writeFile(path.join(temp,'index.html'),fullPage(sourceHtml,base),'utf8');
+    // Copy encrypted share payloads and their static unlock entry pages.
+    await copyEncryptedShares(root,temp);
     // Security scan
     const files=await listFiles(temp);scanOutputFiles(files);await scanOutputContent(temp,files);
     await fs.rm(output,{recursive:true,force:true});await fs.rename(temp,output);
