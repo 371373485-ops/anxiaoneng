@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
+import { execFile as execFileCallback } from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { pathToFileURL } from 'node:url';
+import { promisify } from 'node:util';
 
 const repo=path.resolve(import.meta.dirname,'..');
+const execFile=promisify(execFileCallback);
 const {buildPages}=await import(pathToFileURL(path.join(repo,'scripts/build-pages.mjs')).href);
 const runtime=[
   'chart.umd.min.js','xlsx.full.min.js',
@@ -21,6 +24,17 @@ const runtime=[
 async function optionalDirectoryEntries(directory,options={}){
   try{return await fs.readdir(directory,options);}
   catch(error){if(error.code==='ENOENT')return [];throw error;}
+}
+
+async function copyForCleanCheckout(sourceRoot,targetRoot){
+  const files=(await execFile('git',['ls-files','-z'],{cwd:sourceRoot,encoding:'utf8'}))
+    .stdout.split('\0').filter(Boolean);
+  for(const file of files){
+    const source=path.join(sourceRoot,file);
+    const target=path.join(targetRoot,file);
+    await fs.mkdir(path.dirname(target),{recursive:true});
+    await fs.copyFile(source,target);
+  }
 }
 
 test('buildPages produces a full-featured static site',async()=>{
@@ -74,6 +88,23 @@ test('buildPages produces a full-featured static site',async()=>{
 test('buildPages rejects invalid basePath',async()=>{
   await assert.rejects(buildPages({basePath:'../escape/'}),/absolute URL path/);
   await assert.rejects(buildPages({basePath:'?query=1'}),/absolute URL path/);
+});
+
+test('buildPages succeeds in clean checkout without private data backup',async()=>{
+  const tmp=await fs.mkdtemp(path.join(os.tmpdir(),'pages-clean-'));
+  try{
+    const root=path.join(tmp,'repo');
+    await fs.mkdir(root,{recursive:true});
+    await copyForCleanCheckout(repo,root);
+    await fs.rm(path.join(root,'_data_backup.json'),{force:true});
+    const result=await buildPages({root,output:path.join(tmp,'dist'),basePath:'/anxiaoneng/'});
+    assert.ok(result.files.includes('_data_backup.json'),'fallback data backup missing');
+    const data=JSON.parse(await fs.readFile(path.join(result.output,'_data_backup.json'),'utf8'));
+    assert.deepStrictEqual(data.actuals,{});
+    assert.deepStrictEqual(data._plans,{});
+    const encryptedData=result.files.filter(file=>file.startsWith('pages/data/')&&file.endsWith('.json'));
+    assert.ok(encryptedData.length>0,'encrypted share data should still be published');
+  }finally{await fs.rm(tmp,{recursive:true,force:true});}
 });
 
 test('buildPages output contains no secrets',async()=>{

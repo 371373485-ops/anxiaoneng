@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 const ROOT=path.resolve(import.meta.dirname,'..');
 const OUTPUT_NAME='pages-dist';
 const SHARE_TOKEN_RE=/^[A-Za-z0-9_-]{20,128}$/;
+const EMPTY_DASHBOARD_DATA=JSON.stringify({_plans:{},actuals:{},currentMonth:'',currentPlanKey:'auto'},null,2)+'\n';
 
 // All runtime files — full feature set, nothing stripped
 const RUNTIME_FILES=[
@@ -126,9 +127,17 @@ export async function buildPages({root=ROOT,output=path.join(root,OUTPUT_NAME),b
   try{
     // Copy all runtime files
     for(const file of RUNTIME_FILES)await copyFile(root,temp,file);
-    // Copy data backup
+    // Copy data backup when available. Local authoring workspaces may keep a
+    // private _data_backup.json that is intentionally gitignored; GitHub Pages
+    // builds should still succeed from committed encrypted share payloads.
     const dataPath=path.join(root,'_data_backup.json');
-    const dataText=await fs.readFile(dataPath,'utf8');
+    let dataText;
+    try{
+      dataText=await fs.readFile(dataPath,'utf8');
+    }catch(error){
+      if(error.code!=='ENOENT')throw error;
+      dataText=EMPTY_DASHBOARD_DATA;
+    }
     // Validate it's valid JSON
     try{JSON.parse(dataText);}catch{throw new Error('_data_backup.json is not valid JSON');}
     await fs.writeFile(path.join(temp,'_data_backup.json'),dataText,'utf8');
