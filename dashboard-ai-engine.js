@@ -842,6 +842,399 @@ function renderAnswer(result){
   return html;
 }
 
+function parseSearchIntent(question,options){
+  options=options||{};
+  var goal=parseGoal(question||''), period=options.period||(goal.periods&&goal.periods[0])||currentMonth();
+  var metric=(goal.metrics&&goal.metrics[0])||preferredMetrics()[0]||allMetrics()[0]||null;
+  var org=(goal.orgs&&goal.orgs[0])||findOrg(options.org,period)||(!isShare()?findOrg('全国',period):null)||orgsForPeriod(period).filter(function(o){return o.level==='branch';})[0]||null;
+  var intent=goal.taskType||'snapshot';
+  if(/filter|where|loss|profit|cost|risk|alert|哪些|有哪些|筛选|亏损|利润为负|达成不好|不达标|未达成|赔付率高|成本率高/i.test(String(question||'')))intent='filter';
+  return {
+    schemaVersion:'dashboard-query-intent-v1',
+    question:String(question||''),
+    intent:intent,
+    period:period,
+    org:org&&org.name||'',
+    orgLevel:org&&org.level||'',
+    metric:metric&&metric.metric||'',
+    metricLabel:metric&&metric.label||'',
+    parsedGoal:goal,
+    assumptions:[period===currentMonth()?'default_current_period':null].filter(Boolean)
+  };
+}
+
+function metricByPattern(patterns){
+  patterns=asArray(patterns);
+  return allMetrics().find(function(m){
+    var text=(m.metric||'')+' '+(m.label||'');
+    return patterns.some(function(pattern){return pattern.test(text);});
+  })||null;
+}
+
+function runBranchFilterSearch(intent,options){
+  options=options||{};
+  var question=String(intent&&intent.question||'');
+  var period=(intent&&intent.period)||options.period||currentMonth();
+  var md=monthData(period)||{};
+  var branches=md.branches||[];
+  var targetMetric=metricByPattern([/达成率|进度计划达成率|时间进度达成率/]);
+  var profitMetric=metricByPattern([/^经营利润$|经营利润(?!年度计划)|当月经营利润/]);
+  var lossMetric=metricByPattern([/赔付率/]);
+  var costMetric=metricByPattern([/综合成本率/]);
+  var conditions=[];
+  if(/达成不好|不达标|未达成|达成不足|保费达成不好/.test(question)){
+    conditions.push({key:'target_low',label:'保费达成不足',metric:targetMetric,test:function(v){return numberValue(v)!=null&&numberValue(v)<1;},text:function(v,m){return m.label+' '+formatValue(v,m.unit);}});
+  }
+  if(/亏损|利润为负|利润低|盈利为负/.test(question)){
+    conditions.push({key:'profit_negative',label:'经营利润为负',metric:profitMetric,test:function(v){return numberValue(v)!=null&&numberValue(v)<0;},text:function(v,m){return m.label+' '+formatValue(v,m.unit);}});
+  }
+  if(/赔付率高|赔付高/.test(question)){
+    conditions.push({key:'loss_high',label:'赔付率高于100%',metric:lossMetric,test:function(v){return numberValue(v)!=null&&numberValue(v)>1;},text:function(v,m){return m.label+' '+formatValue(v,m.unit);}});
+  }
+  if(/成本率高|综合成本率高/.test(question)){
+    conditions.push({key:'cost_high',label:'综合成本率高于100%',metric:costMetric,test:function(v){return numberValue(v)!=null&&numberValue(v)>1;},text:function(v,m){return m.label+' '+formatValue(v,m.unit);}});
+  }
+  if(!conditions.length&&/哪些|有哪些|筛选/.test(question)){
+    conditions.push({key:'profit_negative',label:'经营利润为负',metric:profitMetric,test:function(v){return numberValue(v)!=null&&numberValue(v)<0;},text:function(v,m){return m.label+' '+formatValue(v,m.unit);}});
+  }
+  var missing=conditions.filter(function(c){return !c.metric;}).map(function(c){return c.label;});
+  conditions=conditions.filter(function(c){return c.metric;});
+  var evidenceList=[], cards=[];
+  branches.forEach(function(b){
+    var org={id:b.orgId||b.n,orgId:b.orgId||'',name:b.n,region:b.r||'',level:'branch'};
+    var rec=b.d||b, details=[], evs=[], passed=true;
+    conditions.forEach(function(c){
+      var value=rec[c.metric.metric];
+      if(!c.test(value)){passed=false;return;}
+      var ev=evidence(org,period,c.metric,value,'branch_filter');
+      evs.push(ev);
+      details.push(c.text(value,c.metric));
+    });
+    if(passed&&conditions.length){
+      evidenceList=evidenceList.concat(evs);
+      cards.push({org:b.n,region:b.r||'',period:period,text:b.n+(b.r?'（'+b.r+'）':'')+'：'+details.join('；'),evidenceIds:evs.map(function(ev){return ev.id;})});
+    }
+  });
+  var summary;
+  if(cards.length){
+    summary=period+' 符合“'+conditions.map(function(c){return c.label;}).join(' 且 ')+'”条件的分公司共 '+cards.length+' 家：'+cards.map(function(c){return c.org;}).join('、')+'。';
+  }else if(conditions.length){
+    summary=period+' 未找到同时符合“'+conditions.map(function(c){return c.label;}).join(' 且 ')+'”条件的分公司。';
+  }else{
+    summary='未能识别可执行的筛选条件，请补充指标或阈值。';
+  }
+  return {
+    schemaVersion:'dashboard-search-result-v1',
+    intent:Object.assign({},intent,{intent:'filter',org:'全部分公司',metricLabel:conditions.map(function(c){return c.metric&&c.metric.label;}).filter(Boolean).join('、')}),
+    question:question,
+    type:'filter',
+    summary:summary,
+    cards:cards.slice(0,50),
+    evidence:evidenceList,
+    limitations:Array.from(new Set([].concat(missing.length?['缺少可用于筛选的指标：'+missing.join('、')]:[],branches.length?[]:['当前月份没有分公司明细数据']))).filter(Boolean),
+    validation:{passed:true,unverifiedNumbers:[],mode:'local-branch-filter'}
+  };
+}
+
+function semanticMetricGroup(question){
+  question=String(question||'');
+  var groups=[
+    {key:'productivity',label:'人力效能',test:/人力效能|人效|人均|人员|产能|人力成本/,patterns:[/人均产能/,/人均利润/,/人力成本/,/人员实际/,/前台人均产能/,/后台人均产能/]},
+    {key:'profitability',label:'盈利能力',test:/盈利|利润|亏损|利润质量/,patterns:[/经营利润(?!年度计划)/,/当月经营利润/,/利润达成率/,/综合成本率/,/赔付率/,/费用率/]},
+    {key:'cost_quality',label:'成本质量',test:/成本质量|成本率|综合成本|赔付|费用率|承保质量/,patterns:[/综合成本率/,/赔付率/,/费用率/,/经营利润(?!年度计划)/]},
+    {key:'target',label:'目标达成',test:/目标|达成|进度|计划完成|不达标|未达成/,patterns:[/达成率|进度计划达成率|时间进度达成率/,/保费实际/,/经营利润(?!年度计划)/,/保费年度计划/]},
+    {key:'premium',label:'保费规模',test:/保费|规模|收入|业务量/,patterns:[/保费实际合计/,/已赚保费/,/保费达成率|进度计划达成率|时间进度达成率/,/保费年度计划/]}
+  ];
+  return groups.find(function(g){return g.test.test(question);})||null;
+}
+
+function metricsForSemanticGroup(group){
+  if(!group)return [];
+  var result=[];
+  group.patterns.forEach(function(pattern){
+    var found=allMetrics().find(function(m){return pattern.test((m.metric||'')+' '+(m.label||''));});
+    if(found&&!result.some(function(x){return x.metric===found.metric;}))result.push(found);
+  });
+  return result;
+}
+
+function runSemanticMetricSearch(intent,options){
+  options=options||{};
+  var question=String(intent&&intent.question||'');
+  var group=semanticMetricGroup(question);
+  if(!group)return null;
+  var period=(intent&&intent.period)||options.period||currentMonth();
+  var orgName=(intent&&intent.org)||options.org||'';
+  var org=findOrg(orgName,period)||orgsForPeriod(period).filter(function(o){return o.level==='branch';})[0]||null;
+  var metrics=metricsForSemanticGroup(group);
+  var steps=[], evidenceList=[], limitations=[];
+  metrics.forEach(function(m){steps.push(getMetricSnapshot({org:org&&org.name,period:period,metric:m.metric}));});
+  steps.forEach(function(step){
+    evidenceList=evidenceList.concat(step.evidence||[]);
+    limitations=limitations.concat(step.limitations||[]);
+  });
+  var okSteps=steps.filter(function(step){return step.ok;});
+  var cards=okSteps.map(function(step){
+    return {
+      org:step.org&&step.org.name||orgName,
+      period:step.period,
+      metric:step.metric&&step.metric.label,
+      value:step.formattedValue,
+      text:(step.metric&&step.metric.label||'指标')+'：'+step.formattedValue,
+      evidenceIds:(step.evidence||[]).map(function(ev){return ev.id;})
+    };
+  });
+  var summary;
+  if(okSteps.length){
+    summary=(org&&org.name||orgName||'该机构')+' '+period+' '+group.label+'情况：'+cards.slice(0,5).map(function(card){return card.text;}).join('；')+'。';
+  }else{
+    summary=(org&&org.name||orgName||'该机构')+' '+period+' 暂未找到可用于回答“'+group.label+'”的有效指标数据。';
+  }
+  return {
+    schemaVersion:'dashboard-search-result-v1',
+    intent:Object.assign({},intent,{intent:'semantic',org:org&&org.name||orgName,orgLevel:org&&org.level||'',metricLabel:group.label}),
+    question:question,
+    type:'semantic',
+    summary:summary,
+    cards:cards,
+    evidence:evidenceList,
+    limitations:Array.from(new Set(limitations.concat(metrics.length?[]:['未找到主题相关指标']))).filter(Boolean),
+    validation:{passed:true,unverifiedNumbers:[],mode:'local-semantic-metric-search'}
+  };
+}
+
+function runSearch(input,options){
+  var intent=typeof input==='string'?parseSearchIntent(input,options):input;
+  if(intent&&intent.intent==='filter')return runBranchFilterSearch(intent,options);
+  var semantic=runSemanticMetricSearch(intent,options);
+  if(semantic)return semantic;
+  var pack=buildEvidencePack(intent.question||'',Object.assign({},options||{},{period:intent.period,org:intent.org,useDiagnosis:/diagnosis|risk|alert|why|recommend|filter/i.test(intent.intent+' '+intent.question)}));
+  var answer=answerFromPack(pack);
+  return {
+    schemaVersion:'dashboard-search-result-v1',
+    intent:intent,
+    question:intent.question,
+    type:intent.intent,
+    summary:answer.summary||'No deterministic answer was generated.',
+    cards:[].concat(asArray(answer.facts),asArray(answer.analysis)).slice(0,12).map(function(text){return {text:typeof text==='string'?text:JSON.stringify(text)};}),
+    evidence:pack.evidence,
+    limitations:Array.from(new Set((pack.limitations||[]).concat(answer.limitations||[]))).filter(Boolean),
+    validation:answer.validation||{passed:true,unverifiedNumbers:[],mode:'local-search'}
+  };
+}
+
+function reportPeriods(rangeType,customStart,customEnd){
+  var ps=periods(), cur=currentMonth();
+  if(rangeType==='recent3')return ps.slice(-3);
+  if(rangeType==='recent6')return ps.slice(-6);
+  if(rangeType==='annual')return ps.filter(function(p){return p.indexOf(String(cur).slice(0,4)+'-')===0;});
+  if(rangeType==='custom'&&customStart&&customEnd)return ps.filter(function(p){return p>=customStart&&p<=customEnd;});
+  return cur?[cur]:[];
+}
+
+function defaultReportDimensions(){
+  return ['overview','target','profit','cost','productivity','trend','ranking','risk','diagnosis','recommendation','appendix'];
+}
+
+function buildReportEvidence(options){
+  options=options||{};
+  var branches=allOrganizations().filter(function(o){return o.level==='branch';});
+  var org=options.org||options.branch||(branches[0]&&branches[0].name)||'';
+  var dims=options.dimensions&&options.dimensions.length?options.dimensions:defaultReportDimensions();
+  var ps=reportPeriods(options.rangeType||'current',options.customStart,options.customEnd);
+  var period=options.period||ps[ps.length-1]||currentMonth();
+  var metrics=preferredMetrics().slice(0,12), steps=[], evidence=[], limitations=[];
+  metrics.forEach(function(m){steps.push(getMetricSnapshot({org:org,period:period,metric:m.metric}));});
+  if(dims.indexOf('trend')>=0)metrics.slice(0,4).forEach(function(m){steps.push(getTrendSeries({org:org,metric:m.metric,periods:ps.length?ps:periods().slice(-6)}));});
+  if(dims.indexOf('ranking')>=0)metrics.slice(0,4).forEach(function(m){steps.push(rankBranches({period:period,metric:m.metric,limit:5}));});
+  if(dims.indexOf('risk')>=0||dims.indexOf('diagnosis')>=0||dims.indexOf('recommendation')>=0){
+    steps.push(getDiagnosisSummary({org:org,period:period}));
+    steps.push(getTriggeredAlerts({org:org,period:period}));
+    steps.push(getRecommendations({org:org,period:period}));
+  }
+  steps.forEach(function(step){evidence=evidence.concat(step.evidence||[]);limitations=limitations.concat(step.limitations||[]);});
+  var evMap={};evidence.forEach(function(ev){evMap[ev.id]=ev;});
+  evidence=Object.keys(evMap).map(function(k){return evMap[k];});
+  return {schemaVersion:'dashboard-report-evidence-v1',org:org,period:period,periods:ps,dimensions:dims,style:options.style||'management',steps:steps,evidence:evidence,limitations:Array.from(new Set(limitations)).filter(Boolean)};
+}
+
+function generateBranchReport(options){
+  var pack=buildReportEvidence(options), sections=[];
+  var dims=pack.dimensions||defaultReportDimensions();
+  var snapshots=pack.steps.filter(function(s){return s.tool==='getMetricSnapshot'&&s.ok;});
+  var trends=pack.steps.filter(function(s){return s.tool==='getTrendSeries'&&s.ok&&s.series&&s.series.length;});
+  var ranks=pack.steps.filter(function(s){return s.tool==='rankBranches'&&s.ok;});
+  var diagnosis=pack.steps.filter(function(s){return s.tool==='getDiagnosisSummary'&&s.ok;})[0]||null;
+  var alerts=pack.steps.filter(function(s){return s.tool==='getTriggeredAlerts'&&s.ok;})[0]||null;
+  var recs=pack.steps.filter(function(s){return s.tool==='getRecommendations'&&s.ok;})[0]||null;
+  function has(id){return dims.indexOf(id)>=0;}
+  function evIds(steps){
+    var ids={};
+    steps.forEach(function(step){(step.evidence||[]).forEach(function(ev){ids[ev.id]=true;});});
+    return Object.keys(ids);
+  }
+  function byLabel(pattern){
+    return snapshots.find(function(s){return pattern.test(s.metric&&s.metric.label||s.metric&&s.metric.metric||'');});
+  }
+  function chip(step){return step&&step.metric?step.metric.label+' '+step.formattedValue:null;}
+  function valueLine(step){
+    return step&&step.metric?step.metric.label+'为'+step.formattedValue+'（'+step.period+'）':null;
+  }
+  function trendLine(step){
+    if(!step||!step.series||step.series.length<2)return null;
+    var first=step.series[0], last=step.series[step.series.length-1];
+    var diff=numberValue(last.value)-numberValue(first.value);
+    var diffText=numberValue(diff)==null?'':formatValue(diff,step.metric&&step.metric.unit||'');
+    return step.metric.label+'从'+first.period+'的'+first.formattedValue+'变化至'+last.period+'的'+last.formattedValue+(diffText?'，区间变动'+diffText:'')+'。';
+  }
+  function rankLine(step){
+    if(!step||!step.rows)return null;
+    var row=step.rows.find(function(r){return r.org===pack.org;});
+    if(!row)return null;
+    var direction=step.metric&&step.metric.direction==='asc'?'数值越低排名越靠前':'数值越高排名越靠前';
+    return step.metric.label+'在分公司中排名第'+row.rank+'/'+row.total+'，当前值'+row.formattedValue+'，排序口径为“'+direction+'”。';
+  }
+  function addSection(id,title,paragraphs,items,steps){
+    if(id!=='summary'&&!has(id))return;
+    sections.push({
+      id:id,
+      title:title,
+      paragraphs:(paragraphs||[]).filter(Boolean),
+      items:(items||[]).filter(Boolean).length?items.filter(Boolean):['insufficient_data'],
+      evidenceIds:evIds(steps||pack.steps).slice(0,20)
+    });
+  }
+  var premium=byLabel(/保费/), profit=byLabel(/经营利润/), target=byLabel(/达成率|进度/), cost=byLabel(/综合成本率/), loss=byLabel(/赔付率/), expense=byLabel(/费用率/), productivity=byLabel(/人均产能/), headcount=byLabel(/人员实际|人力/);
+  addSection('summary','management_summary',[
+    pack.org+'本期报告基于'+pack.period+'及所选期间的看板证据生成，定位为经营管理分析报告；它不复述智能经营诊断的规则化结论，而是围绕规模、进度、盈利、成本、人效和对标关系进行综合解读。',
+    '从当前可用证据看，'+[valueLine(premium),valueLine(profit),valueLine(cost)].filter(Boolean).join('；')+'。这些指标共同构成本期经营表现的主线：规模表现决定收入基础，利润表现体现结果质量，成本率指标反映经营消耗。'
+  ],[chip(premium),chip(profit),chip(cost)],snapshots);
+  addSection('overview','core_metrics',[
+    '核心指标层面，本报告优先选择与经营结果直接相关的指标进行交叉观察。'+[valueLine(premium),valueLine(target),valueLine(profit)].filter(Boolean).join('；')+'。如果规模指标和利润指标方向不一致，应重点复核业务结构、成本消耗和费用投放是否同步改善。',
+    cost||loss||expense?'成本质量方面，'+[valueLine(cost),valueLine(loss),valueLine(expense)].filter(Boolean).join('；')+'。该组指标用于判断利润形成是否依赖规模扩张，还是已经体现出承保质量和费用效率的改善。':null
+  ],[chip(premium),chip(target),chip(profit),chip(cost)],snapshots);
+  addSection('target','target_progress',[
+    target?'目标达成维度显示，'+valueLine(target)+'。该指标用于衡量当前经营节奏与计划节奏的匹配程度；若达成率偏离预期，应结合保费、利润和成本率同步判断是规模不足、利润质量不足，还是费用/赔付压力造成的进度折损。':'当前看板未提供可用于目标达成分析的有效证据。'
+  ],[chip(target),chip(premium)],target?[target,premium].filter(Boolean):[]);
+  addSection('profit','profitability',[
+    profit?'盈利能力方面，'+valueLine(profit)+'。报告将其作为结果指标，而不是单独结论：需要与综合成本率、赔付率和费用率联动观察，才能判断利润来自规模增长、成本改善，还是短期结构波动。':'当前看板未提供可用于盈利能力分析的有效经营利润证据。',
+    cost||loss||expense?'与利润相关的成本侧证据显示：'+[valueLine(cost),valueLine(loss),valueLine(expense)].filter(Boolean).join('；')+'。若利润改善但成本率未同步改善，需要警惕利润可持续性；若成本率改善而利润仍承压，则应进一步查看规模和产品结构。':null
+  ],[chip(profit),chip(cost),chip(loss),chip(expense)],[profit,cost,loss,expense].filter(Boolean));
+  addSection('cost','cost_quality',[
+    cost||loss||expense?'成本质量分析重点放在综合成本率、赔付率和费用率三类证据。'+[valueLine(cost),valueLine(loss),valueLine(expense)].filter(Boolean).join('；')+'。该部分与智能诊断不同，不直接判定风险等级，而是说明成本压力来自赔付端、费用端，还是两者共同作用。':'当前看板未提供可用于成本质量分析的有效证据。'
+  ],[chip(cost),chip(loss),chip(expense)],[cost,loss,expense].filter(Boolean));
+  addSection('productivity','productivity',[
+    productivity||headcount?'人力效能维度用于观察经营产出与人员投入之间的匹配关系。'+[valueLine(productivity),valueLine(headcount)].filter(Boolean).join('；')+'。如果人均产能改善而利润未改善，应结合费用率和赔付率判断产能是否转化为有效利润。':'当前看板未提供可用于人力效能分析的有效证据。'
+  ],[chip(productivity),chip(headcount)],[productivity,headcount].filter(Boolean));
+  addSection('trend','trend_and_benchmark',[
+    trends.length?trends.slice(0,3).map(trendLine).filter(Boolean).join(' '):'所选期间内趋势证据不足，无法形成连续趋势判断。',
+    ranks.length?ranks.slice(0,3).map(rankLine).filter(Boolean).join(' '):'当前未形成可用排名对标证据。'
+  ],trends.slice(0,2).map(function(s){return s.metric.label+'趋势';}).concat(ranks.slice(0,2).map(function(s){return s.metric.label+'排名';})),trends.concat(ranks));
+  addSection('risk','risk_monitor',[
+    diagnosis?'风险观察方面，当前诊断索引记录的风险等级为'+(diagnosis.riskLevel||'未评级')+'。本报告只把诊断结果作为辅助证据，重点仍放在其背后的指标表现与经营含义：'+(diagnosis.summary||'暂无摘要'):'当前未取得诊断索引证据，风险部分仅基于经营指标进行解释。',
+    alerts?'预警触发项数量为'+((alerts.triggeredAlerts||[]).length)+'。该数量用于提示需要复核的指标范围，不直接替代人工经营判断。':null
+  ],[diagnosis?('风险等级 '+(diagnosis.riskLevel||'未评级')):null,alerts?('预警项 '+((alerts.triggeredAlerts||[]).length)):null],[diagnosis,alerts].filter(Boolean));
+  addSection('recommendation','recommendations',[
+    recs&&recs.recommendations&&recs.recommendations.length?'管理建议围绕当前证据中的主要矛盾展开：'+recs.recommendations.slice(0,3).join('；')+'。执行时建议先确认数据口径，再按规模、成本、利润和人效四条线拆解责任动作。':'当前看板未提供可直接引用的建议记录。建议先围绕保费、经营利润、综合成本率和人均产能建立复盘清单，再逐项追问异常来源。'
+  ],recs&&recs.recommendations?recs.recommendations.slice(0,4):[],recs?[recs]:[]);
+  if(has('appendix'))sections.push({id:'appendix',title:'evidence_appendix',paragraphs:['以下为本报告引用的数据证据。所有正文数字均来自这些证据或由证据值直接计算。'],items:pack.evidence.slice(0,30).map(function(ev){return ev.period+' / '+ev.org+' / '+ev.label+' / '+ev.formattedValue+' / '+ev.id;}),evidenceIds:pack.evidence.slice(0,30).map(function(ev){return ev.id;})});
+  var document={schemaVersion:'dashboard-report-document-v1',title:pack.org+'分公司经营分析报告',summary:pack.org+' '+pack.period+' 管理分析报告，基于 '+pack.evidence.length+' 条数据面板证据生成。',sections:sections,evidence:pack.evidence,limitations:pack.limitations,validation:{passed:true,unverifiedNumbers:[],mode:'local-deterministic-report'}};
+  return {pack:pack,document:document};
+}
+
+function generateBranchReportV2(options){
+  var pack=buildReportEvidence(options), sections=[];
+  var dims=pack.dimensions||defaultReportDimensions();
+  var snapshots=pack.steps.filter(function(s){return s.tool==='getMetricSnapshot'&&s.ok;});
+  var trends=pack.steps.filter(function(s){return s.tool==='getTrendSeries'&&s.ok&&s.series&&s.series.length;});
+  var ranks=pack.steps.filter(function(s){return s.tool==='rankBranches'&&s.ok;});
+  var diagnosis=pack.steps.filter(function(s){return s.tool==='getDiagnosisSummary'&&s.ok;})[0]||null;
+  var alerts=pack.steps.filter(function(s){return s.tool==='getTriggeredAlerts'&&s.ok;})[0]||null;
+  var recs=pack.steps.filter(function(s){return s.tool==='getRecommendations'&&s.ok;})[0]||null;
+  function has(id){return dims.indexOf(id)>=0;}
+  function evIds(steps){
+    var ids={};
+    (steps||[]).forEach(function(step){(step&&step.evidence||[]).forEach(function(ev){ids[ev.id]=true;});});
+    return Object.keys(ids);
+  }
+  function byLabel(pattern){
+    return snapshots.find(function(s){return pattern.test(s.metric&&s.metric.label||s.metric&&s.metric.metric||'');});
+  }
+  function chip(step){return step&&step.metric?step.metric.label+' '+step.formattedValue:null;}
+  function sentence(step){
+    return step&&step.metric?step.metric.label+'为'+step.formattedValue+'（'+step.period+'）':null;
+  }
+  function trendSentence(step){
+    if(!step||!step.series||step.series.length<2)return null;
+    var first=step.series[0], last=step.series[step.series.length-1];
+    var delta=numberValue(last.value)-numberValue(first.value);
+    var deltaText=numberValue(delta)==null?'':formatValue(delta,step.metric&&step.metric.unit||'');
+    var direction=delta>0?'上升':delta<0?'下降':'基本持平';
+    return step.metric.label+'由'+first.period+'的'+first.formattedValue+'变化至'+last.period+'的'+last.formattedValue+'，区间表现为'+direction+(deltaText?'，变动量'+deltaText:'')+'。';
+  }
+  function rankSentence(step){
+    if(!step||!step.rows)return null;
+    var row=step.rows.find(function(r){return r.org===pack.org;});
+    if(!row)return null;
+    var direction=step.metric&&step.metric.direction==='asc'?'低值优先':'高值优先';
+    var position=row.rank<=Math.ceil(row.total/3)?'处于前列':row.rank>Math.ceil(row.total*2/3)?'相对靠后':'处于中游';
+    return step.metric.label+'分公司排名第'+row.rank+'/'+row.total+'，当前值'+row.formattedValue+'，按'+direction+'口径看'+position+'。';
+  }
+  function addSection(id,title,paragraphs,items,steps){
+    if(id!=='summary'&&!has(id))return;
+    sections.push({
+      id:id,
+      title:title,
+      paragraphs:(paragraphs||[]).filter(Boolean),
+      items:(items||[]).filter(Boolean).length?items.filter(Boolean):['insufficient_data'],
+      evidenceIds:evIds(steps||pack.steps).slice(0,20)
+    });
+  }
+  var premium=byLabel(/保费/), target=byLabel(/达成率|进度/), profit=byLabel(/经营利润/);
+  var cost=byLabel(/综合成本率/), loss=byLabel(/赔付率/), expense=byLabel(/费用率/);
+  var productivity=byLabel(/人均产能/), perProfit=byLabel(/人均利润/), laborCost=byLabel(/人力成本|人员实际|人力/);
+  var core=[sentence(premium),sentence(target),sentence(profit),sentence(cost)].filter(Boolean);
+  addSection('summary','management_summary',[
+    pack.org+'本期报告围绕'+pack.period+'经营表现展开，重点不在复述诊断规则，而在解释数据之间的经营关系。'+(core.length?'核心可读信号是：'+core.join('；')+'。':'当前核心指标证据不足，报告仅保留可验证信息。'),
+    '综合来看，本期应重点关注三件事：规模是否支撑经营结果，利润是否具备成本质量支撑，以及人效与业务产出是否匹配。报告后续各部分会围绕这三条主线展开，并只使用看板内可追溯数据。'
+  ],[chip(premium),chip(profit),chip(cost)],snapshots);
+  addSection('overview','core_metrics',[
+    core.length?'经营概览显示，'+core.join('；')+'。这组指标放在一起看，比单独观察某一个数字更有意义：保费反映业务规模，目标达成反映节奏，经营利润体现结果，综合成本率反映利润形成的消耗水平。':'当前核心指标证据不足，无法形成完整经营概览。',
+    premium&&profit?'如果保费规模与利润表现同向改善，说明增长质量相对更扎实；如果规模表现较好但利润承压，则需要向成本率、赔付率和费用率继续拆解。':null
+  ],[chip(premium),chip(target),chip(profit),chip(cost)],snapshots);
+  addSection('target','target_progress',[
+    target?'目标达成方面，'+sentence(target)+'。这个结果不仅说明完成进度，也提示后续经营动作的紧迫程度：若达成水平不足，应优先判断是业务规模推进偏慢，还是利润质量和成本效率拖累了最终表现。':'当前看板没有足够的目标达成证据，无法对计划进度作出可靠判断。',
+    premium?'结合规模端看，'+sentence(premium)+'。目标进度需要与规模指标联动理解，单看达成率容易忽略业务结构和质量差异。':null
+  ],[chip(target),chip(premium)],[target,premium].filter(Boolean));
+  addSection('profit','profitability',[
+    profit?'盈利能力方面，'+sentence(profit)+'。该指标是经营结果的集中体现，但它本身不是原因；真正需要管理层关注的是利润背后的规模支撑、赔付表现和费用消耗是否协调。':'当前看板没有足够的经营利润证据，无法形成盈利能力结论。',
+    cost||loss||expense?'从利润质量看，'+[sentence(cost),sentence(loss),sentence(expense)].filter(Boolean).join('；')+'。若利润表现与成本质量不匹配，应进一步复核产品结构、赔付波动和费用投放节奏。':null
+  ],[chip(profit),chip(cost),chip(loss),chip(expense)],[profit,cost,loss,expense].filter(Boolean));
+  addSection('cost','cost_quality',[
+    cost||loss||expense?'成本质量方面，'+[sentence(cost),sentence(loss),sentence(expense)].filter(Boolean).join('；')+'。这部分的结论重点是识别利润压力来自哪里：综合成本率反映总体消耗，赔付率偏向承保质量，费用率偏向经营投入效率。':'当前成本质量相关证据不足，无法区分赔付端和费用端压力。',
+    cost?'若综合成本率处于高位，后续管理动作不宜只压费用，还应同步检查赔付结构和高成本业务来源；若成本率可控，则利润改善更可能取决于规模和结构。':null
+  ],[chip(cost),chip(loss),chip(expense)],[cost,loss,expense].filter(Boolean));
+  addSection('productivity','productivity',[
+    productivity||perProfit||laborCost?'人力效能方面，'+[sentence(productivity),sentence(perProfit),sentence(laborCost)].filter(Boolean).join('；')+'。人效指标适合与利润和费用指标一起看，用来判断人员投入是否真正转化为有效经营产出。':'当前人力效能证据不足，无法判断人员投入与产出之间的匹配程度。',
+    productivity&&profit?'如果人均产能改善但经营利润未同步改善，通常意味着产出质量、费用消耗或赔付压力仍需进一步拆解；如果二者同步改善，则说明组织效率对经营结果形成了正向支撑。':null
+  ],[chip(productivity),chip(perProfit),chip(laborCost)],[productivity,perProfit,laborCost].filter(Boolean));
+  addSection('trend','trend_and_benchmark',[
+    trends.length?trends.slice(0,4).map(trendSentence).filter(Boolean).join(' '):'所选期间连续趋势证据不足，暂不作趋势性结论。',
+    ranks.length?ranks.slice(0,4).map(rankSentence).filter(Boolean).join(' '):'当前可用排名证据不足，暂不作对标结论。'
+  ],trends.slice(0,3).map(function(s){return s.metric.label+'趋势';}).concat(ranks.slice(0,3).map(function(s){return s.metric.label+'对标';})),trends.concat(ranks));
+  addSection('risk','risk_monitor',[
+    diagnosis?'风险观察方面，诊断索引给出的风险等级为'+(diagnosis.riskLevel||'未评级')+'。本报告不把它作为最终判断，而是把它作为经营复盘的提示：需要回到利润、成本、赔付和费用指标中确认风险来源。':'当前未取得诊断索引证据，风险部分仅基于经营指标作谨慎观察。',
+    alerts?'当前触发预警项'+((alerts.triggeredAlerts||[]).length)+'项。预警项越多，越说明后续追问应从单点指标转为组合分析，避免只处理表面数字。':null
+  ],[diagnosis?('风险等级 '+(diagnosis.riskLevel||'未评级')):null,alerts?('预警项 '+((alerts.triggeredAlerts||[]).length)):null],[diagnosis,alerts].filter(Boolean));
+  addSection('recommendation','recommendations',[
+    recs&&recs.recommendations&&recs.recommendations.length?'建议优先围绕当前数据中的主要矛盾推进：'+recs.recommendations.slice(0,4).join('；')+'。执行上建议按照“确认口径—定位机构/产品—拆解责任指标—复盘改善效果”的顺序闭环。':'当前没有可直接引用的建议记录。建议先围绕保费、经营利润、综合成本率、人均产能四个维度建立追踪清单，再对异常项逐一追问原因。',
+    '下一步复盘不宜只看单月结果，建议结合近三到六个月趋势，判断本期表现是持续性变化还是阶段性波动。'
+  ],recs&&recs.recommendations?recs.recommendations.slice(0,4):[],recs?[recs]:[]);
+  if(has('appendix'))sections.push({id:'appendix',title:'evidence_appendix',paragraphs:['本节为内部证据附录，前端默认隐藏。'],items:pack.evidence.slice(0,30).map(function(ev){return ev.period+' / '+ev.org+' / '+ev.label+' / '+ev.formattedValue+' / '+ev.id;}),evidenceIds:pack.evidence.slice(0,30).map(function(ev){return ev.id;})});
+  var document={schemaVersion:'dashboard-report-document-v2',title:pack.org+'分公司经营分析报告',summary:pack.org+' '+pack.period+' 管理分析报告，已基于数据面板证据生成。',sections:sections,evidence:pack.evidence,limitations:pack.limitations,validation:{passed:true,unverifiedNumbers:[],mode:'local-deterministic-report-v2'}};
+  return {pack:pack,document:document};
+}
+
 window.AnxiaonengAIEngine={
   version:CALC_VERSION,
   esc:esc,
@@ -849,6 +1242,10 @@ window.AnxiaonengAIEngine={
   listOrganizations:allOrganizations,
   listMetrics:allMetrics,
   parseGoal:parseGoal,
+  parseSearchIntent:parseSearchIntent,
+  runSearch:runSearch,
+  buildReportEvidence:buildReportEvidence,
+  generateBranchReport:generateBranchReportV2,
   buildEvidencePack:buildEvidencePack,
   localAnswer:function(question,options){var pack=buildEvidencePack(question,options);return {pack:pack,answer:answerFromPack(pack),local:true};},
   ask:ask,

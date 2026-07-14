@@ -40,3 +40,19 @@
 @media(max-width:900px){.agent-result-grid{grid-template-columns:1fr}.agent-compose{grid-template-columns:1fr}.agent-actions{flex-direction:row;flex-wrap:wrap}}
 @media(max-width:900px){.agent-pilot-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:900px){.validation-grid{grid-template-columns:repeat(2,1fr)}}
+
+/* Clean diagnosis layout after AI modules are retired. */
+.diagnosis-toolbar{padding:4px 0 12px;margin-bottom:10px;border-bottom:1px solid #eef2f7}
+.diagnosis-toolbar select{border-color:#dbe2ea}
+.diagnosis-summary-row{gap:12px;margin-bottom:16px}
+.diagnosis-summary-row>div{border-color:#eef2f7;box-shadow:none}
+.diagnosis-card{padding:20px 22px;border-color:#eef2f7;box-shadow:none}
+.diagnosis-card-head{padding-bottom:12px;border-bottom:1px solid #eef2f7}
+.diagnosis-lead{margin:0 0 16px;padding:0 0 0 12px;background:transparent;border-left-color:#1d4ed8;border-radius:0;line-height:1.7}
+.diagnosis-grid{gap:0;border-top:1px solid #f1f5f9}
+.diagnosis-grid>div{padding:18px 16px;background:transparent;border-bottom:1px solid #f1f5f9;border-radius:0}
+.diagnosis-grid>div:nth-child(odd){border-right:1px solid #f1f5f9}
+.diagnosis-grid h4{margin-bottom:10px;color:#0f172a}
+.pattern-item,.recommendation,.diagnosis-fact{background:#fff;border-color:#edf2f7}
+.limitations{margin-top:16px;padding-top:12px;border-top-color:#e5edf6}
+@media(max-width:760px){.diagnosis-grid>div:nth-child(odd){border-right:0}}

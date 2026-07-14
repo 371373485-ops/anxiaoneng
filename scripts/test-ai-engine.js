@@ -503,6 +503,62 @@ async function testEvidencePackDoesNotRequireDiagnosisIndex() {
   assert.ok(!pack.steps.some((step) => String(step.tool || '').startsWith('getDiagnosis')));
   assert.ok(pack.steps.some((step) => step.tool === 'getMetricSnapshot'));
 }
+
+async function testGlobalSearchAndReportApis() {
+  const context = bootstrap();
+  const engine = context.AIEngine;
+  assert.strictEqual(typeof engine.parseSearchIntent, 'function');
+  assert.strictEqual(typeof engine.runSearch, 'function');
+  assert.strictEqual(typeof engine.buildReportEvidence, 'function');
+  assert.strictEqual(typeof engine.generateBranchReport, 'function');
+
+  const intent = engine.parseSearchIntent(`Branch A 2026-02 ${context.__metricKey} 是多少？`);
+  assert.strictEqual(intent.period, '2026-02');
+  assert.strictEqual(intent.org, 'Branch A');
+  assert.ok(intent.metric);
+
+  const search = engine.runSearch(intent);
+  assert.strictEqual(search.validation.passed, true);
+  assert.ok(search.summary.includes('Branch A') || search.cards.length > 0);
+  assert.ok(search.evidence.length > 0);
+
+  const targetField = context.App.FIELDS.find((field) => /达成率|进度/.test(String(field.k || '') + String(field.l || '')));
+  const merged = context.App.ALL_DATA._merged && context.App.ALL_DATA._merged['2026-02'];
+  const branchB = merged.branches.find((branch) => branch.n === 'Branch B');
+  const branchA = merged.branches.find((branch) => branch.n === 'Branch A');
+  branchB.d[context.__metricKey] = -5;
+  if (targetField) {
+    branchB.d[targetField.k] = 0.8;
+    branchA.d[targetField.k] = 1.1;
+  }
+  const filterSearch = engine.runSearch('保费达成不好且亏损的分公司有哪些');
+  assert.strictEqual(filterSearch.type, 'filter');
+  assert.ok(filterSearch.summary.includes('Branch B'));
+  assert.ok(filterSearch.cards.some((card) => card.org === 'Branch B'));
+  assert.ok(!filterSearch.cards.some((card) => card.org === 'Branch A'));
+
+  const productivityField = context.App.FIELDS.find((field) => /人均产能|人力|人员/.test(String(field.k || '') + String(field.l || '')));
+  if (productivityField) {
+    branchA.d[productivityField.k] = 12.34;
+    branchB.d[productivityField.k] = 5.67;
+    const semanticSearch = engine.runSearch('Branch A 人力效能情况');
+    assert.strictEqual(semanticSearch.type, 'semantic');
+    assert.ok(semanticSearch.summary.includes('人力效能'));
+    assert.ok(semanticSearch.cards.some((card) => String(card.metric || '').includes('人')));
+    assert.ok(!semanticSearch.summary.includes('保费实际合计为'));
+  }
+
+  const report = engine.generateBranchReport({
+    org: 'Branch A',
+    rangeType: 'recent3',
+    dimensions: ['overview', 'trend', 'ranking', 'appendix'],
+    style: 'management',
+  });
+  assert.strictEqual(report.document.validation.passed, true);
+  assert.ok(report.pack.evidence.length > 0);
+  assert.ok(report.document.sections.some((section) => section.id === 'appendix'));
+  assert.ok(JSON.stringify(report.document).includes('Branch A'));
+}
 async function main() {
   await testQueryBase();
   await testShareLocalAnalysisDoesNotCallModel();
@@ -519,6 +575,7 @@ async function main() {
   await testDiagnosisContextTakesPrecedenceOverIndex();
   await testEvidencePackReadsDiagnosisIndex();
   await testEvidencePackDoesNotRequireDiagnosisIndex();
+  await testGlobalSearchAndReportApis();
   console.log('PASS AI query base covers months, orgs, metrics, MoM, YoY and ranking');
   console.log('PASS share mode uses local deterministic analysis without model calls');
   console.log('PASS admin AI answer is checked against evidence numbers');
@@ -531,6 +588,7 @@ async function main() {
   console.log('PASS diagnosisContext takes precedence over rebuilt DiagnosisIndex records');
   console.log('PASS evidence pack reads DiagnosisIndex and merges diagnosis evidence');
   console.log('PASS AIEngine keeps working when DiagnosisIndex is unavailable');
+  console.log('PASS global search and branch report APIs return evidence-backed results');
 }
 
 main().catch((error) => {

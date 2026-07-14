@@ -775,8 +775,8 @@ function _report(bn,alerts){
 window._renderRulesReport = function(){
   var ct=document.getElementById('ai-content');
   if(!ct)return;
-  // 如果已经渲染过且用户有 AI 交互内容（深度解读/问答），切换 tab 时不重建
-  if(ct.getAttribute('data-rendered')==='1' && (ct.querySelector('#ai-deep-content') && ct.querySelector('#ai-deep-content').innerHTML.trim() || ct.querySelector('#ai-chat-messages') && ct.querySelector('#ai-chat-messages').children.length>0)){
+  // 如果已经渲染过且用户有交互内容，切换 tab 时不重建
+  if(ct.getAttribute('data-rendered')==='1' && (ct.querySelector('#ai-chat-messages') && ct.querySelector('#ai-chat-messages').children.length>0)){
     return;
   }
   var results=App._alertResults||[];
@@ -817,11 +817,8 @@ window._renderRulesReport = function(){
 
   var h='';
 
-  // ═══ 顶部：总览 + 个性化分析（醒目位置）═══
-  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">';
-
-  // 左侧：风险总览
-  h+='<div style="background:var(--card,#fff);border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:16px">';
+  // ═══ 顶部：风险总览 ═══
+  h+='<div style="background:var(--card,#fff);border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:16px;margin-bottom:20px">';
   h+='<div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--text)">📋 风险总览</div>';
   h+='<div style="display:flex;gap:8px;flex-wrap:wrap">';
   h+='<div style="flex:1;min-width:80px;padding:10px 8px;background:#fef2f2;border-radius:8px;text-align:center"><div style="font-size:24px;font-weight:800;color:#dc2626">'+highRisk+'</div><div style="font-size:11px;color:#991b1b">高风险</div></div>';
@@ -836,31 +833,7 @@ window._renderRulesReport = function(){
   h+='<div style="margin-top:10px;font-size:12px;color:var(--muted,#888)">'+overallText+'</div>';
   h+='</div>';
 
-  // 右侧：个性化分析（醒目位置）
-  h+='<div style="background:var(--card,#fff);border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:16px">';
-  h+='<div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)">💬 个性化 AI 分析</div>';
-  h+='<p style="font-size:11px;color:var(--muted,#888);margin-bottom:10px">基于看板全量数据，输入分析需求，AI 精准读取数据并生成报告</p>';
-  h+='<div id="ai-ca-msgs" style="min-height:40px;max-height:200px;overflow-y:auto;margin-bottom:10px;font-size:12px;line-height:1.6"></div>';
-  // 快捷问题
-  var CA_QUICK=[
-    {icon:'📊',title:'全国经营概览',q:'请分析2026年全国整体经营情况，包括保费达成、利润和COR表现'},
-    {icon:'🏢',title:'责任区对比',q:'请对比四个责任区2026年的综合成本率、赔付率和费用率差异'},
-    {icon:'📈',title:'趋势分析',q:'请分析全国综合成本率近两年的变化趋势'},
-    {icon:'👥',title:'人效诊断',q:'请分析各责任区2026年人均产能和人均利润的差异'}
-  ];
-  h+='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">';
-  CA_QUICK.forEach(function(q){
-    h+='<button class="ai-qc" onclick="quickAnalyze(\''+q.q.replace(/'/g,'\\\'')+'\')" style="padding:4px 10px;border:1px solid var(--border,#d1d5db);border-radius:6px;background:var(--card,#fff);cursor:pointer;font-size:11px;color:var(--text)">'+q.icon+' '+q.title+'</button>';
-  });
-  h+='</div>';
-  h+='<div style="display:flex;gap:6px">';
-  h+='<input id="ai-ca-input" placeholder="如：请分析河南分公司近三年综合成本率变化情况" style="flex:1;padding:8px 12px;border:1px solid var(--border,#d1d5db);border-radius:6px;font-size:12px;background:var(--card,#fff);color:var(--text)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();sendAnalyze();}" autocomplete="off">';
-  h+='<button onclick="sendAnalyze()" style="padding:8px 16px;background:#1E3A5F;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:12px">发送</button>';
-  h+='</div>';
-  h+='</div>';
-  h+='</div>'; // end grid
-
-  // ═══ 分公司选择器 + 规则报告 + AI深度解读 ═══
+  // ═══ 分公司选择器 + 规则报告 ═══
   h+='<div style="background:var(--card,#fff);border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:16px;margin-bottom:16px">';
 
   // 全国/责任区级告警（放在分公司选择器前面）
@@ -901,7 +874,7 @@ window._renderRulesReport = function(){
   }
 };
 
-// ═══ 分公司切换：只显示选中的分公司报告 + 一对一AI深度解读 ═══
+// ═══ 分公司切换：只显示选中的分公司报告 ═══
 window.switchDiagnosisBranch=function(idx){
   var results=App._alertResults||[];
   var branchMap={};
@@ -939,152 +912,14 @@ window.showDiagnosisBranch=function(idx,reps){
   h+='<div style="padding:0 12px 6px">'+rep.report.body+'</div>';
   h+='</details>';
 
-  // 一对一AI深度解读
-  h+='<div id="ai-deep-reading" style="margin-top:12px;border-top:1px solid var(--border,#e5e7eb);padding-top:12px">';
-  h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
-  h+='<span style="font-size:13px;font-weight:700;color:var(--text)">🤖 AI 深度解读 · '+_eh(bn)+'</span>';
-  h+='<button id="ai-deep-btn" onclick="generateDeepReading(\''+bn.replace(/'/g,'\\\'')+'\')" style="padding:6px 14px;border:1px solid #1E3A5F;border-radius:6px;background:#1E3A5F;color:#fff;cursor:pointer;font-size:11px;font-weight:600">生成 AI 深度解读</button>';
-  h+='</div>';
-  h+='<div id="ai-deep-content" style="min-height:40px;font-size:12px;line-height:1.7;color:var(--text)"></div>';
-  h+='</div>';
-
   container.innerHTML=h;
 };
 
-// ══════════ AI 深度解读 + 个性化分析 ══════════
-
-function fmtAI(text){
-  if(!text)return '';
-  var html=text;
-  // 代码块
-  html=html.replace(/```([\s\S]*?)```/g,function(m,c){return '<pre style="background:#f5f5f5;padding:10px;border-radius:4px;overflow-x:auto;font-size:12px">'+c.replace(/</g,'&lt;')+'</pre>';});
-  // 标题
-  html=html.replace(/^### (.+)$/gm,'<h4 style="font-size:13px;font-weight:700;margin:10px 0 4px">$1</h4>');
-  html=html.replace(/^## (.+)$/gm,'<h3 style="font-size:14px;font-weight:700;margin:12px 0 6px">$1</h3>');
-  html=html.replace(/^# (.+)$/gm,'<h2 style="font-size:15px;font-weight:700;margin:14px 0 8px">$1</h2>');
-  // 粗体
-  html=html.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
-  // 列表
-  html=html.replace(/^- (.+)$/gm,'<li style="margin-left:18px;list-style:disc">$1</li>');
-  html=html.replace(/^\d+\. (.+)$/gm,'<li style="margin-left:18px;list-style:decimal">$1</li>');
-  // 换行
-  html=html.replace(/\n\n/g,'</p><p style="margin:6px 0">');
-  html=html.replace(/\n/g,'<br>');
-  // 清理多余空标签
-  html=html.replace(/<br><\/p><p/g,'</p><p');
-  return '<p style="margin:6px 0">'+html+'</p>';
-}
-
-window.generateDeepReading=function(branchName){
-  var btn=document.getElementById('ai-deep-btn');
-  var ct=document.getElementById('ai-deep-content');
-  if(!btn||!ct)return;
-  if(!branchName){ct.innerHTML='<span style="color:var(--muted)">请先选择分公司</span>';return;}
-  if(_aiUnavailable()){ct.innerHTML='<div style="padding:24px;text-align:center;color:var(--muted)"><div style="font-size:36px;margin-bottom:8px">🔒</div><div style="font-size:14px;font-weight:600;margin-bottom:4px">AI 深度解读在分享模式下不可用</div><div style="font-size:12px">此功能需要后端服务支持，请在本地完整环境中使用</div></div>';btn.disabled=false;btn.textContent='深度解读';return;}
-  btn.disabled=true;btn.textContent='生成中…';
-  ct.innerHTML='<span style="color:var(--muted)">正在分析 '+branchName+' 的诊断数据...</span>';
-
-  var results=App._alertResults||[];
-  var branchAlerts=results.filter(function(r){return r.branchName===branchName;});
-  var model=(typeof _buildDiagnosisModel==='function')?_buildDiagnosisModel(branchName,branchAlerts):null;
-
-  var CORE_METRICS=['保费实际合计','时间进度计划达成率','经营利润','时间进度达成率','综合成本率实际（整体利润口径）','已赚赔付率实际','已赚费用率实际','整体人均产能实际','整体人均利润实际','整体人力成本保费率实际'];
-  var branchData=(App.DATA.branches||[]).find(function(b){return b.n===branchName;});
-  var currentMetrics={};
-  if(branchData&&branchData.d){CORE_METRICS.forEach(function(mk){var v=Number(branchData.d[mk]);if(!isNaN(v)&&v!=null)currentMetrics[mk]=v;});}
-  var nationalAvg={};
-  var nat=App.DATA.national||{};
-  CORE_METRICS.forEach(function(mk){var v=Number(nat[mk]);if(!isNaN(v)&&v!=null)nationalAvg[mk]=v;});
-  var allMonths=Object.keys(App.ALL_DATA._merged||{}).sort();
-  var recentMonths=allMonths.slice(-6);
-  var trendData={};
-  CORE_METRICS.forEach(function(mk){trendData[mk]=[];});
-  recentMonths.forEach(function(mk){var mdata=(App.ALL_DATA._merged||{})[mk];if(!mdata||!mdata.branches)return;var b=mdata.branches.find(function(x){return x.n===branchName;});if(b&&b.d){CORE_METRICS.forEach(function(metric){var v=Number(b.d[metric]);if(!isNaN(v)&&v!=null)trendData[metric].push({month:mk,value:v});});}});
-  var triggeredAlerts=branchAlerts.map(function(a){return{field:a.fieldLabel||a.field,severity:a.severity,value:a.currentValue,threshold:a.threshold};});
-
-  // 预格式化数据：让 AI 直接引用，不需要自己转换
-  function _fmtAI(v,unit){
-    if(v==null||isNaN(v))return null;
-    if(unit==='%')return(v*100).toFixed(2)+'%';
-    if(unit==='人')return v.toFixed(0)+'人';
-    if(unit==='万元/人')return v.toFixed(2)+'万/人';
-    return v.toFixed(2)+'万元';
-  }
-  var _mdef={};
-  CORE_METRICS.forEach(function(mk){var fi=(App.FIELDS||[]).find(function(f){return f.k===mk;});if(fi)_mdef[mk]=fi;});
-  var currentMetricsFmt={};
-  CORE_METRICS.forEach(function(mk){var v=Number(branchData&&branchData.d?branchData.d[mk]:null);var u=(_mdef[mk]||{}).u||'';var f=_fmtAI(v,u);if(f)currentMetricsFmt[mk]=f;});
-  var nationalAvgFmt={};
-  CORE_METRICS.forEach(function(mk){var v=Number(nat[mk]);var u=(_mdef[mk]||{}).u||'';var f=_fmtAI(v,u);if(f)nationalAvgFmt[mk]=f;});
-  var trendDataFmt={};
-  CORE_METRICS.forEach(function(mk){trendDataFmt[mk]=(trendData[mk]||[]).map(function(item){var u=(_mdef[mk]||{}).u||'';return{month:item.month,value:_fmtAI(item.value,u)};});});
-  var triggeredAlertsFmt=triggeredAlerts.map(function(a){var fi=(App.FIELDS||[]).find(function(f){return f.k===a.field;});var u=fi?fi.u:'';return{field:a.field,severity:a.severity,value:_fmtAI(a.value,u),threshold:_fmtAI(a.threshold,u)};});
-
-  var context={
-    period:App.currentMonth,branch:branchName,
-    nationalAverage:nationalAvgFmt,currentMetrics:currentMetricsFmt,trends:trendDataFmt,
-    triggeredAlerts:triggeredAlertsFmt,
-    diagnosis:model?{riskLevel:model.riskLevel,summary:model.summary,
-      patterns:(model.patterns||[]).map(function(p){return{name:p.name,desc:p.trigger};}),
-      inferences:(model.inferences||[]).slice(0,6).map(function(i){return i.text;}),
-      recommendations:(model.recommendations||[]).slice(0,5).map(function(r){return{title:r.title,action:r.action,period:r.period};})
-    }:null,
-    metricDefs:CORE_METRICS.map(function(mk){var fi=(App.FIELDS||[]).find(function(f){return f.k===mk;});return{key:mk,label:fi?fi.l:mk,unit:fi?fi.u:'',direction:fi?fi.rd:''};})
-  };
-
-  var question='你是财产保险经营分析专家。以下是'+branchName+'在'+App.currentMonth+'的经营数据、近6个月趋势及规则诊断结果（JSON）。\\n\\n**重要：数据已格式化好——百分比类已是"98.47%"格式，金额类已是"5,023.50万元"格式，人数类已是"123人"格式。直接引用这些值，不要自己做任何转换。**\\n\\n请对该分公司做**一对一深度分析报告**。\\n\\n**关键要求：规则报告已经做了以下内容——指标逐项罗列、排名对比、经营模式标注、归因分解、分级建议。你的深度解读严禁重复这些内容。你应该说规则报告没说的东西：**\\n\\n1. **矛盾信号推理**：规则报告只会标注"增长陷阱"模式，你要做的是——为什么会出现这个矛盾？最可能的原因是什么？需要核查什么来验证？给出推理链条而非模式名称\\n2. **趋势走向预判**：规则报告只看当前月数据，你要做的是——基于6个月趋势序列，哪些指标在加速恶化？哪些在减速改善？如果趋势延续，下个月可能是什么值？何时会突破临界点？\\n3. **不可见的风险**：规则报告只能看到已触发的预警，你要做的是——当前看似正常但趋势在恶化的指标有哪些？哪些指标虽然没触发预警但已经接近阈值？\\n4. **业务经验判断**：基于财险经营经验，该分公司的指标组合是否暗示特定的业务问题（如渠道结构变化、核保标准放松、大案集中等）？给出判断依据和需要核实的数据\\n5. **差异化行动方案**：规则报告给的是通用建议，你要给的是——针对该分公司的具体指标组合，第一步应该做什么？预期效果是什么？如果无效的备选方案是什么？\\n\\n⚠️ 直接引用 context 中的格式化值，保持原始格式（2位小数+单位）。禁止编造数据。如数据不足明确说明。';
-
-  var globalCtx=_buildGlobalContext();
-  var _text='',_started=false;
-  ct.innerHTML='';
-  AICLIENT.stream([
-    {role:'system',content:'你是安效能数据看板AI助手。以下是当前看板的完整数据上下文，包括全国、各责任区、各分公司的全部指标数据、预警信息、近6个月趋势和排名。请严格基于这些数据进行分析。\n\n## 全局数据上下文\n'+JSON.stringify(globalCtx,null,1)+'\n\n## 该分公司专项上下文\n'+JSON.stringify(context,null,1)},
-    {role:'user',content:question}
-  ],function(chunk){
-    if(chunk===null){btn.disabled=false;btn.textContent='重新生成';return;}
-    if(!_started){_started=true;ct.innerHTML='';}
-    _text+=chunk;ct.innerHTML=fmtAI(_text);
-    ct.scrollTop=ct.scrollHeight;
-  }).catch(function(e){
-    ct.innerHTML='<span style="color:#dc2626">生成失败：'+e.message+'</span>';
-    btn.disabled=false;btn.textContent='生成 AI 深度解读';
-  });
-};
-
-window.quickAnalyze=function(q){
-  var input=document.getElementById('ai-ca-input');
-  if(input)input.value=q;
-  sendAnalyze();
-};
-
-window.sendAnalyze=function(){
-  var input=document.getElementById('ai-ca-input');
-  if(!input)return;
-  var question=input.value.trim();
-  if(!question)return;
-  if(_aiUnavailable()){msgs.insertAdjacentHTML('beforeend','<div style="margin-bottom:12px;color:var(--muted);padding:8px 14px;background:#f5f5f5;border-radius:8px;font-size:13px">🔒 分享模式下 AI 问答不可用，请在本地完整环境中使用</div>');return;}
-  input.value='';
-  var msgs=document.getElementById('ai-ca-msgs');
-  if(!msgs)return;
-  msgs.insertAdjacentHTML('beforeend',
-    '<div style="text-align:right;margin-bottom:8px"><span style="display:inline-block;padding:8px 14px;background:#2563eb;color:#fff;border-radius:12px 12px 2px 12px;font-size:13px">'+question.replace(/</g,'&lt;')+'</span></div>');
-  var aiId='ai-ca-'+Date.now();
-  msgs.insertAdjacentHTML('beforeend',
-    '<div id="'+aiId+'" style="margin-bottom:12px"><span style="color:var(--muted)">分析中...</span></div>');
-  var el=document.getElementById(aiId);
-  el.innerHTML='<span class="ai-dots">●●●</span>';
-
-  var globalCtx=_buildGlobalContext();
-  AICLIENT.chat([
-    {role:'system',content:'你是安效能数据看板AI助手。以下是当前看板的完整数据上下文（JSON）。请严格基于这些数据回答问题，不要编造数据。如果问题超出看板数据范围，明确告知。\n\n'+JSON.stringify(globalCtx,null,1)},
-    {role:'user',content:question}
-  ]).then(function(content){
-    el.innerHTML=fmtAI(content||'（无内容）');
-    el.scrollTop=el.scrollHeight;
-  }).catch(function(e){
-    el.innerHTML='<span style="color:#dc2626">分析失败：'+e.message+'</span>';
-  });
-};
+// Retired interactive analysis entrypoints remain as no-ops for compatibility
+// with older saved pages or share-mode guards.
+window.generateDeepReading=function(){toast('该功能已下线。','info');return false;};
+window.quickAnalyze=function(){toast('该功能已下线。','info');return false;};
+window.sendAnalyze=function(){toast('该功能已下线。','info');return false;};
 
 // ── 徽章 ──
 var _orig=window.renderNavBadge;
@@ -1092,46 +927,6 @@ window.renderNavBadge=function(results){
   if(_orig)_orig(results);
   var b=document.getElementById('ai-badge');
   if(b){var c=(results||App._alertResults||[]).length;b.textContent=c;b.style.display=c>0?'inline-block':'none';}
-};
-
-// Evidence-based AI entrypoints. The shared AI engine performs deterministic
-// browser-side queries first, then lets the admin AI explain only the evidence pack.
-window.generateDeepReading=function(branchName){
-  var btn=document.getElementById('ai-deep-btn');
-  var ct=document.getElementById('ai-deep-content');
-  if(!btn||!ct)return;
-  if(!window.AIEngine){ct.innerHTML='<span style="color:#dc2626">AI查询底座未加载</span>';return;}
-  if(App.shareMode){ct.innerHTML='<div style="padding:16px;color:var(--muted)">分享模式提供本地智能分析，不开放大模型深度解读。</div>';return;}
-  btn.disabled=true;btn.textContent='生成中…';
-  ct.innerHTML='<span style="color:var(--muted)">正在查询证据并生成深度分析…</span>';
-  var question='请基于证据包，对 '+branchName+' 做经营深度分析：说明关键事实、趋势判断、风险原因、具体建议和数据限制。';
-  AIEngine.ask(question,{org:branchName,mode:'deep'}).then(function(result){
-    ct.innerHTML=AIEngine.renderAnswer(result);
-  }).catch(function(error){
-    ct.innerHTML='<span style="color:#dc2626">分析失败：'+_eh(error.message)+'</span>';
-  }).finally(function(){btn.disabled=false;btn.textContent='重新生成';});
-};
-
-window.sendAnalyze=function(){
-  var input=document.getElementById('ai-ca-input');
-  if(!input)return;
-  var question=input.value.trim();
-  if(!question)return;
-  input.value='';
-  var msgs=document.getElementById('ai-ca-msgs');
-  if(!msgs)return;
-  msgs.insertAdjacentHTML('beforeend',
-    '<div style="text-align:right;margin-bottom:8px"><span style="display:inline-block;padding:8px 14px;background:#2563eb;color:#fff;border-radius:12px 12px 2px 12px;font-size:13px">'+_eh(question)+'</span></div>');
-  var aiId='ai-evidence-'+Date.now();
-  msgs.insertAdjacentHTML('beforeend','<div id="'+aiId+'" style="margin-bottom:12px"><span style="color:var(--muted)">正在查询看板数据和证据…</span></div>');
-  var el=document.getElementById(aiId);
-  if(!window.AIEngine){el.innerHTML='<span style="color:#dc2626">AI查询底座未加载</span>';return;}
-  AIEngine.ask(question).then(function(result){
-    el.innerHTML=AIEngine.renderAnswer(result);
-    el.scrollTop=el.scrollHeight;
-  }).catch(function(error){
-    el.innerHTML='<span style="color:#dc2626">分析失败：'+_eh(error.message)+'</span>';
-  });
 };
 
 })();

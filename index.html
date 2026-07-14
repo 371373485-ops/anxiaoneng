@@ -5,7 +5,7 @@
 >
 <title>分公司经营与效能数据看板 - 2026年4月</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="dashboard-diagnosis.css?v=20260623">
+<link rel="stylesheet" href="dashboard-diagnosis.css?v=20260714-ai-retired">
 <link rel="stylesheet" href="dashboard-publish.css?v=20260623">
 <link rel="stylesheet" href="pages/unlock.css?v=20260623">
 <script src="chart.umd.min.js"></script>
@@ -394,6 +394,7 @@ td.cmp-delta{transition:background .2s}
 
 <button data-share-ai onclick="switchTab('ai')">🧭 智能经营诊断<span id="ai-badge" style="display:none;background:#667eea;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:4px;vertical-align:top">0</span></button>
 <button onclick="switchTab('trend')">📉 趋势分析</button>
+<button onclick="switchTab('report')">🔎 数据查询</button>
 <button data-share-restricted onclick="switchTab('data')">📦 数据管理</button>
 <button onclick="switchTab('guide')">📖 指标说明</button>
 <button data-share-export onclick="switchTab('export')">📥 数据导出（测试）</button>
@@ -419,6 +420,7 @@ td.cmp-delta{transition:background .2s}
 </div>
 <div id="tab-ai" class="tab"><div id="ai-content"></div></div>
 <div id="tab-trend" class="tab"></div>
+<div id="tab-report" class="tab"></div>
 
 </div>
 <div id="pagesUnlockRoot"></div>
@@ -436,10 +438,14 @@ td.cmp-delta{transition:background .2s}
 <script src="dashboard-publish.js?v=20260623"></script>
 <script src="ai-client.js?v=20260626"></script>
 <script src="dashboard-ai-engine.js?v=20260627-ai8"></script>
-<script src="dashboard-ai.js?v=20260627-ai8"></script>
+<script src="dashboard-metric-dictionary.js?v=20260710-search-v2"></script>
+<script src="dashboard-query-intent.js?v=20260710-search-v2"></script>
+<script src="dashboard-search.js?v=20260714-data-query"></script>
+<script src="dashboard-report.js?v=20260714-data-query"></script>
+<script src="dashboard-ai.js?v=20260714-ai-retired"></script>
 <script src="dashboard-diagnosis-index.js?v=20260708-step1"></script>
 <script src="dashboard-agent.js?v=20260623"></script>
-<script src="dashboard-diagnosis.js?v=20260627-ai8"></script>
+<script src="dashboard-diagnosis.js?v=20260714-ai-retired"></script>
 <script src="dashboard-remediation.js?v=20260623"></script>
 <script src="dashboard-trend.js?v=20260629-annual-dec"></script>
 <script src="dashboard-main.js?v=20260623"></script>

@@ -183,6 +183,7 @@ function switchTab(t){
     if(t==='data')try{renderDataTab();}catch(e3){showError('数据管理渲染失败: '+e3.message);}
     if(t==='guide')try{renderGuideTab();}catch(e3){showError('指标说明渲染失败: '+e3.message);}
     if(t==='ai')try{renderAITab();}catch(e3){showError('AI解读渲染失败: '+e3.message);}
+    if(t==='report')try{renderReportTab();}catch(e3){showError('报告生成渲染失败: '+e3.message);}
     if(t==='trend')try{Trend.render();}catch(e3){showError('趋势渲染失败: '+e3.message);}
     if(App.isCompareMode)try{applyCompareMode();}catch(e3){showError('对比模式注入失败: '+e3.message);}
   }catch(e){
