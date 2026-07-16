@@ -204,6 +204,8 @@ SCHEMA = [
         risk_metrics TEXT NOT NULL, description TEXT NOT NULL, action TEXT NOT NULL,
         owner_department TEXT, owner_name TEXT, due_date TEXT,
         current_value REAL, target_value REAL, metric TEXT, direction TEXT,
+        evidence_ids TEXT NOT NULL DEFAULT '[]', binding_reason TEXT,
+        requires_evidence_review INTEGER NOT NULL DEFAULT 0,
         status TEXT NOT NULL, created_by TEXT NOT NULL, created_at TEXT NOT NULL,
         updated_by TEXT NOT NULL, updated_at TEXT NOT NULL
     )""",
@@ -348,6 +350,9 @@ MIGRATION_COLUMNS = {
         "source_recommendation_id": "TEXT",
         "org_id": "TEXT",
         "metric_id": "TEXT",
+        "evidence_ids": "TEXT NOT NULL DEFAULT '[]'",
+        "binding_reason": "TEXT",
+        "requires_evidence_review": "INTEGER NOT NULL DEFAULT 0",
     },
     "remediation_reviews": {
         "org_id": "TEXT",

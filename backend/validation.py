@@ -306,16 +306,66 @@ class EvaluationScore:
     numeric_success: bool = False
     evidence_success: bool = False
     recommendation_success: bool = False
+    recommendation_evidence_binding_success: bool = False
+    causal_safety_success: bool = False
+    remediation_actionability_success: bool = False
+    metric_direction_success: bool = False
     relevance_success: bool = False
     specificity_success: bool = False
     unsupported_conclusions: int = 0
     critical_violations: list[str] = field(default_factory=list)
 
 
+def _append_violation(score: EvaluationScore, code: str) -> None:
+    if code not in score.critical_violations:
+        score.critical_violations.append(code)
+
+
+def _as_list(value: Any) -> list:
+    return value if isinstance(value, list) else []
+
+
+def _expected_metric_ids(case: dict) -> set[str]:
+    metric_ids = set()
+    snapshot = case.get("inputSnapshot", {})
+    if isinstance(snapshot, dict):
+        for key in ("metricId", "metric_id"):
+            if snapshot.get(key):
+                metric_ids.add(str(snapshot[key]))
+    for item in _as_list(case.get("requiredMetrics")):
+        if isinstance(item, dict):
+            metric_id = item.get("metricId") or item.get("metric_id")
+            if metric_id:
+                metric_ids.add(str(metric_id))
+    return metric_ids
+
+
+def _expected_metric_direction(case: dict) -> str | None:
+    snapshot = case.get("inputSnapshot", {})
+    if isinstance(snapshot, dict):
+        direction = snapshot.get("metricDirection") or snapshot.get("direction")
+        if direction:
+            return str(direction)
+    for item in _as_list(case.get("requiredMetrics")):
+        if isinstance(item, dict) and item.get("direction"):
+            return str(item["direction"])
+    return None
+
+
+def _evidence_ids_from(item: dict) -> set[str]:
+    evidence_ids = set()
+    if not isinstance(item, dict):
+        return evidence_ids
+    if item.get("evidenceId"):
+        evidence_ids.add(str(item["evidenceId"]))
+    evidence_ids.update(str(value) for value in _as_list(item.get("evidenceIds")))
+    return evidence_ids
+
+
 def score_evaluation_output(output: Any, case: dict) -> EvaluationScore:
     score = EvaluationScore()
     if not isinstance(output, dict):
-        score.critical_violations.append("invalid_schema")
+        _append_violation(score, "invalid_schema")
         return score
 
     serialized = json.dumps(output, ensure_ascii=False)
@@ -324,7 +374,7 @@ def score_evaluation_output(output: Any, case: dict) -> EvaluationScore:
         1 for text in case.get("forbiddenConclusions", []) if text and text in serialized
     )
     if score.unsupported_conclusions:
-        score.critical_violations.append("forbidden_conclusion")
+        _append_violation(score, "forbidden_conclusion")
 
     required_evidence = set(case.get("requiredEvidence", []))
     cited = set(output.get("evidenceIds", []))
@@ -338,7 +388,7 @@ def score_evaluation_output(output: Any, case: dict) -> EvaluationScore:
             cited.update(item.get("evidenceIds", []))
     score.evidence_success = required_evidence.issubset(cited)
     if required_evidence and not score.evidence_success:
-        score.critical_violations.append("missing_evidence")
+        _append_violation(score, "missing_evidence")
 
     source_numbers = {
         round(float(token), 6)
@@ -356,13 +406,74 @@ def score_evaluation_output(output: Any, case: dict) -> EvaluationScore:
         for number in output_numbers
     )
     if not score.numeric_success:
-        score.critical_violations.append("unsupported_number")
+        _append_violation(score, "unsupported_number")
 
     expected = case.get("expectedRecommendations", [])
-    recommendations_text = json.dumps(output.get("recommendations", []), ensure_ascii=False)
+    recommendations = [
+        item for item in _as_list(output.get("recommendations")) if isinstance(item, dict)
+    ]
+    recommendations_text = json.dumps(recommendations, ensure_ascii=False)
     score.recommendation_success = not expected or any(
         text and text in recommendations_text for text in expected
     )
+    if expected and not score.recommendation_success:
+        _append_violation(score, "missing_recommendation")
+
+    expected_metric_ids = _expected_metric_ids(case)
+    expected_direction = _expected_metric_direction(case)
+    binding_ok = True
+    direction_ok = True
+    actionability_ok = True
+    for recommendation in recommendations:
+        rec_evidence = _evidence_ids_from(recommendation)
+        rec_metric = recommendation.get("metricId") or recommendation.get("metric_id")
+        if required_evidence and not rec_evidence:
+            binding_ok = False
+        if rec_evidence and required_evidence and not rec_evidence.issubset(required_evidence):
+            binding_ok = False
+        if expected_metric_ids and rec_metric and str(rec_metric) not in expected_metric_ids:
+            binding_ok = False
+        rec_direction = recommendation.get("direction")
+        if expected_direction and rec_direction and str(rec_direction) != expected_direction:
+            direction_ok = False
+        if expected_direction and case.get("category") == "direction" and not rec_direction:
+            direction_ok = False
+        action = str(recommendation.get("action") or recommendation.get("title") or "")
+        if any(phrase in action for phrase in VAGUE_RECOMMENDATIONS):
+            actionability_ok = False
+        if len(action.strip()) < 12:
+            actionability_ok = False
+        if case.get("category") in {"remediation", "specificity"}:
+            if not (
+                recommendation.get("ownerRole") or recommendation.get("ownerDepartment")
+            ):
+                actionability_ok = False
+            if not (recommendation.get("period") or recommendation.get("reviewCycle")):
+                actionability_ok = False
+            if required_evidence and not rec_evidence:
+                actionability_ok = False
+    if expected and not recommendations:
+        binding_ok = False
+        actionability_ok = False
+    score.recommendation_evidence_binding_success = binding_ok
+    if not binding_ok:
+        _append_violation(score, "recommendation_evidence_mismatch")
+    score.metric_direction_success = direction_ok
+    if not direction_ok:
+        _append_violation(score, "metric_direction_error")
+    score.remediation_actionability_success = actionability_ok
+    if not actionability_ok:
+        _append_violation(score, "vague_recommendation")
+
+    causal_patterns = tuple(CAUSAL_PATTERNS) + (
+        "导致", "造成", "证明", "唯一原因", "直接带来", "directly caused",
+    )
+    score.causal_safety_success = not any(
+        phrase.casefold() in serialized.casefold() for phrase in causal_patterns
+    ) and score.unsupported_conclusions == 0
+    if not score.causal_safety_success:
+        _append_violation(score, "causal_claim")
+
     goal = case.get("goal") or case.get("scenario") or ""
     overlap = _goal_tokens(goal) & _goal_tokens(serialized)
     score.relevance_success = not goal or bool(overlap)

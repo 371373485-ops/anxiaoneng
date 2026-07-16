@@ -240,6 +240,10 @@ class TaskInput(BaseModel):
     targetValue: float | None = None
     metric: str | None = None
     metricId: str | None = None
+    direction: str | None = None
+    evidenceIds: list[str] = Field(default_factory=list)
+    bindingReason: str | None = None
+    requiresEvidenceReview: bool = False
     sourceRecommendationId: str | None = None
 
 
@@ -415,6 +419,8 @@ def rule_fallback(diagnosis):
 
 def task_response(row):
     row["riskMetrics"] = db.load(row.pop("risk_metrics"), [])
+    row["evidenceIds"] = db.load(row.pop("evidence_ids", "[]"), [])
+    row["requiresEvidenceReview"] = bool(row.pop("requires_evidence_review", 0))
     mapping = {
         "diagnosis_id": "diagnosisId", "recommendation_index": "recommendationIndex",
         "owner_department": "ownerDepartment", "owner_name": "ownerName",
@@ -423,6 +429,7 @@ def task_response(row):
         "created_at": "createdAt", "updated_by": "updatedBy", "updated_at": "updatedAt",
         "metric_id": "metricId", "org_id": "orgId",
         "source_recommendation_id": "sourceRecommendationId",
+        "binding_reason": "bindingReason",
     }
     for old, new in mapping.items():
         row[new] = row.pop(old)

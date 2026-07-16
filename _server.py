@@ -26,17 +26,7 @@ AI_CHAT_MAX_BYTES = int(os.environ.get("AI_CHAT_MAX_BYTES", str(2 * 1024 * 1024)
 
 # ── Zhipu GLM API config ──
 def _get_api_key():
-    key = os.environ.get("ZAI_API_KEY", "")
-    if key and key != "autoclaw-internal-proxy":
-        return key
-    try:
-        import winreg
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Environment") as _key:
-            val, _ = winreg.QueryValueEx(_key, "ZAI_API_KEY")
-            print(f'[Config] API Key loaded from registry', flush=True)
-            return val
-    except Exception:
-        return key
+    return os.environ.get("ZAI_API_KEY", "").strip()
 
 ZHIPU_API_KEY = _get_api_key()
 ZHIPU_API_URL = "https://open.bigmodel.cn/api/paas/v4/chat/completions"

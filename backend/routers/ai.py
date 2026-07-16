@@ -30,16 +30,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def _get_api_key():
-    key = os.environ.get("ZAI_API_KEY", "")
-    if key and key != "autoclaw-internal-proxy":
-        return key
-    try:
-        import winreg
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Environment") as _key:
-            val, _ = winreg.QueryValueEx(_key, "ZAI_API_KEY")
-            return val
-    except Exception:
-        return key
+    return os.environ.get("ZAI_API_KEY", "").strip()
 
 
 ZHIPU_API_KEY = _get_api_key()

@@ -124,6 +124,14 @@ function renderRuleDiagnosis(diagnosis){
         '<button class="link-btn" onclick="showDiagnosisEvidence(\''+esc(item.evidenceId)+'\')">查看依据</button></div>';
     }).join('');
   }
+  function recommendationEvidenceNotice(item){
+    if(!item)return '';
+    var ids=Array.isArray(item.evidenceIds)?item.evidenceIds:[];
+    if(item.requiresEvidenceReview||!ids.length){
+      return '<div class="recommendation-evidence-warning">需人工补充依据</div>';
+    }
+    return '<div class="recommendation-evidence-ok">依据已绑定：'+esc(ids.join('、'))+'</div>';
+  }
   function recommendationGroups(items){
     var definitions=[
       {key:'business',label:'业务端'},
@@ -136,7 +144,7 @@ function renderRuleDiagnosis(diagnosis){
         .filter(function(entry){return (entry.item.domain||'management')===group.key;});
       if(!rows.length)return '';
       return '<section class="recommendation-group recommendation-'+group.key+'"><h5>'+esc(group.label)+'<span>'+rows.length+'项</span></h5>'+
-        rows.map(function(entry){var item=entry.item;return '<div class="recommendation"><div class="recommendation-meta">'+esc(item.period||'')+'</div><b>'+esc(item.title)+'</b><p>'+esc(item.action)+'</p><button class="btn-sm" onclick="createRemediationDraft('+entry.index+')">转为整改任务</button></div>';}).join('')+
+        rows.map(function(entry){var item=entry.item;return '<div class="recommendation"><div class="recommendation-meta">'+esc(item.period||'')+'</div><b>'+esc(item.title)+'</b><p>'+esc(item.action)+'</p>'+recommendationEvidenceNotice(item)+'<button class="btn-sm" onclick="createRemediationDraft('+entry.index+')">转为整改任务</button></div>';}).join('')+
         '</section>';
     }).join('');
   }

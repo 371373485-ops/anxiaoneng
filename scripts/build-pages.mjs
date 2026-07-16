@@ -12,7 +12,7 @@ const EMPTY_DASHBOARD_DATA=JSON.stringify({_plans:{},actuals:{},currentMonth:'',
 // All runtime files — full feature set, nothing stripped
 const RUNTIME_FILES=[
   'chart.umd.min.js','xlsx.full.min.js',
-  'dashboard-data.js','dashboard-config.js','dashboard-compute.js','dashboard-metrics.js',
+  'dashboard-data.js','dashboard-config.js','dashboard-compute.js','dashboard-metric-catalog.js','dashboard-metrics.js',
   'dashboard-charts.js','dashboard-render.js','dashboard-alerts.js','dashboard-share.js',
   'dashboard-trend.js','dashboard-main.js',
   'dashboard-export.js','dashboard-publish.js','ai-client.js','dashboard-ai-engine.js','dashboard-metric-dictionary.js','dashboard-query-intent.js','dashboard-search.js','dashboard-report.js','dashboard-diagnosis-index.js','dashboard-ai.js','dashboard-agent.js',

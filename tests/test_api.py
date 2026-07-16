@@ -247,6 +247,141 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(response.json()["degradeReason"], "format_error")
         self.assertEqual(mocked.call_count, 2)
 
+    def _create_binding_guard_diagnosis(self, suffix):
+        payload = {
+            "schemaVersion": "diagnosis-v2",
+            "orgId": f"BR_BINDING_{suffix}",
+            "branch": f"Binding Guard Branch {suffix}",
+            "period": "2026-05",
+            "dataVersion": f"binding-data-{suffix}",
+            "ruleVersion": "rules-binding",
+            "riskLevel": "high",
+            "summary": "binding guard",
+            "facts": [], "inferences": [], "investigations": [],
+            "recommendations": [
+                {
+                    "id": "rec_cost", "title": "Cost improvement",
+                    "metric": "cost_ratio", "metricId": "M_COST",
+                    "direction": "decrease", "evidenceIds": [f"ev_cost_{suffix}"],
+                    "bindingReason": "rule_metric", "requiresEvidenceReview": False,
+                },
+                {
+                    "id": "rec_fee_wrong_premium", "title": "Fee improvement",
+                    "metric": "fee_ratio", "metricId": "M_FEE",
+                    "direction": "decrease", "evidenceIds": [f"ev_premium_plan_{suffix}"],
+                    "bindingReason": "text_keyword", "requiresEvidenceReview": False,
+                },
+                {
+                    "id": "rec_review", "title": "Manual review needed",
+                    "metric": "cost_ratio", "metricId": "M_COST",
+                    "direction": "decrease", "evidenceIds": [],
+                    "bindingReason": "no_reliable_evidence", "requiresEvidenceReview": True,
+                },
+            ],
+            "limitations": [],
+            "evidence": [
+                {
+                    "id": f"ev_cost_{suffix}", "metric": "cost_ratio", "metricId": "M_COST",
+                    "label": "Cost ratio", "currentValue": 1.10,
+                    "benchmarkValue": 1.00, "differenceValue": 0.10,
+                    "unit": "%", "source": "test", "direction": "decrease",
+                    "benchmarkType": "overall", "calculationVersion": "calc-v1",
+                },
+                {
+                    "id": f"ev_fee_{suffix}", "metric": "fee_ratio", "metricId": "M_FEE",
+                    "label": "Fee ratio", "currentValue": 0.36,
+                    "benchmarkValue": 0.32, "differenceValue": 0.04,
+                    "unit": "%", "source": "test", "direction": "decrease",
+                    "benchmarkType": "overall", "calculationVersion": "calc-v1",
+                },
+                {
+                    "id": f"ev_premium_plan_{suffix}", "metric": "premium_plan",
+                    "metricId": "M_PREMIUM_PLAN", "label": "Premium plan",
+                    "currentValue": 5000, "benchmarkValue": 4500,
+                    "differenceValue": 500, "unit": "万元", "source": "test",
+                    "direction": "increase", "benchmarkType": "plan",
+                    "calculationVersion": "calc-v1",
+                },
+            ],
+        }
+        response = self.client.post("/api/diagnoses", json=payload, headers=self.headers)
+        self.assertEqual(response.status_code, 200, response.text)
+        return response.json()
+
+    def test_remediation_accepts_correct_cost_evidence_and_ignores_client_direction(self):
+        diagnosis = self._create_binding_guard_diagnosis("ok")
+        response = self.client.post(
+            "/api/remediation-tasks",
+            json={
+                "diagnosisId": diagnosis["id"], "recommendationIndex": 0,
+                "sourceRecommendationId": "rec_cost", "metricId": "M_COST",
+                "direction": "increase", "evidenceIds": ["ev_cost_ok"],
+                "title": "Lower cost ratio", "metric": "cost_ratio",
+                "currentValue": 1.10, "targetValue": 1.00,
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        body = response.json()
+        self.assertEqual(body["direction"], "decrease")
+        self.assertEqual(body["evidenceIds"], ["ev_cost_ok"])
+        self.assertFalse(body["requiresEvidenceReview"])
+
+    def test_remediation_rejects_fee_recommendation_bound_to_premium_plan(self):
+        diagnosis = self._create_binding_guard_diagnosis("wrong-evidence")
+        response = self.client.post(
+            "/api/remediation-tasks",
+            json={
+                "diagnosisId": diagnosis["id"], "recommendationIndex": 1,
+                "sourceRecommendationId": "rec_fee_wrong_premium",
+                "metricId": "M_FEE", "evidenceIds": ["ev_premium_plan_wrong-evidence"],
+                "title": "Lower fee ratio", "metric": "fee_ratio",
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(response.status_code, 422)
+
+    def test_remediation_rejects_metric_id_not_matching_recommendation(self):
+        diagnosis = self._create_binding_guard_diagnosis("wrong-metric")
+        response = self.client.post(
+            "/api/remediation-tasks",
+            json={
+                "diagnosisId": diagnosis["id"], "recommendationIndex": 0,
+                "sourceRecommendationId": "rec_cost",
+                "metricId": "M_PREMIUM_PLAN", "evidenceIds": ["ev_cost_wrong-metric"],
+                "title": "Wrong metric", "metric": "premium_plan",
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(response.status_code, 422)
+
+    def test_remediation_without_evidence_cannot_be_confirmed(self):
+        diagnosis = self._create_binding_guard_diagnosis("review")
+        created = self.client.post(
+            "/api/remediation-tasks",
+            json={
+                "diagnosisId": diagnosis["id"], "recommendationIndex": 2,
+                "sourceRecommendationId": "rec_review", "metricId": "M_COST",
+                "title": "Review before action", "metric": "cost_ratio",
+                "requiresEvidenceReview": True,
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(created.status_code, 200, created.text)
+        task = created.json()
+        self.assertTrue(task["requiresEvidenceReview"])
+        self.assertEqual(task["evidenceIds"], [])
+        patch = self.client.patch(
+            f"/api/remediation-tasks/{task['id']}",
+            json={
+                "status": "confirmed", "action": "Review evidence first",
+                "ownerDepartment": "Operations", "ownerName": "Tester",
+                "dueDate": "2026-07-01",
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(patch.status_code, 409)
+
     def test_task_direction_history_and_review_are_metadata_driven(self):
         initial = {
             "schemaVersion": "diagnosis-v2", "orgId": "BR_TEST",
@@ -257,6 +392,7 @@ class ApiTests(unittest.TestCase):
             "recommendations": [{
                 "id": "rec_cost", "title": "成本改善", "metric": "综合成本率",
                 "metricId": "M_COST", "direction": "decrease",
+                "evidenceIds": ["ev_task_1"],
             }],
             "limitations": [],
             "evidence": [{
@@ -276,6 +412,7 @@ class ApiTests(unittest.TestCase):
             json={
                 "diagnosisId": diagnosis["id"], "recommendationIndex": 0,
                 "sourceRecommendationId": "rec_cost", "metricId": "M_COST",
+                "evidenceIds": ["ev_task_1"],
                 "title": "降低综合成本率", "metric": "综合成本率",
                 "currentValue": 1.10, "targetValue": 1.00,
             },
@@ -323,6 +460,138 @@ class ApiTests(unittest.TestCase):
             (task["id"],),
         )
         self.assertEqual([item["to_status"] for item in history], ["draft", "confirmed"])
+
+    def _create_review_case_diagnosis(
+        self, suffix, period, metric, metric_id, direction, value, benchmark=None
+    ):
+        payload = {
+            "schemaVersion": "diagnosis-v2", "orgId": f"BR_REVIEW_{suffix}",
+            "branch": f"Review Direction Branch {suffix}", "period": period,
+            "dataVersion": f"review-data-{suffix}-{period}", "ruleVersion": "rules-review",
+            "riskLevel": "attention", "summary": "review case",
+            "facts": [], "inferences": [], "investigations": [],
+            "recommendations": [{
+                "id": f"rec_{suffix}", "title": "review recommendation",
+                "metric": metric, "metricId": metric_id, "direction": direction,
+                "evidenceIds": [f"ev_{suffix}_{period}"],
+            }],
+            "limitations": [],
+            "evidence": [{
+                "id": f"ev_{suffix}_{period}", "metric": metric, "metricId": metric_id,
+                "label": metric, "currentValue": value, "benchmarkValue": benchmark,
+                "differenceValue": None, "unit": "%", "source": "test",
+                "direction": direction, "benchmarkType": "target" if direction == "target" else "overall",
+                "calculationVersion": "calc-v1",
+            }],
+        }
+        response = self.client.post("/api/diagnoses", json=payload, headers=self.headers)
+        self.assertEqual(response.status_code, 200, response.text)
+        return response.json()
+
+    def _create_task_for_review_case(self, suffix, diagnosis, metric, metric_id, current_value, target_value=None):
+        response = self.client.post(
+            "/api/remediation-tasks",
+            json={
+                "diagnosisId": diagnosis["id"], "sourceRecommendationId": f"rec_{suffix}",
+                "metricId": metric_id, "evidenceIds": [f"ev_{suffix}_{diagnosis['period']}"],
+                "title": "review task", "metric": metric,
+                "currentValue": current_value, "targetValue": target_value,
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        return response.json()
+
+    def test_remediation_review_uses_backend_direction_for_all_direction_types(self):
+        cases = [
+            ("review_decrease", "review_cost", "M_REVIEW_DECREASE", "decrease", 1.10, 0.95, 1.00),
+            ("review_increase", "review_profit", "M_REVIEW_INCREASE", "increase", 100, 115, 110),
+            ("review_target", "review_attainment", "M_REVIEW_TARGET", "target", 0.80, 0.95, None),
+            ("review_neutral", "review_staff", "M_REVIEW_NEUTRAL", "neutral", 100, 130, None),
+        ]
+        from backend import app as app_module
+        from backend.domain import classify_review
+        for suffix, metric, metric_id, direction, previous, current, target in cases:
+            initial = self._create_review_case_diagnosis(
+                suffix, "2026-05", metric, metric_id, direction, previous, target or 1.0
+            )
+            task = self._create_task_for_review_case(
+                suffix, initial, metric, metric_id, previous, target
+            )
+            app_module.db.execute(
+                "UPDATE remediation_tasks SET direction=? WHERE id=?",
+                ("increase" if direction != "increase" else "decrease", task["id"]),
+            )
+            followup = self._create_review_case_diagnosis(
+                suffix, "2026-06", metric, metric_id, direction, current, target or 1.0
+            )
+            review = self.client.post(
+                f"/api/remediation-tasks/{task['id']}/reviews",
+                json={"diagnosisId": followup["id"]}, headers=self.headers,
+            )
+            self.assertEqual(review.status_code, 200, review.text)
+            result = review.json()
+            expected = classify_review(previous, current, direction, target or 1.0)
+            self.assertEqual(result["result"], expected["result"])
+            if direction == "target":
+                self.assertAlmostEqual(result["previousTargetDistance"], 0.20)
+                self.assertAlmostEqual(result["currentTargetDistance"], 0.05)
+                self.assertAlmostEqual(result["targetDistanceChange"], 0.15)
+
+    def test_remediation_review_falls_back_to_metric_catalog_when_metadata_is_missing(self):
+        metric = "时间进度计划达成率"
+        metric_id = "M_PREMIUM_TIME_PROGRESS_ATTAINMENT"
+        initial = {
+            "schemaVersion": "diagnosis-v2", "orgId": "BR_REVIEW_CATALOG",
+            "branch": "Review Catalog Branch", "period": "2026-05",
+            "dataVersion": "review-catalog-1", "ruleVersion": "rules-review",
+            "riskLevel": "attention", "summary": "catalog fallback",
+            "facts": [], "inferences": [], "investigations": [],
+            "recommendations": [], "limitations": [],
+            "evidence": [{
+                "id": "ev_review_catalog_1", "metric": metric, "metricId": metric_id,
+                "label": metric, "currentValue": 0.80, "benchmarkValue": 1.0,
+                "unit": "%", "source": "test", "calculationVersion": "calc-v1",
+            }],
+        }
+        diagnosis = self.client.post("/api/diagnoses", json=initial, headers=self.headers)
+        self.assertEqual(diagnosis.status_code, 200, diagnosis.text)
+        diagnosis = diagnosis.json()
+        from backend import app as app_module
+        from backend.domain import now_iso
+        task_id = "task_review_catalog"
+        timestamp = now_iso()
+        app_module.db.execute(
+            """INSERT INTO remediation_tasks
+            (id,diagnosis_id,recommendation_index,source_recommendation_id,org_id,metric_id,
+             branch,period,title,risk_metrics,description,action,owner_department,owner_name,
+             due_date,current_value,target_value,metric,direction,evidence_ids,binding_reason,
+             requires_evidence_review,status,created_by,created_at,updated_by,updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                task_id, diagnosis["id"], None, None, diagnosis["orgId"], metric_id,
+                diagnosis["branch"], diagnosis["period"], "catalog fallback review",
+                "[]", "", "", None, None, None, 0.80, None, metric, "increase",
+                "[]", None, 0, "draft", "tester", timestamp, "tester", timestamp,
+            ),
+        )
+        followup = dict(initial)
+        followup.update({"period": "2026-06", "dataVersion": "review-catalog-2"})
+        followup["evidence"] = [dict(initial["evidence"][0], **{
+            "id": "ev_review_catalog_2", "currentValue": 0.95,
+        })]
+        followup_response = self.client.post("/api/diagnoses", json=followup, headers=self.headers)
+        self.assertEqual(followup_response.status_code, 200, followup_response.text)
+        review = self.client.post(
+            f"/api/remediation-tasks/{task_id}/reviews",
+            json={"diagnosisId": followup_response.json()["id"]}, headers=self.headers,
+        )
+        self.assertEqual(review.status_code, 200, review.text)
+        result = review.json()
+        self.assertEqual(result["result"], "明显改善")
+        self.assertAlmostEqual(result["previousTargetDistance"], 0.20)
+        self.assertAlmostEqual(result["currentTargetDistance"], 0.05)
+        self.assertAlmostEqual(result["targetDistanceChange"], 0.15)
 
 
     def test_agent_run_wait_resume_and_cancel_contract(self):
@@ -472,6 +741,10 @@ class ApiTests(unittest.TestCase):
             "numericAccuracy": 0.995, "evidenceValidityRate": 1.0,
             "organizationIsolationRate": 1.0, "unsupportedFactRate": 0.0,
             "relevanceRate": 0.95, "recommendationCompletenessRate": 0.96,
+            "recommendationEvidenceBindingRate": 1.0,
+            "causalSafetyRate": 1.0,
+            "remediationActionabilityRate": 0.96,
+            "metricDirectionConsistencyRate": 1.0,
             "specificityRate": 0.95, "fallbackSuccessRate": 1.0,
             "criticalViolations": 0,
         }
@@ -490,12 +763,46 @@ class ApiTests(unittest.TestCase):
             "/api/release-gates",
             json={
                 "evaluationRunId": eval_id,
-                "datasetVersion": "reliability-200-v1",
+                "datasetVersion": "reliability-200-v2",
             },
             headers=self.headers,
         )
         self.assertEqual(gate.status_code, 200, gate.text)
         self.assertTrue(gate.json()["passed"])
+
+        blocked_eval_id = "eval_release_gate_missing_new_metrics"
+        blocked_metrics = {
+            "numericAccuracy": 0.995, "evidenceValidityRate": 1.0,
+            "organizationIsolationRate": 1.0, "unsupportedFactRate": 0.0,
+            "relevanceRate": 0.95, "recommendationCompletenessRate": 0.96,
+            "specificityRate": 0.95, "fallbackSuccessRate": 1.0,
+            "criticalViolations": 0,
+        }
+        app_module.db.execute(
+            """INSERT INTO evaluation_runs
+            (id,status,model,temperature,prompt_version,schema_version,total_cases,
+             completed_cases,metrics,gate_passed,created_by,created_at,completed_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                blocked_eval_id, "completed", "test", 0.0, "p1", "s1", 200, 200,
+                app_module.db.dump(blocked_metrics), 0, "tester",
+                "2026-06-19T00:00:02+00:00", "2026-06-19T00:00:03+00:00",
+            ),
+        )
+        blocked_gate = self.client.post(
+            "/api/release-gates",
+            json={
+                "evaluationRunId": blocked_eval_id,
+                "datasetVersion": "reliability-200-v2",
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(blocked_gate.status_code, 200, blocked_gate.text)
+        self.assertFalse(blocked_gate.json()["passed"])
+        self.assertIn(
+            "missing_metric:recommendationEvidenceBindingRate",
+            blocked_gate.json()["blockers"],
+        )
 
 
 if __name__ == "__main__":

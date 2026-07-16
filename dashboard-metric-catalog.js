@@ -1,0 +1,147 @@
+(function(){
+'use strict';
+var root=window.App=window.App||{};
+var VERSION='metric-catalog-v1';
+function metric(config){return Object.assign({
+  aliases:[],targetValue:null,planField:null,planPeriod:null,planValueScope:null,
+  ownerDepartment:'经营管理部',ownerRole:'经营管理',remediationApplicable:true,
+  reviewCycle:'monthly',validLevels:['branch','region','national'],
+  aggregateMethod:'none',displayPrecision:2,evidencePrecision:2,
+  trendThreshold:0.05,calculationVersion:'calc-v1',metadataVersion:VERSION,
+  description:'',businessMeaning:'',limitations:[]
+},config);}
+function annualPlan(config){
+  return Object.assign({targetType:'annual_plan',planPeriod:'year',planValueScope:'annual'},config);
+}
+root.METRIC_CATALOG_VERSION=VERSION;
+root.METRIC_CATALOG={
+  '保费实际合计':metric(annualPlan({
+    metricId:'M_PREMIUM_TOTAL',key:'保费实际合计',label:'保费实际合计',
+    aliases:['保费','保费收入','保费规模','业务规模'],category:'amount',group:'保费',unit:'万元',
+    direction:'increase',benchmarkStrategy:'plan',planField:'保费年度计划',
+    ownerDepartment:'业务管理部',ownerRole:'业务经营负责人',aggregateMethod:'sum',
+    description:'用于衡量机构累计保费实际完成规模。'
+  })),
+  '经营利润':metric(annualPlan({
+    metricId:'M_OPERATING_PROFIT',key:'经营利润',label:'经营利润',
+    aliases:['利润','盈利','经营结果'],category:'amount',group:'效益',unit:'万元',
+    direction:'increase',benchmarkStrategy:'plan',planField:'经营利润年度计划',
+    ownerDepartment:'经营管理部',aggregateMethod:'sum',
+    description:'用于衡量机构累计经营利润。'
+  })),
+  '当月经营利润':metric({
+    metricId:'M_MONTHLY_OPERATING_PROFIT',key:'当月经营利润',label:'当月经营利润',
+    aliases:['当月利润','月度利润'],category:'amount',group:'效益',unit:'万元',
+    direction:'increase',benchmarkStrategy:'prior',targetType:'none',
+    ownerDepartment:'经营管理部',aggregateMethod:'sum',remediationApplicable:true
+  }),
+  '综合成本率实际（整体利润口径）':metric({
+    metricId:'M_COMBINED_RATIO',key:'综合成本率实际（整体利润口径）',label:'综合成本率',
+    aliases:['综合成本率','成本率','综合成本'],category:'ratio',group:'效益',unit:'%',
+    direction:'decrease',benchmarkStrategy:'weightedOverall',targetType:'plan',
+    planField:'综合成本率计划（整体利润口径）',ownerDepartment:'经营管理部',
+    aggregateMethod:'weightedAverage',trendThreshold:0.02
+  }),
+  '已赚赔付率实际':metric({
+    metricId:'M_EARNED_LOSS_RATIO',key:'已赚赔付率实际',label:'已赚赔付率',
+    aliases:['赔付率','已赚赔付率','理赔赔付率'],category:'ratio',group:'效益',unit:'%',
+    direction:'decrease',benchmarkStrategy:'weightedOverall',targetType:'target',
+    ownerDepartment:'理赔管理部',aggregateMethod:'weightedAverage',trendThreshold:0.02
+  }),
+  '已赚费用率实际':metric({
+    metricId:'M_EARNED_EXPENSE_RATIO',key:'已赚费用率实际',label:'已赚费用率',
+    aliases:['费用率','已赚费用率'],category:'ratio',group:'效益',unit:'%',
+    direction:'decrease',benchmarkStrategy:'weightedOverall',targetType:'target',
+    ownerDepartment:'经营管理部',aggregateMethod:'weightedAverage',trendThreshold:0.02
+  }),
+  '时间进度计划达成率':metric({
+    metricId:'M_PREMIUM_TIME_PROGRESS_ATTAINMENT',key:'时间进度计划达成率',label:'保费达成率',
+    aliases:['保费达成率','时间进度计划达成率','保费时间进度'],category:'attainment',group:'保费',unit:'%',
+    direction:'target',benchmarkStrategy:'target',targetType:'time_progress',targetValue:1,
+    planField:'保费年度计划',planPeriod:'year',planValueScope:'annual',
+    ownerDepartment:'业务管理部',aggregateMethod:'weightedAverage',trendThreshold:0.02
+  }),
+  '时间进度达成率':metric({
+    metricId:'M_PROFIT_TIME_PROGRESS_ATTAINMENT',key:'时间进度达成率',label:'利润达成率',
+    aliases:['利润达成率','利润时间进度','时间进度达成率'],category:'attainment',group:'效益',unit:'%',
+    direction:'target',benchmarkStrategy:'target',targetType:'time_progress',targetValue:1,
+    planField:'经营利润年度计划',planPeriod:'year',planValueScope:'annual',
+    ownerDepartment:'经营管理部',aggregateMethod:'weightedAverage',trendThreshold:0.02
+  })
+};
+[
+  ['前台人力成本预算执行率','M_FRONT_HR_COST_BUDGET_EXECUTION','前台成本执行率'],
+  ['后台人力成本预算执行率','M_BACK_HR_COST_BUDGET_EXECUTION','后台成本执行率'],
+  ['整体人力成本预算执行率','M_TOTAL_HR_COST_BUDGET_EXECUTION','整体成本执行率'],
+  ['前台人力成本保费率计划执行率','M_FRONT_HR_COST_PREMIUM_EXECUTION','前台保费率执行率'],
+  ['后台人力成本保费率计划执行率','M_BACK_HR_COST_PREMIUM_EXECUTION','后台保费率执行率'],
+  ['整体人力成本保费率计划执行率','M_TOTAL_HR_COST_PREMIUM_EXECUTION','整体保费率执行率'],
+  ['前台人员计划执行率','M_FRONT_STAFF_PLAN_EXECUTION','前台执行率'],
+  ['后台人员计划执行率','M_BACK_STAFF_PLAN_EXECUTION','后台执行率'],
+  ['整体人员计划执行率','M_TOTAL_STAFF_PLAN_EXECUTION','整体执行率']
+].forEach(function(row){
+  root.METRIC_CATALOG[row[0]]=metric({
+    metricId:row[1],key:row[0],label:row[2],aliases:[row[2],row[0]],
+    category:'execution',group:row[0].indexOf('人员')>=0?'人员':'效能',unit:'%',
+    direction:'target',benchmarkStrategy:'target',targetType:'fixed',targetValue:1,
+    ownerDepartment:row[0].indexOf('人员')>=0?'人力资源部':'经营管理部',
+    aggregateMethod:'weightedAverage',trendThreshold:0.02
+  });
+});
+[
+  ['前台人力成本保费率实际','M_FRONT_HR_COST_PREMIUM_RATIO','前台保费率(实际)'],
+  ['后台人力成本保费率实际','M_BACK_HR_COST_PREMIUM_RATIO','后台保费率(实际)'],
+  ['整体人力成本保费率实际','M_TOTAL_HR_COST_PREMIUM_RATIO','整体保费率(实际)']
+].forEach(function(row){
+  root.METRIC_CATALOG[row[0]]=metric({
+    metricId:row[1],key:row[0],label:row[2],aliases:[row[2],row[0],'人力成本保费率'],
+    category:'ratio',group:'效能',unit:'%',direction:'decrease',
+    benchmarkStrategy:'weightedOverall',targetType:'plan',ownerDepartment:'人力资源部',
+    aggregateMethod:'weightedAverage',trendThreshold:0.02
+  });
+});
+[
+  ['前台人均产能实际','M_FRONT_PRODUCTIVITY_ACTUAL','前台产能(实际)','前台人均产能计划'],
+  ['后台人均产能实际','M_BACK_PRODUCTIVITY_ACTUAL','后台产能(实际)','后台人均产能计划'],
+  ['整体人均产能实际','M_TOTAL_PRODUCTIVITY_ACTUAL','整体产能(实际)','整体人均产能计划'],
+  ['前台人均利润实际','M_FRONT_PROFIT_PER_CAPITA_ACTUAL','前台人均利润(实际)','前台人均利润计划'],
+  ['后台人均利润实际','M_BACK_PROFIT_PER_CAPITA_ACTUAL','后台人均利润(实际)','后台人均利润计划'],
+  ['整体人均利润实际','M_TOTAL_PROFIT_PER_CAPITA_ACTUAL','整体人均利润(实际)','整体人均利润计划']
+].forEach(function(row){
+  root.METRIC_CATALOG[row[0]]=metric(annualPlan({
+    metricId:row[1],key:row[0],label:row[2],aliases:[row[2],row[0]],
+    category:'productivity',group:'效能',unit:'万元/人',direction:'increase',
+    benchmarkStrategy:'median',planField:row[3],ownerDepartment:'人力资源部',
+    aggregateMethod:'weightedAverage'
+  }));
+});
+[
+  ['前台人员实际','M_FRONT_STAFF_ACTUAL','前台实际','前台人员计划'],
+  ['后台人员实际','M_BACK_STAFF_ACTUAL','后台实际','后台人员计划'],
+  ['整体人员实际','M_TOTAL_STAFF_ACTUAL','整体实际','整体人员计划'],
+  ['前台平均人数','M_FRONT_STAFF_AVERAGE','前台平均','前台人员计划'],
+  ['后台平均人数','M_BACK_STAFF_AVERAGE','后台平均','后台人员计划'],
+  ['整体平均人数','M_TOTAL_STAFF_AVERAGE','整体平均','整体人员计划']
+].forEach(function(row){
+  root.METRIC_CATALOG[row[0]]=metric({
+    metricId:row[1],key:row[0],label:row[2],aliases:[row[2],row[0],'人员数量','人数'],
+    category:'count',group:'人员',unit:'人',direction:'neutral',
+    benchmarkStrategy:'plan',targetType:'plan',planField:row[3],ownerDepartment:'人力资源部',
+    remediationApplicable:false,aggregateMethod:'sum',
+    description:'人员数量为中性监测指标，应结合人均产能、人均利润和人力成本率判断。'
+  });
+});
+[
+  ['保费年度计划','M_PREMIUM_ANNUAL_PLAN','保费年度计划','保费'],
+  ['经营利润年度计划','M_OPERATING_PROFIT_ANNUAL_PLAN','利润年度计划','效益'],
+  ['综合成本率计划（整体利润口径）','M_COMBINED_RATIO_PLAN','综合成本率计划','效益']
+].forEach(function(row){
+  root.METRIC_CATALOG[row[0]]=metric(annualPlan({
+    metricId:row[1],key:row[0],label:row[2],aliases:[row[2],row[0]],
+    category:'budget',group:row[3],unit:row[0].indexOf('率')>=0?'%':'万元',
+    direction:'neutral',benchmarkStrategy:'none',targetType:'none',
+    remediationApplicable:false,aggregateMethod:row[0].indexOf('率')>=0?'weightedAverage':'sum',
+    description:'计划或预算字段为参照对象，不作为直接整改指标。'
+  }));
+});
+})();

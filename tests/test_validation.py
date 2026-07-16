@@ -71,6 +71,85 @@ class ValidationTests(unittest.TestCase):
         self.assertTrue(score.evidence_success)
         self.assertFalse(score.critical_violations)
 
+    def test_evaluation_score_blocks_weak_release_gate_dimensions(self):
+        case = {
+            "category": "remediation",
+            "goal": "Branch A high risk remediation",
+            "inputSnapshot": {
+                "value": 0.95,
+                "metricId": "M_COST",
+                "metricDirection": "decrease",
+            },
+            "requiredMetrics": [{
+                "metricId": "M_COST",
+                "direction": "decrease",
+            }],
+            "requiredEvidence": ["ev_1"],
+            "expectedRecommendations": ["reduce cost leakage"],
+            "forbiddenConclusions": ["directly caused"],
+        }
+        score = score_evaluation_output(
+            {
+                "summary": "Branch A high risk is directly caused by cost.",
+                "evidenceIds": ["ev_1"],
+                "recommendations": [{
+                    "id": "rec_1",
+                    "metricId": "M_PROFIT",
+                    "direction": "increase",
+                    "action": "optimize process",
+                    "evidenceIds": ["ev_fake"],
+                }],
+            },
+            case,
+        )
+        self.assertFalse(score.recommendation_evidence_binding_success)
+        self.assertFalse(score.causal_safety_success)
+        self.assertFalse(score.remediation_actionability_success)
+        self.assertFalse(score.metric_direction_success)
+        self.assertIn("recommendation_evidence_mismatch", score.critical_violations)
+        self.assertIn("causal_claim", score.critical_violations)
+        self.assertIn("vague_recommendation", score.critical_violations)
+        self.assertIn("metric_direction_error", score.critical_violations)
+
+    def test_evaluation_score_accepts_actionable_bound_recommendation(self):
+        case = {
+            "category": "remediation",
+            "goal": "Branch A cost remediation",
+            "inputSnapshot": {
+                "value": 0.95,
+                "metricId": "M_COST",
+                "metricDirection": "decrease",
+            },
+            "requiredMetrics": [{
+                "metricId": "M_COST",
+                "direction": "decrease",
+            }],
+            "requiredEvidence": ["ev_1"],
+            "expectedRecommendations": ["review claim expense mix"],
+            "forbiddenConclusions": [],
+        }
+        score = score_evaluation_output(
+            {
+                "summary": "Branch A cost risk needs verified follow-up.",
+                "evidenceIds": ["ev_1"],
+                "recommendations": [{
+                    "id": "rec_1",
+                    "metricId": "M_COST",
+                    "direction": "decrease",
+                    "action": "review claim expense mix by product line and close gaps",
+                    "ownerRole": "operations lead",
+                    "period": "2026-Q3",
+                    "evidenceIds": ["ev_1"],
+                }],
+            },
+            case,
+        )
+        self.assertTrue(score.recommendation_evidence_binding_success)
+        self.assertTrue(score.causal_safety_success)
+        self.assertTrue(score.remediation_actionability_success)
+        self.assertTrue(score.metric_direction_success)
+        self.assertNotIn("recommendation_evidence_mismatch", score.critical_violations)
+
     def test_report_rejects_wrong_unit_and_direction(self):
         payload = {
             "summary": "综合成本率需要改善。",

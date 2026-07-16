@@ -44,12 +44,18 @@ function build(){
   var result={};
   (App.FIELDS||[]).forEach(function(field){
     var category=classify(field),dir=direction(field,category);
-    result[field.k]={
+    var inferred={
       metricId:'M_'+slug(field.k),key:field.k,label:field.l||field.k,unit:field.u||'',
       category:category,direction:dir,benchmarkStrategy:benchmark(field,category),
       planField:planField(field),trendThreshold:category==='ratio'||category==='attainment'?0.02:0.05,
       evidencePrecision:field.u==='%'?1:2,calculationVersion:'calc-v1'
     };
+    var catalog=(App.METRIC_CATALOG&&App.METRIC_CATALOG[field.k])||null;
+    result[field.k]=Object.assign({},inferred,catalog||{},{
+      key:field.k,
+      label:(catalog&&catalog.label)||field.l||field.k,
+      unit:(catalog&&catalog.unit!=null)?catalog.unit:(field.u||'')
+    });
   });
   return result;
 }
@@ -70,6 +76,8 @@ function benchmarkFor(name,metricKey){
   if(type==='weightedOverall'){
     value=App.DATA.national&&Number(App.DATA.national[metricKey]);
     label='全国加权值';
+  }else if(type==='target'&&meta.targetValue!=null){
+    value=Number(meta.targetValue);label='目标值';
   }else if(type==='plan'&&meta.planField&&data[meta.planField]!=null){
     value=Number(data[meta.planField]);label='自身年度计划';
   }else if(type==='median'){

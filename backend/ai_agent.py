@@ -14,17 +14,8 @@ MAX_TOKENS = int(os.environ.get("ZAI_MAX_TOKENS", "4096"))
 
 
 def _get_api_key():
-    """动态获取 API Key，优先环境变量，fallback 注册表"""
-    key = os.environ.get("ZAI_API_KEY", "")
-    if key and key != "autoclaw-internal-proxy":
-        return key
-    try:
-        import winreg
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Environment") as _key:
-            val, _ = winreg.QueryValueEx(_key, "ZAI_API_KEY")
-            return val
-    except Exception:
-        return key
+    """Load API key only from the current process environment."""
+    return os.environ.get("ZAI_API_KEY", "").strip()
 
 
 ZHIPU_API_KEY = _get_api_key()

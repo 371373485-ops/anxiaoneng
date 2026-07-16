@@ -25,7 +25,7 @@ services:
       DATABASE_URL: postgresql://diagnosis:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@db:5432/diagnosis
       PROXY_SHARED_SECRET: ${PROXY_SHARED_SECRET:?PROXY_SHARED_SECRET is required}
       AI_ENABLED: "false"
-      ZAI_API_KEY: ${ZAI_API_KEY:-}
+      ZAI_API_KEY: ""
       ZHIPU_MODEL: ${ZHIPU_MODEL:-glm-4-flash}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8080}
       SERVE_FRONTEND: "true"

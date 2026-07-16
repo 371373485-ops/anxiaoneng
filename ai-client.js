@@ -1,14 +1,13 @@
-// ai-client.js — 前端直连智谱 API（无需后端）
-// Key 分段存储，增加随手翻源码的门槛
+﻿// ai-client.js - browser demo client. API keys must be injected at runtime,
+// never committed to the repository or bundled into share data.
 (function(){
-  var _p1='58ff9cc0d7344a4b8596df01852b8ebc.';
-  var _p2='SD8tLnqWUvlCyaqZ';
   window.AICLIENT={
-    apiKey:_p1+_p2,
+    apiKey:(window.AI_RUNTIME_API_KEY||window.ZAI_API_KEY||''),
     apiUrl:'https://open.bigmodel.cn/api/paas/v4/chat/completions',
     model:'glm-4-flash',
-    // 流式调用，返回 ReadableStream reader
+    // 娴佸紡璋冪敤锛岃繑鍥?ReadableStream reader
     stream:function(messages,onChunk){
+      if(!this.apiKey)return Promise.reject(new Error('AI API Key not configured'));
       return fetch(this.apiUrl,{
         method:'POST',
         headers:{
@@ -22,7 +21,7 @@
           temperature:0.3
         })
       }).then(function(res){
-        if(!res.ok)throw new Error('AI请求失败('+res.status+')');
+        if(!res.ok)throw new Error('AI璇锋眰澶辫触('+res.status+')');
         var reader=res.body.getReader(),decoder=new TextDecoder();
         function read(){
           return reader.read().then(function(done){
@@ -47,8 +46,9 @@
         return read();
       });
     },
-    // 非流式调用，返回完整文本
+    // 闈炴祦寮忚皟鐢紝杩斿洖瀹屾暣鏂囨湰
     chat:function(messages){
+      if(!this.apiKey)return Promise.reject(new Error('AI API Key not configured'));
       return fetch(this.apiUrl,{
         method:'POST',
         headers:{
@@ -61,10 +61,10 @@
           temperature:0.3
         })
       }).then(function(res){
-        if(!res.ok)throw new Error('AI请求失败('+res.status+')');
+        if(!res.ok)throw new Error('AI璇锋眰澶辫触('+res.status+')');
         return res.json();
       }).then(function(data){
-        return data.choices&&data.choices[0]&&data.choices[0].message?data.choices[0].message.content:'（无响应）';
+        return data.choices&&data.choices[0]&&data.choices[0].message?data.choices[0].message.content:'No AI response';
       });
     }
   };

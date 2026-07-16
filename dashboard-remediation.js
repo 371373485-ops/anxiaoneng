@@ -12,10 +12,13 @@ function ensureDiagnosis(){
   return api('/api/diagnoses',{method:'POST',body:JSON.stringify(w.diagnosis)}).then(function(saved){w.diagnosis=Object.assign({},w.diagnosis,saved);return w.diagnosis;});
 }
 function form(recommendation,index){
-  var w=workspace(),diagnosis=w.diagnosis,metric=recommendation.metric||'',evidence=(diagnosis.evidence||[]).find(function(item){return item.metric===metric;});
+  var w=workspace(),diagnosis=w.diagnosis,metric=recommendation.metric||'',evidenceIds=Array.isArray(recommendation.evidenceIds)?recommendation.evidenceIds:[],evidence=(diagnosis.evidence||[]).find(function(item){return evidenceIds.indexOf(item.id)>=0;});
+  if(!evidence&&recommendation.metricId)evidence=(diagnosis.evidence||[]).find(function(item){return item.metricId===recommendation.metricId;});
+  if(!evidence&&metric)evidence=(diagnosis.evidence||[]).find(function(item){return item.metric===metric;});
   var drawer=document.getElementById('diagnosis-drawer');if(!drawer)return;
   drawer.classList.add('open');
   drawer.innerHTML='<button class="drawer-close" onclick="this.parentNode.classList.remove(\'open\')">×</button><small>整改任务草稿</small><h3>'+esc(recommendation.title||'经营改善任务')+'</h3>'+
+    (recommendation.requiresEvidenceReview?'<div class="recommendation-evidence-warning">需人工补充依据：该建议暂未绑定有效证据，仅可作为草稿。</div>':'')+
     '<div class="task-form"><label>任务标题<input id="task-title" value="'+esc(recommendation.title||'')+'"></label><label>问题描述<textarea id="task-desc">'+esc(recommendation.text||recommendation.action||'')+'</textarea></label><label>整改措施<textarea id="task-action">'+esc(recommendation.action||'')+'</textarea></label>'+
     '<div class="task-form-row"><label>责任部门<input id="task-dept"></label><label>责任人<input id="task-owner"></label></div><div class="task-form-row"><label>完成期限<input id="task-due" type="date"></label><label>目标值<input id="task-target" type="number" step="any"></label></div>'+
     '<button class="btn" onclick="saveRemediationDraft('+index+',\''+esc(metric)+'\','+(evidence&&evidence.currentValue!=null?evidence.currentValue:'null')+')">保存草稿</button></div>';
@@ -31,7 +34,9 @@ window.saveRemediationDraft=function(index,metric,currentValue){
       action:document.getElementById('task-action').value,ownerDepartment:document.getElementById('task-dept').value||null,
       ownerName:document.getElementById('task-owner').value||null,dueDate:document.getElementById('task-due').value||null,
       currentValue:currentValue,targetValue:document.getElementById('task-target').value?Number(document.getElementById('task-target').value):null,
-      metric:metric||null,metricId:rec.metricId||null,sourceRecommendationId:rec.id||null
+      metric:metric||null,metricId:rec.metricId||null,direction:rec.direction||null,
+      evidenceIds:Array.isArray(rec.evidenceIds)?rec.evidenceIds:[],bindingReason:rec.bindingReason||null,
+      requiresEvidenceReview:!!rec.requiresEvidenceReview,sourceRecommendationId:rec.id||null
     })});
   }).then(function(){toast('整改任务草稿已创建','success');document.getElementById('diagnosis-drawer').classList.remove('open');})
     .catch(function(e){toast(e.message,'error');});

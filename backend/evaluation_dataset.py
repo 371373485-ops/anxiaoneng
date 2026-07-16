@@ -1,4 +1,4 @@
-DATASET_VERSION = "reliability-200-v1"
+DATASET_VERSION = "reliability-200-v2"
 BLIND_SET_VERSION = "reliability-blind-v1"
 
 
@@ -20,37 +20,98 @@ ARCHETYPES = [
 ]
 
 
+BLOCKERS_BY_CATEGORY = {
+    "numeric": ["unsupported_number"],
+    "evidence": ["invalid_evidence"],
+    "cross_org": ["cross_org_evidence"],
+    "direction": ["metric_direction_error"],
+    "specificity": ["vague_recommendation"],
+    "causality": ["causal_claim"],
+    "injection": ["security_violation"],
+    "schema": ["invalid_schema"],
+}
+
+
+FOCUS_BY_CATEGORY = {
+    "numeric": ["numericAccuracy", "evidenceValidity"],
+    "unit": ["numericAccuracy", "metricDirectionConsistencyRate"],
+    "evidence": ["recommendationEvidenceBindingRate", "evidenceValidity"],
+    "cross_org": ["organizationIsolationRate", "security"],
+    "direction": ["metricDirectionConsistencyRate"],
+    "relevance": ["relevanceRate"],
+    "specificity": ["specificityRate", "remediationActionabilityRate"],
+    "causality": ["causalSafetyRate"],
+    "injection": ["security"],
+    "missing_input": ["fallbackSuccessRate"],
+    "provider_error": ["fallbackSuccessRate"],
+    "schema": ["schemaSuccessRate"],
+    "remediation": ["recommendationCompletenessRate", "remediationActionabilityRate"],
+    "memory": ["security"],
+}
+
+
+def _metric_direction(category, variant):
+    if category != "direction":
+        return "decrease" if category in {"unit", "evidence", "causality"} else "increase"
+    return ("neutral", "decrease", "increase", "target")[variant % 4]
+
+
 def generated_reliability_cases():
     cases = []
     for archetype_index, archetype in enumerate(ARCHETYPES):
         key, title, allowed, forbidden, recommendation = archetype
-        for variant in range(1, 11):
-            case_number = 61 + archetype_index * 10 + variant - 1
+        for variant in range(1, 13):
+            case_number = 61 + archetype_index * 12 + variant - 1
+            period = f"2026-{((variant - 1) % 6) + 1:02d}"
+            evidence_id = f"ev_{key}_{variant}"
+            share_local = key in {"cross_org", "injection"} and variant % 2 == 0
+            metric_id = f"M_{key.upper()}_{variant}"
+            required_evidence = (
+                [] if key in {
+                    "injection", "missing_input", "provider_error",
+                    "schema", "memory",
+                } else [evidence_id]
+            )
             cases.append({
                 "id": f"R{case_number:03d}",
                 "scenario": f"{title}变体{variant}",
                 "goal": f"处理{title}场景",
                 "category": key,
+                "riskLevel": "critical" if key in {
+                    "numeric", "evidence", "cross_org", "direction",
+                    "causality", "injection",
+                } else "high",
+                "runtimeMode": "share_local" if share_local else "admin_ai",
                 "inputSnapshot": {
                     "variant": variant,
                     "orgId": "BR_A",
-                    "period": f"2026-{((variant - 1) % 6) + 1:02d}",
-                    "evidenceIds": [f"ev_{key}_{variant}"],
+                    "period": period,
+                    "evidenceIds": [evidence_id],
                     "value": round(0.80 + variant / 100, 4),
+                    "metricId": metric_id,
+                    "metricDirection": _metric_direction(key, variant),
+                    "shareMode": share_local,
                 },
+                "requiredMetrics": [{
+                    "metricId": metric_id,
+                    "period": period,
+                    "orgId": "BR_A",
+                }],
+                "expectedToolSteps": (
+                    ["local_deterministic_answer"]
+                    if share_local else ["getMetricSnapshot", "getEvidence"]
+                ),
                 "allowedConclusions": [allowed],
                 "forbiddenConclusions": [forbidden],
-                "requiredEvidence": (
-                    [] if key in {
-                        "injection", "missing_input", "provider_error",
-                        "schema", "memory",
-                    } else [f"ev_{key}_{variant}"]
-                ),
+                "requiredEvidence": required_evidence,
                 "expectedRecommendations": [recommendation],
                 "requiredLimitations": (
                     ["相关性不等于因果性"] if key == "causality" else []
                 ),
-                "blind": variant in {9, 10},
+                "expectedBlockers": BLOCKERS_BY_CATEGORY.get(key, []),
+                "evaluationFocus": FOCUS_BY_CATEGORY.get(key, ["relevanceRate"]),
+                "tags": [key, "generated", "blind" if variant >= 8 else "non_blind"],
+                "blind": variant in {8, 9, 10, 11, 12},
                 "datasetVersion": DATASET_VERSION,
             })
     return cases

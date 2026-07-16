@@ -473,6 +473,92 @@ function _suggestions(lv,pat,cor,lr,cr,pr,prem,pcr,prod,prodR,back,hrCR){
   return selected.slice(0,7);
 }
 
+function _normText(v){
+  return String(v==null?'':v).toLowerCase();
+}
+function _hasAny(text,words){
+  text=_normText(text);
+  return words.some(function(word){return word&&text.indexOf(_normText(word))>=0;});
+}
+function _evidenceRiskScore(ev){
+  var sev={error:100,severe:100,high:90,warn:70,warning:70,attention:50}[ev&&ev.severity]||0;
+  var diff=ev&&ev.differenceValue!=null&&isFinite(Number(ev.differenceValue))?Math.abs(Number(ev.differenceValue)):0;
+  var rank=ev&&ev.rank&&ev.rank.pct!=null?Number(ev.rank.pct):0;
+  return sev*1000000+diff*1000+rank;
+}
+function _sortEvidence(candidates){
+  return candidates.slice().sort(function(a,b){return _evidenceRiskScore(b)-_evidenceRiskScore(a);});
+}
+function _domainWords(domain){
+  return {
+    business:['保费','达成','业务','渠道','险种','收入','规模','计划'],
+    claims:['赔付','理赔','赔款','综合成本','成本率'],
+    efficiency:['人均','人效','产能','人力','编制','后台','前台','效率'],
+    management:['费用','成本','利润','预算','经营','综合成本','管理']
+  }[domain||'management']||['经营','管理'];
+}
+function _textMetricWords(text){
+  var groups=[
+    ['综合成本','成本率','降本','费用率','费用','成本'],
+    ['赔付','理赔','赔款'],
+    ['保费','达成','收入','业务','渠道','险种'],
+    ['利润','盈利','经营结果'],
+    ['人均','人效','产能','人力','编制','后台','前台'],
+    ['进度','时间进度','预算']
+  ];
+  return groups.filter(function(words){return _hasAny(text,words);})
+    .reduce(function(all,words){return all.concat(words);},[]);
+}
+function _evidenceMatchesWords(ev,words){
+  var text=[ev.metric,ev.metricId,ev.label,ev.alertMessage].join(' ');
+  return _hasAny(text,words);
+}
+function _bindRecommendationEvidence(item,evidence){
+  evidence=Array.isArray(evidence)?evidence:[];
+  if(!evidence.length){
+    return {
+      metric:null,metricId:null,direction:'neutral',evidenceIds:[],
+      bindingReason:'no_reliable_evidence',requiresEvidenceReview:true
+    };
+  }
+  var domain=item.domain||'management';
+  var text=[item.title,item.text,item.action,domain].join(' ');
+  var domainWords=_domainWords(domain);
+  var metricWords=_textMetricWords(text);
+  var words=metricWords.length?metricWords:domainWords;
+  var ruleCandidates=_sortEvidence(evidence.filter(function(ev){
+    return ev.ruleId&&(_evidenceMatchesWords(ev,words)||_evidenceMatchesWords(ev,domainWords));
+  }));
+  var domainCandidates=_sortEvidence(evidence.filter(function(ev){
+    return !metricWords.length&&_evidenceMatchesWords(ev,domainWords);
+  }));
+  var keywordCandidates=_sortEvidence(evidence.filter(function(ev){
+    return _evidenceMatchesWords(ev,words);
+  }));
+  var highRiskCandidates=_sortEvidence(evidence.filter(function(ev){
+    return ev.severity&&_evidenceMatchesWords(ev,domainWords);
+  }));
+  var picked=null,reason='no_reliable_evidence';
+  if(ruleCandidates.length){picked=ruleCandidates[0];reason='rule_metric';}
+  else if(domainCandidates.length){picked=domainCandidates[0];reason='domain_core_metric';}
+  else if(keywordCandidates.length){picked=keywordCandidates[0];reason='text_keyword';}
+  else if(highRiskCandidates.length){picked=highRiskCandidates[0];reason='same_domain_high_risk';}
+  if(!picked){
+    return {
+      metric:null,metricId:null,direction:'neutral',evidenceIds:[],
+      bindingReason:reason,requiresEvidenceReview:true
+    };
+  }
+  return {
+    metric:picked.metric||null,
+    metricId:picked.metricId||null,
+    direction:picked.direction||'neutral',
+    evidenceIds:picked.id?[picked.id]:[],
+    bindingReason:reason,
+    requiresEvidenceReview:!picked.id||!picked.metricId
+  };
+}
+
 function _stableHash(value){
   var text=JSON.stringify(value),hash=2166136261;
   for(var i=0;i<text.length;i++){hash^=text.charCodeAt(i);hash=Math.imul(hash,16777619);}
@@ -512,7 +598,7 @@ function _buildDiagnosisModel(bn,alerts){
       id:id,metric:key,metricId:meta.metricId,label:meta.label,currentValue:Number(current),
       benchmarkValue:benchmark.value,differenceValue:benchmark.value==null?null:Number(current)-benchmark.value,
       benchmarkType:benchmark.type,benchmarkLabel:benchmark.label,benchmarkStrategy:benchmark.strategy,
-      direction:meta.direction,unit:meta.unit,source:'dashboard:'+App.currentMonth,
+      direction:meta.direction,unit:meta.unit,category:meta.category,source:'dashboard:'+App.currentMonth,
       ruleId:alert?alert.ruleId:null,calculationVersion:meta.calculationVersion,
       severity:alert?alert.severity:null,alertMessage:alert?alert.msg:null,
       alertThreshold:alert?alert.threshold:null,alertOperator:alert?alert.op:null,
@@ -568,10 +654,11 @@ function _buildDiagnosisModel(bn,alerts){
     patterns:patterns.map(function(p){return {name:p.name,trigger:p.desc,businessMeaning:p.action};}),
     inferences:causes.map(function(text){return {text:text,confidence:'中',evidenceIds:evidenceIds};}),
     investigations:checks.map(function(text){return {text:text,priority:'中',ownerRole:'相关专业部门'};}),
-    recommendations:suggestions.map(function(item,index){
-      var ev=evidence[index%evidence.length];
+    recommendations:suggestions.map(function(item){
+      var binding=_bindRecommendationEvidence(item,evidence);
+      var ev={metric:binding.metric,metricId:binding.metricId,direction:binding.direction,id:(binding.evidenceIds||[])[0]};
       var domainTitle={business:'业务质量改善',claims:'理赔改善',efficiency:'人效改善',management:'管理机制改善'}[item.domain]||'经营改善';
-      return {id:'rec_'+_stableHash([bn,item.term,item.text]),domain:item.domain||'management',title:domainTitle,action:item.text,period:item.term,ownerRole:'经营管理',metric:ev?ev.metric:null,metricId:ev?ev.metricId:null,direction:ev?ev.direction:'neutral',evidenceIds:ev?[ev.id]:[]};
+      return {id:'rec_'+_stableHash([bn,item.term,item.text]),domain:item.domain||'management',title:domainTitle,action:item.text,period:item.term,ownerRole:'经营管理',metric:ev?ev.metric:null,metricId:ev?ev.metricId:null,direction:ev?ev.direction:'neutral',evidenceIds:ev&&ev.id?[ev.id]:[],bindingReason:binding.bindingReason,requiresEvidenceReview:binding.requiresEvidenceReview};
     }),
     limitations:['现有汇总数据仅支持经营假设，确定性根因需结合业务明细核查。'],
     evidence:evidence

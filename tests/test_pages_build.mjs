@@ -12,7 +12,7 @@ const execFile=promisify(execFileCallback);
 const {buildPages}=await import(pathToFileURL(path.join(repo,'scripts/build-pages.mjs')).href);
 const runtime=[
   'chart.umd.min.js','xlsx.full.min.js',
-  'dashboard-data.js','dashboard-config.js','dashboard-compute.js','dashboard-metrics.js',
+  'dashboard-data.js','dashboard-config.js','dashboard-compute.js','dashboard-metric-catalog.js','dashboard-metrics.js',
   'dashboard-charts.js','dashboard-render.js','dashboard-alerts.js','dashboard-share.js',
   'dashboard-trend.js','dashboard-main.js',
   'dashboard-export.js','dashboard-publish.js','dashboard-ai-engine.js','dashboard-metric-dictionary.js','dashboard-query-intent.js','dashboard-search.js','dashboard-report.js','dashboard-diagnosis-index.js','dashboard-ai.js','dashboard-agent.js',
@@ -27,7 +27,7 @@ async function optionalDirectoryEntries(directory,options={}){
 }
 
 async function copyForCleanCheckout(sourceRoot,targetRoot){
-  const files=(await execFile('git',['ls-files','-z'],{cwd:sourceRoot,encoding:'utf8'}))
+  const files=(await execFile('git',['ls-files','--cached','--others','--exclude-standard','-z'],{cwd:sourceRoot,encoding:'utf8'}))
     .stdout.split('\0').filter(Boolean);
   for(const file of files){
     const source=path.join(sourceRoot,file);

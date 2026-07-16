@@ -70,6 +70,10 @@ def run_evaluation(body: EvaluationRunInput, user: Identity = Depends(identity))
     counters = {
         "schemaSuccess": 0, "numericSuccess": 0, "unsupportedConclusion": 0,
         "evidenceSuccess": 0, "recommendationSuccess": 0,
+        "recommendationEvidenceBindingSuccess": 0,
+        "causalSafetySuccess": 0,
+        "remediationActionabilitySuccess": 0,
+        "metricDirectionConsistencySuccess": 0,
         "relevanceSuccess": 0, "specificitySuccess": 0,
         "organizationIsolationSuccess": 0,
         "criticalViolation": 0, "fallbackAttempts": 0, "fallbackSuccess": 0,
@@ -92,6 +96,16 @@ def run_evaluation(body: EvaluationRunInput, user: Identity = Depends(identity))
             counters["numericSuccess"] += int(score.numeric_success)
             counters["evidenceSuccess"] += int(score.evidence_success)
             counters["recommendationSuccess"] += int(score.recommendation_success)
+            counters["recommendationEvidenceBindingSuccess"] += int(
+                score.recommendation_evidence_binding_success
+            )
+            counters["causalSafetySuccess"] += int(score.causal_safety_success)
+            counters["remediationActionabilitySuccess"] += int(
+                score.remediation_actionability_success
+            )
+            counters["metricDirectionConsistencySuccess"] += int(
+                score.metric_direction_success
+            )
             counters["relevanceSuccess"] += int(score.relevance_success)
             counters["specificitySuccess"] += int(score.specificity_success)
             counters["organizationIsolationSuccess"] += int(
@@ -113,7 +127,17 @@ def run_evaluation(body: EvaluationRunInput, user: Identity = Depends(identity))
                     float(score.relevance_success), float(score.specificity_success),
                     float(not score.critical_violations),
                     int(bool(score.critical_violations)),
-                    db.dump({"violations": score.critical_violations}),
+                    db.dump({
+                        "violations": score.critical_violations,
+                        "recommendationEvidenceBinding": (
+                            score.recommendation_evidence_binding_success
+                        ),
+                        "causalSafety": score.causal_safety_success,
+                        "remediationActionability": (
+                            score.remediation_actionability_success
+                        ),
+                        "metricDirectionConsistency": score.metric_direction_success,
+                    }),
                     created_at,
                 ),
             )
@@ -143,6 +167,16 @@ def run_evaluation(body: EvaluationRunInput, user: Identity = Depends(identity))
         "evidenceValidityRate": counters["evidenceSuccess"] / total,
         "organizationIsolationRate": counters["organizationIsolationSuccess"] / total,
         "recommendationCompletenessRate": counters["recommendationSuccess"] / total,
+        "recommendationEvidenceBindingRate": (
+            counters["recommendationEvidenceBindingSuccess"] / total
+        ),
+        "causalSafetyRate": counters["causalSafetySuccess"] / total,
+        "remediationActionabilityRate": (
+            counters["remediationActionabilitySuccess"] / total
+        ),
+        "metricDirectionConsistencyRate": (
+            counters["metricDirectionConsistencySuccess"] / total
+        ),
         "relevanceRate": counters["relevanceSuccess"] / total,
         "specificityRate": counters["specificitySuccess"] / total,
         "unsupportedConclusionRate": counters["unsupportedConclusion"] / total,
@@ -159,6 +193,10 @@ def run_evaluation(body: EvaluationRunInput, user: Identity = Depends(identity))
         and metrics["evidenceValidityRate"] == 1.0
         and metrics["organizationIsolationRate"] == 1.0
         and metrics["recommendationCompletenessRate"] >= 0.95
+        and metrics["recommendationEvidenceBindingRate"] == 1.0
+        and metrics["causalSafetyRate"] == 1.0
+        and metrics["remediationActionabilityRate"] >= 0.95
+        and metrics["metricDirectionConsistencyRate"] == 1.0
         and metrics["relevanceRate"] >= 0.90
         and metrics["specificityRate"] >= 0.95
         and metrics["unsupportedFactRate"] <= 0.01
