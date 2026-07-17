@@ -684,6 +684,10 @@ tr:hover td{background:#f8f9ff}
 
 .btn-sm.warn:hover{background:#fff3e0}
 
+.data-management-subtab.active{background:#1d4ed8;color:#fff;border-color:#1d4ed8;font-weight:700}
+
+.data-management-subtab.active:hover{background:#1e40af}
+
 
 
 .import-time{font-size:10px;color:var(--muted)}
