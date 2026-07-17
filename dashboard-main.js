@@ -165,8 +165,40 @@ function setDataMonth(m){
   else switchTab('overview');
 }
 
+var DATA_MANAGEMENT_TABS={report:1,data:1,guide:1,export:1};
+function renderDataManagementTab(t){
+  if(t==='export')try{renderExportTab();}catch(e3){showError('数据导出渲染失败: '+e3.message);}
+  if(t==='data')try{renderDataTab();}catch(e3){showError('预警规则渲染失败: '+e3.message);}
+  if(t==='guide')try{renderGuideTab();}catch(e3){showError('指标说明渲染失败: '+e3.message);}
+  if(t==='report')try{renderReportTab();}catch(e3){showError('数据查询渲染失败: '+e3.message);}
+}
+function switchDataManagementTab(t){
+  try{
+    if(!DATA_MANAGEMENT_TABS[t])t='report';
+    App.dataManagementTab=t;
+    document.querySelectorAll('.data-management-subtab').forEach(function(btn){
+      btn.classList.toggle('active',btn.getAttribute('data-dm-tab')===t);
+    });
+    document.querySelectorAll('.data-management-pane').forEach(function(pane){
+      pane.classList.toggle('active',pane.id==='data-management-pane-'+t);
+      pane.style.display=pane.id==='data-management-pane-'+t?'':'none';
+    });
+    renderDataManagementTab(t);
+    if(App.shareMode&&typeof applyShareVisibility==='function')applyShareVisibility();
+  }catch(e){
+    showError('数据管理子页切换失败: '+e.message);
+  }
+}
+window.switchDataManagementTab=switchDataManagementTab;
 function switchTab(t){
   try{
+    var dataManagementSubTab=null;
+    if(DATA_MANAGEMENT_TABS[t]){
+      dataManagementSubTab=t;
+      t='data-management';
+    }else if(t==='data-management'){
+      dataManagementSubTab=App.dataManagementTab||'report';
+    }
     // Remove any empty-state overlay first
     var ov=document.querySelector('.empty-overlay');if(ov)ov.remove();
     // Restore tab display if hidden by empty state
@@ -179,11 +211,8 @@ function switchTab(t){
     if(t==='overview')try{renderOverview();}catch(e3){showError('概览渲染失败: '+e3.message);}
     if(t==='regions')try{renderRegions();}catch(e3){showError('责任区渲染失败: '+e3.message);}
     if(t==='branches'){hideBranchDetail();try{renderBranches();}catch(e3){showError('分公司渲染失败: '+e3.message);}}
-    if(t==='export')try{renderExportTab();}catch(e3){showError('数据导出渲染失败: '+e3.message);}
-    if(t==='data')try{renderDataTab();}catch(e3){showError('数据管理渲染失败: '+e3.message);}
-    if(t==='guide')try{renderGuideTab();}catch(e3){showError('指标说明渲染失败: '+e3.message);}
+    if(t==='data-management')switchDataManagementTab(dataManagementSubTab||'report');
     if(t==='ai')try{renderAITab();}catch(e3){showError('AI解读渲染失败: '+e3.message);}
-    if(t==='report')try{renderReportTab();}catch(e3){showError('报告生成渲染失败: '+e3.message);}
     if(t==='trend')try{Trend.render();}catch(e3){showError('趋势渲染失败: '+e3.message);}
     if(App.isCompareMode)try{applyCompareMode();}catch(e3){showError('对比模式注入失败: '+e3.message);}
   }catch(e){

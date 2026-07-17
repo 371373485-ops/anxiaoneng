@@ -297,7 +297,7 @@ var _alertEditId = null; // 当前正在编辑的规则 id
 function renderAlertConfig() {
   var rules = App.ALL_DATA._alertRules || App.DEFAULT_ALERT_RULES;
   
-  var h = '<div class="data-section"><h4>🔔 预警规则设置</h4>';
+  var h = '<div class="data-section"><div style="font-size:20px;font-weight:700;margin:0 0 8px;color:var(--text);line-height:1.4">🔔 预警规则设置</div>';
   h += '<p style="font-size:11px;color:#888;margin:4px 0 12px">规则对<strong>全国汇总 + 所有分公司</strong>同时生效。修改/删除立即生效。编辑需先禁用规则。</p>';
   
   h += '<div class="tbl-wrap"><table><thead><tr><th>指标</th><th>条件</th><th>阈值</th><th>级别</th><th>说明</th><th>操作</th></tr></thead><tbody>';

@@ -868,7 +868,7 @@ window._renderRulesReport = function(){
   }
   var results=App._alertResults||[];
   if(!results.length){
-    ct.innerHTML='<div style="display:flex;align-items:center;justify-content:center;padding:80px 20px;min-height:300px;text-align:center"><div><div style="font-size:48px;margin-bottom:12px">✅</div><div style="font-size:16px;font-weight:600;color:var(--text)">当前无预警触发</div><div style="font-size:12px;color:var(--muted);margin-top:8px">在「数据管理」→ 「预警规则」中启用规则后，切换 Tab 即可自动分析</div></div></div>';
+    ct.innerHTML='<div style="display:flex;align-items:center;justify-content:center;padding:80px 20px;min-height:300px;text-align:center"><div><div style="font-size:48px;margin-bottom:12px">✅</div><div style="font-size:16px;font-weight:600;color:var(--text)">当前无预警触发</div><div style="font-size:12px;color:var(--muted);margin-top:8px">在「数据管理」→ 「预警规则」中启用规则后，切换到「预警诊断」即可自动分析</div></div></div>';
     return;
   }
 

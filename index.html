@@ -223,6 +223,8 @@ tr:hover td{background:#f8f9ff}
 .btn-sm.danger:hover{background:#ffebee}
 .btn-sm.warn{color:#e65100;border-color:#ffcc80}
 .btn-sm.warn:hover{background:#fff3e0}
+.data-management-subtab.active{background:#1d4ed8;color:#fff;border-color:#1d4ed8;font-weight:700}
+.data-management-subtab.active:hover{background:#1e40af}
 .trend-show-btn{padding:6px 16px;border:1px solid #2563eb;border-radius:6px;background:#2563eb;color:#fff;cursor:pointer;font-size:12px;font-weight:600;transition:.15s}
 .trend-show-btn:hover{background:#1d4ed8;border-color:#1d4ed8}
 .trend-show-btn:focus-visible{outline:2px solid #93c5fd;outline-offset:2px}
@@ -392,12 +394,9 @@ td.cmp-delta{transition:background .2s}
 <button onclick="switchTab('regions')">📈 责任区对比<span id="regions-badge" style="display:none;background:#dc2626;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:4px;vertical-align:top">0</span></button>
 <button onclick="switchTab('branches')">📋 各分公司明细<span id="branches-badge" style="display:none;background:#dc2626;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:4px;vertical-align:top">0</span></button>
 
-<button data-share-ai onclick="switchTab('ai')">🧭 智能经营诊断<span id="ai-badge" style="display:none;background:#667eea;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:4px;vertical-align:top">0</span></button>
 <button onclick="switchTab('trend')">📉 趋势分析</button>
-<button onclick="switchTab('report')">🔎 数据查询</button>
-<button data-share-restricted onclick="switchTab('data')">📦 数据管理</button>
-<button onclick="switchTab('guide')">📖 指标说明</button>
-<button data-share-export onclick="switchTab('export')">📥 数据导出（测试）</button>
+<button data-share-ai onclick="switchTab('ai')">🧭 预警诊断<span id="ai-badge" style="display:none;background:#667eea;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:4px;vertical-align:top">0</span></button>
+<button onclick="switchTab('data-management')">🗂️ 数据管理</button>
 </div>
 <div id="alert-bar" class="alert-bar" style="display:none"></div>
 <style>.alert-detail{max-height:60vh;overflow-y:auto;padding:4px 0}.alert-summary:hover{opacity:.85}
@@ -410,9 +409,18 @@ td.cmp-delta{transition:background .2s}
 <div class="main">
 <div id="tab-overview" class="tab active"><div id="overview-kpi" class="kpi-row"></div><div id="overview-sections"></div></div>
 <div id="tab-regions" class="tab"><div id="regions-kpi" class="region-grid"></div><div id="regions-key-table"></div><div id="regions-charts"></div><div id="regions-detail"></div></div>
-<div id="tab-guide" class="tab"></div>
-<div id="tab-data" class="tab"><div id="data-panel"></div><div style="padding:12px 16px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="exportData()">💾 导出备份</button><button class="btn" onclick="exportShareData()" title="导出数据为JSON文件">📤 导出分享数据</button><button class="btn" onclick="encryptShareData()" title="一键加密并下载，用于GitHub Pages分享">🔒 加密分享数据</button><label class="btn-file">📂 恢复备份<input type="file" accept=".json" onchange="importData(this)"></label></div></div>
-<div id="tab-export" class="tab"></div>
+<div id="tab-data-management" class="tab">
+<div class="data-management-subtabs" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+<button class="btn-sm data-management-subtab active" data-dm-tab="report" onclick="switchDataManagementTab('report')">🔎 数据查询</button>
+<button class="btn-sm data-management-subtab" data-share-restricted data-dm-tab="data" onclick="switchDataManagementTab('data')">⚙️ 预警规则</button>
+<button class="btn-sm data-management-subtab" data-dm-tab="guide" onclick="switchDataManagementTab('guide')">📖 指标说明</button>
+<button class="btn-sm data-management-subtab" data-share-export data-dm-tab="export" onclick="switchDataManagementTab('export')">📥 数据导出（测试）</button>
+</div>
+<div id="data-management-pane-report" class="data-management-pane active"><div id="tab-report"></div></div>
+<div id="data-management-pane-data" class="data-management-pane" data-share-restricted style="display:none"><div id="tab-data"><div id="data-panel"></div></div></div>
+<div id="data-management-pane-guide" class="data-management-pane" style="display:none"><div id="tab-guide"></div></div>
+<div id="data-management-pane-export" class="data-management-pane" data-share-export style="display:none"><div id="tab-export"></div></div>
+</div>
 <div id="tab-branches" class="tab">
 <div id="branches-list-view"><div class="search-bar"><input type="text" id="branchSearch" placeholder="搜索分公司..." oninput="renderBranches()"><select id="branchGroup" onchange="renderBranches();if(window.App&&App.isCompareMode&&typeof applyCompareMode==='function')applyCompareMode()"><option value="all">全部指标</option><option value="保费">保费类</option><option value="效益">效益类</option><option value="效能">效能类</option><option value="人员">人员类</option></select><select id="branchRegion" onchange="renderBranches();if(window.App&&App.isCompareMode&&typeof applyCompareMode==='function')applyCompareMode()"><option value="all">全部责任区</option><option value="第一责任区">第一责任区</option><option value="第二责任区">第二责任区</option><option value="第三责任区">第三责任区</option><option value="第四责任区">第四责任区</option></select><span class="hint-text" style="font-size:11px;color:var(--text2);margin-left:8px">点击分公司行查看详情与排名</span></div><div id="branches-table" class="tbl-wrap"></div></div>
 <div id="branch-detail-view" style="display:none"><button class="back-btn" onclick="hideBranchDetail()">← 返回分公司列表</button><div id="branch-detail-content"></div></div>
@@ -433,8 +441,8 @@ td.cmp-delta{transition:background .2s}
 <script src="dashboard-metric-catalog.js?v=20260715-task2"></script>
 <script src="dashboard-metrics.js?v=20260623"></script>
 <script src="dashboard-charts.js?v=202606232050"></script>
-<script src="dashboard-render.js?v=20260623"></script>
-<script src="dashboard-alerts.js?v=20260623"></script>
+<script src="dashboard-render.js?v=20260717-warning-rules-v3"></script>
+<script src="dashboard-alerts.js?v=20260717-warning-rules-title"></script>
 <script src="dashboard-export.js?v=20260623"></script>
 <script src="dashboard-publish.js?v=20260623"></script>
 <script src="ai-client.js?v=20260626"></script>
@@ -443,12 +451,12 @@ td.cmp-delta{transition:background .2s}
 <script src="dashboard-query-intent.js?v=20260710-search-v2"></script>
 <script src="dashboard-search.js?v=20260714-data-query"></script>
 <script src="dashboard-report.js?v=20260714-data-query"></script>
-<script src="dashboard-ai.js?v=20260714-ai-retired"></script>
+<script src="dashboard-ai.js?v=20260717-warning-diagnosis-label"></script>
 <script src="dashboard-diagnosis-index.js?v=20260708-step1"></script>
 <script src="dashboard-agent.js?v=20260623"></script>
 <script src="dashboard-diagnosis.js?v=20260714-ai-retired"></script>
 <script src="dashboard-remediation.js?v=20260623"></script>
 <script src="dashboard-trend.js?v=20260629-annual-dec"></script>
-<script src="dashboard-main.js?v=20260623"></script>
+<script src="dashboard-main.js?v=20260717-data-management-tabs"></script>
 </body>
 </html>

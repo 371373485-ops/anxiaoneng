@@ -614,8 +614,11 @@ function renderDataTab(){
   var impTimes=ad._importTimes||{};
   var h='';
 
-  // 1. Month grid by year
-  h+='<div class="data-section"><h4>📅 实际数据月份概览</h4>';
+  // 1. Alert config
+  h += renderAlertConfig();
+
+  // 2. Data maintenance summary (collapsed by default)
+  h+='<details class="data-section data-month-overview"><summary style="cursor:pointer;font-weight:700;margin:0 0 8px;color:var(--text)">📅 实际数据月份概览</summary>';
   var years={};
   Object.keys(acts).sort().forEach(function(k){
     var parts=k.split('-'),y=parts[0],m=parseInt(parts[1]);
@@ -639,9 +642,9 @@ function renderDataTab(){
       h+='</div></div>';
     });
   }
-  h+='</div>';
+  h+='<div style="height:12px"></div>';
 
-  // 2. Plan versions
+  // 3. Plan versions
   h+='<div class="data-section"><h4>📋 计划版本列表</h4>';
   var planKeys=Object.keys(plans).sort().reverse();
   if(planKeys.length===0){
@@ -660,7 +663,7 @@ function renderDataTab(){
   }
   h+='</div>';
 
-  // 3. Last import time
+  // 4. Last import time
   h+='<div class="data-section"><h4>🕐 最后一次导入时间</h4>';
   var latest=null;
   function chk(t){if(!t)return;try{var d3=new Date(t);if(!latest||d3>latest)latest=d3;}catch(e){}}
@@ -673,7 +676,7 @@ function renderDataTab(){
   }
   h+='</div>';
 
-  // 4. Backup and management actions
+  // 5. Backup and management actions
   h+='<div class="data-section"><h4>备份与分享</h4>';
   h+='<div class="data-actions">';
   h+='<button class="btn-sm" data-share-restricted onclick="exportData()">💾 导出备份</button>';
@@ -683,9 +686,8 @@ function renderDataTab(){
   h+='<button class="btn-sm warn" onclick="confirmClearAll()">🗑️ 清空全部数据</button>';
   h+='<span style="font-size:10px;color:#999;margin-left:8px;align-self:center">清空前建议先导出备份</span>';
   h+='</div></div>';
+  h+='</details>';
 
-  // 5. Alert config
-  h += renderAlertConfig();
   panel.innerHTML=h;
 }
 
